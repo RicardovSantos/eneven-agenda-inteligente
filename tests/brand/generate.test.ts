@@ -163,6 +163,46 @@ describe("generateBrandAssets", () => {
     expect(nearWhiteOpaque).toBe(0);
   });
 
+  it("logo-dark.png recolore o texto escuro para claro e mantém o degradê roxo", async () => {
+    expect(wideFiles).toContain(`${outWide}/logo-dark.png`);
+    const light = await pixels(`${outWide}/logo.png`);
+    const dark = await pixels(`${outWide}/logo-dark.png`);
+    expect(dark.info.width).toBe(light.info.width);
+    expect(dark.info.height).toBe(light.info.height);
+
+    // O texto (#29303C) é a barra à direita; o símbolo (#3E07D2) fica à esquerda.
+    const textPixel = (p: Awaited<ReturnType<typeof pixels>>) => {
+      for (let x = p.info.width - 1; x >= 0; x--) {
+        const c = p.at(x, Math.floor(p.info.height / 2));
+        if (c.a === 255) return { x, c };
+      }
+      throw new Error("sem pixel opaco");
+    };
+    const { x: textX, c: before } = textPixel(light);
+    expect(before.r).toBeLessThan(60); // era escuro
+    const after = dark.at(textX - 5, Math.floor(dark.info.height / 2));
+    expect(after).toEqual({ r: 0xec, g: 0xea, b: 0xf5, a: 255 });
+
+    // Roxo do símbolo intocado (mesmo pixel, mesma cor, mesmo alfa).
+    const sx = 5;
+    const sy = Math.floor(light.info.height * 0.15);
+    expect(light.at(sx, sy)).toEqual({ r: 0x3e, g: 0x07, b: 0xd2, a: 255 });
+    expect(dark.at(sx, sy)).toEqual(light.at(sx, sy));
+
+    // Nenhum pixel opaco fica escuro e sem cor (sem texto "sumindo" no fundo escuro).
+    let stillDark = 0;
+    for (let y = 0; y < dark.info.height; y++) {
+      for (let x = 0; x < dark.info.width; x++) {
+        const c = dark.at(x, y);
+        if (c.a > 200 && c.r < 90 && c.g < 90 && c.b < 90) stillDark++;
+      }
+    }
+    expect(stillDark).toBe(0);
+
+    // O alfa é preservado (fundo transparente continua transparente).
+    expect(dark.at(0, 0).a).toBe(light.at(0, 0).a);
+  });
+
   it("og-default tem o fundo canvas e a assinatura em degradê", async () => {
     const p = await pixels(`${outWide}/og-default.png`);
     expect(p.at(5, 5)).toEqual({ r: 247, g: 246, b: 252, a: 255 });

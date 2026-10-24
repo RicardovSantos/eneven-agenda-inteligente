@@ -3,7 +3,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 import pngToIco from "png-to-ico";
 import sharp from "sharp";
-import { extractLogo, extractSymbol, type Region } from "./crop";
+import { extractLogo, extractSymbol, lightenDarkText, type Region } from "./crop";
 
 export type BrandConfig = {
   /** Região do símbolo (o "E" com o ponto) em frações (0–1) da logo horizontal. */
@@ -128,6 +128,7 @@ export async function generateBrandAssets({
       ),
     ],
     ["logo.png", logo],
+    ["logo-dark.png", await lightenDarkText(logo)],
     ["og-default.png", await ogImage(logo, config)],
   ];
 

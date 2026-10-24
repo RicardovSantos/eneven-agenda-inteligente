@@ -83,3 +83,47 @@ export async function extractSymbol(input: Buffer, region: Region): Promise<Buff
   const cropped = await sharp(input).extract({ left, top, width: w, height: h }).png().toBuffer();
   return trimTransparent(await whiteToTransparent(cropped));
 }
+
+/** Cor do texto da logo no tema escuro (`--ink` escuro). */
+const DARK_TEXT_REPLACEMENT = { r: 0xec, g: 0xea, b: 0xf5 };
+/** Saturação (HSL) abaixo da qual um pixel conta como "cinza" (o texto #29303C tem ~0,19). */
+const GRAY_SATURATION_MAX = 0.3;
+/** Abaixo desta luminância o pixel cinza é texto escuro e vira claro por inteiro. */
+const DARK_LUMINANCE_MAX = 0.35;
+/** Dos 35% a 92% de luminância (borda suavizada do texto) o alfa cai até sumir, sem deixar halo cinza. */
+const FADE_LUMINANCE_END = 0.92;
+
+/**
+ * Versão da logo para o tema escuro: o texto escuro (cinza de baixa saturação
+ * e luminância < 35%) é recolorido para `#ECEAF5`, preservando o alfa. A borda
+ * suavizada do texto vira transparência em vez de cinza. O símbolo e o
+ * degradê roxo/rosa ficam intactos.
+ */
+export async function lightenDarkText(input: Buffer): Promise<Buffer> {
+  const img = await toRgba(input);
+  const { data } = img;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const sum = max + min;
+    if (sum === 0 || sum === 510) continue;
+    const saturation = (max - min) / (sum <= 255 ? sum : 510 - sum);
+    if (saturation >= GRAY_SATURATION_MAX) continue;
+
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    if (luminance >= FADE_LUMINANCE_END) continue;
+
+    data[i] = DARK_TEXT_REPLACEMENT.r;
+    data[i + 1] = DARK_TEXT_REPLACEMENT.g;
+    data[i + 2] = DARK_TEXT_REPLACEMENT.b;
+    if (luminance >= DARK_LUMINANCE_MAX) {
+      const keep =
+        (FADE_LUMINANCE_END - luminance) / (FADE_LUMINANCE_END - DARK_LUMINANCE_MAX);
+      data[i + 3] = Math.round(data[i + 3] * keep);
+    }
+  }
+  return fromRgba(img).png().toBuffer();
+}
