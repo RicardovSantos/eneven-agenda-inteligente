@@ -108,6 +108,41 @@ describe("fluxos de e-mail", () => {
       sendEmailMock.mockRejectedValueOnce(new Error("ZeptoMail 500"));
       await expect(sendVerificationEmail(db, userId, now)).rejects.toThrow("ZeptoMail 500");
     });
+
+    it("se o envio falha, o token recém-emitido é apagado e o intervalo de 60 s não é consumido", async () => {
+      sendEmailMock.mockRejectedValueOnce(new Error("ZeptoMail 500"));
+      await expect(sendVerificationEmail(db, userId, now)).rejects.toThrow("ZeptoMail 500");
+      expect(
+        await db.select().from(emailTokens).where(eq(emailTokens.userId, userId)),
+      ).toHaveLength(0);
+
+      // Tentar de novo na hora funciona (nada de "aguarde um minuto").
+      expect((await sendVerificationEmail(db, userId, seconds(now, 1))).status).toBe("sent");
+    });
+
+    it("reserva o envio com pg_advisory_xact_lock(hashtext(userId:propósito)) em vez de travar a linha do usuário", async () => {
+      const executed: string[] = [];
+      const original = db.transaction.bind(db);
+      vi.spyOn(db, "transaction").mockImplementation(((
+        callback: (tx: Parameters<Parameters<Db["transaction"]>[0]>[0]) => Promise<unknown>,
+        config?: Parameters<Db["transaction"]>[1],
+      ) =>
+        original(async (tx) => {
+          const execute = tx.execute.bind(tx);
+          tx.execute = ((query: Parameters<typeof execute>[0]) => {
+            executed.push(JSON.stringify(query));
+            return execute(query);
+          }) as typeof tx.execute;
+          return callback(tx);
+        }, config)) as unknown as Db["transaction"]);
+
+      await sendVerificationEmail(db, userId, now);
+
+      const lock = executed.find((q) => q.includes("pg_advisory_xact_lock"));
+      expect(lock).toBeDefined();
+      expect(lock).toContain("hashtext");
+      expect(lock).toContain(`${userId}:verify`);
+    });
   });
 
   describe("requestPasswordReset", () => {
@@ -159,6 +194,19 @@ describe("fluxos de e-mail", () => {
       sendEmailMock.mockRejectedValueOnce(new Error("ZeptoMail 500"));
       await expect(requestPasswordReset(db, "ana@defendi.com", now)).resolves.toBeUndefined();
       expect(log).toHaveBeenCalled();
+      log.mockRestore();
+    });
+
+    it("falha no envio apaga o token emitido, e um novo pedido logo depois envia", async () => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      sendEmailMock.mockRejectedValueOnce(new Error("ZeptoMail 500"));
+      await requestPasswordReset(db, "ana@defendi.com", now);
+      expect(
+        await db.select().from(emailTokens).where(eq(emailTokens.userId, userId)),
+      ).toHaveLength(0);
+
+      await requestPasswordReset(db, "ana@defendi.com", seconds(now, 1));
+      expect(sendEmailMock).toHaveBeenCalledTimes(2);
       log.mockRestore();
     });
   });

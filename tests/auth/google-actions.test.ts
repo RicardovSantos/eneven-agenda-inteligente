@@ -2,7 +2,11 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { oauthAccounts, sessions, users } from "@/db/schema";
 import type { Db } from "@/db/types";
-import { signPendingProfile, type GoogleProfile } from "@/server/auth/google";
+import {
+  GOOGLE_PENDING_PURPOSE,
+  signPendingProfile,
+  type GoogleProfile,
+} from "@/server/auth/google";
 import { hashToken } from "@/server/auth/session";
 import { signValue } from "@/server/auth/signed-cookie";
 import { signup } from "@/server/auth/signup";
@@ -25,6 +29,7 @@ vi.mock("next/headers", () => ({
       else state.jar.set(name, value);
     },
   }),
+  headers: async () => new Headers(),
 }));
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
@@ -89,7 +94,12 @@ describe("server actions do Google", () => {
   });
 
   it("sem cookie pendente (ou adulterado/vencido) volta ao cadastro sem criar nada", async () => {
-    for (const value of [null, "lixo", signValue(profile, -1), signValue({ sub: "x" }, 900)]) {
+    for (const value of [
+      null,
+      "lixo",
+      signValue(profile, -1, GOOGLE_PENDING_PURPOSE),
+      signValue({ sub: "x" }, 900, GOOGLE_PENDING_PURPOSE),
+    ]) {
       state.jar.clear();
       if (value) state.jar.set("ea_google_pending", value);
       expect(await redirectOf(actions.completeGoogleSignupAction({}, form(valid)))).toBe(

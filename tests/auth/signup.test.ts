@@ -110,3 +110,20 @@ describe("isUniqueViolation", () => {
     expect(isUniqueViolation(null, "tenants_slug_unique")).toBe(false);
   });
 });
+
+describe("restrição de e-mail em minúsculas", () => {
+  it("o banco recusa e-mail com maiúsculas (check 23514), mesmo sem passar pelo signup", async () => {
+    const db = await createTestDb();
+
+    const error = await db
+      .insert(users)
+      .values({ email: "ANA@Defendi.com", passwordHash: "x", name: "Ana" })
+      .then(
+        () => null,
+        (e: unknown) => e as { cause?: { code?: string; constraint?: string } },
+      );
+
+    expect(error).not.toBeNull();
+    expect(error?.cause?.code).toBe("23514");
+  });
+});

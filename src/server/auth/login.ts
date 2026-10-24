@@ -8,8 +8,15 @@ export function normalizeEmail(email: string): string {
 }
 
 // Hash descartável para gastar o mesmo tempo quando o e-mail não existe
-// (evita descobrir contas pelo tempo de resposta).
-let dummyHash: Promise<string> | undefined;
+// (evita descobrir contas pelo tempo de resposta). Calculado uma vez, ao
+// carregar o módulo, para o primeiro login não ser mais lento que os outros.
+// A falha é tratada aqui mesmo: nada de promessa rejeitada guardada.
+const dummyHash: Promise<string | null> = hashPassword(
+  "senha-descartavel-para-equalizar-tempo",
+).catch((error: unknown) => {
+  console.error("Falha ao preparar o hash descartável do login", error);
+  return null;
+});
 
 /**
  * Confere e-mail e senha. Retorna `{ userId }` ou `null` (sem dizer qual dos
@@ -29,8 +36,8 @@ export async function login(
   // Sem usuário, ou conta só do Google (sem senha): gasta o mesmo tempo de uma
   // conferência de verdade e responde como senha incorreta.
   if (!user || user.passwordHash === null) {
-    dummyHash ??= hashPassword("senha-descartavel-para-equalizar-tempo");
-    await verifyPassword(await dummyHash, password);
+    const hash = await dummyHash;
+    if (hash) await verifyPassword(hash, password);
     return null;
   }
 

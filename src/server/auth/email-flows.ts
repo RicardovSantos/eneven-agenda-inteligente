@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import { memberships, tenants, users } from "@/db/schema";
+import { eq, sql } from "drizzle-orm";
+import { emailTokens, memberships, tenants, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { buildResetEmail, buildVerifyEmail, resetLink, verifyLink } from "@/server/email/templates";
 import { sendEmail } from "@/server/email/send";
@@ -9,14 +9,17 @@ import {
   revokeUnusedEmailTokens,
 } from "./email-tokens";
 import { normalizeEmail } from "./login";
+import { hashToken } from "./session";
 
 /** Intervalo mínimo entre dois e-mails do mesmo tipo para o mesmo usuário. */
 export const RESEND_COOLDOWN_SECONDS = 60;
 
 /**
- * Reserva o envio de um e-mail do usuário: dentro de uma transação, trava a
- * linha do usuário (`FOR UPDATE`, serializa pedidos simultâneos do mesmo
- * usuário), confere o intervalo de 60 s, invalida os links antigos e emite o
+ * Reserva o envio de um e-mail do usuário: dentro de uma transação, pega um
+ * lock consultivo da transação por `userId:propósito`
+ * (`pg_advisory_xact_lock`, serializa pedidos simultâneos do mesmo usuário e
+ * tipo sem travar a linha do usuário, o que evitava deadlock com o consumo do
+ * token), confere o intervalo de 60 s, invalida os links antigos e emite o
  * novo. Devolve `null` se ainda está no intervalo. O e-mail é enviado por
  * quem chama, depois do commit.
  */
@@ -27,7 +30,7 @@ async function reserveToken(
   now: Date,
 ): Promise<string | null> {
   return db.transaction(async (tx) => {
-    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`${userId}:${purpose}`}::text))`);
 
     const last = await lastEmailTokenIssuedAt(tx, userId, purpose);
     if (last !== null && now.getTime() - last.getTime() < RESEND_COOLDOWN_SECONDS * 1000) {
@@ -36,6 +39,29 @@ async function reserveToken(
     await revokeUnusedEmailTokens(tx, userId, purpose);
     return issueEmailToken(tx, userId, purpose, now);
   });
+}
+
+/**
+ * Envia o e-mail do token recém-emitido. Se o envio falhar, apaga o token
+ * (senão ele consumiria o intervalo de 60 s e a pessoa não poderia tentar de
+ * novo na hora) e repassa o erro.
+ */
+async function sendOrDiscardToken(
+  db: Db,
+  token: string,
+  send: () => Promise<void>,
+): Promise<void> {
+  try {
+    await send();
+  } catch (error) {
+    await db
+      .delete(emailTokens)
+      .where(eq(emailTokens.id, hashToken(token)))
+      .catch((cleanupError: unknown) => {
+        console.error("Falha ao descartar o token do e-mail não enviado", cleanupError);
+      });
+    throw error;
+  }
 }
 
 export type SendVerificationResult =
@@ -47,8 +73,9 @@ export type SendVerificationResult =
 /**
  * Envia (ou reenvia) o e-mail de confirmação: invalida os links anteriores
  * ainda não usados, emite um novo e envia. Respeita 1 envio por 60 s por
- * usuário. Se o envio falhar a exceção sobe: no cadastro quem chama engole e
- * registra; no "Reenviar e-mail" mostra uma mensagem.
+ * usuário. Se o envio falhar o token novo é apagado e a exceção sobe: no
+ * cadastro quem chama engole e registra; no "Reenviar e-mail" mostra uma
+ * mensagem.
  */
 export async function sendVerificationEmail(
   db: Db,
@@ -73,14 +100,16 @@ export async function sendVerificationEmail(
 
   const token = await reserveToken(db, userId, "verify", now);
   if (token === null) return { status: "cooldown" };
-  await sendEmail({
-    to: user.email,
-    ...buildVerifyEmail({
-      name: user.name,
-      businessName: user.businessName ?? "seu estabelecimento",
-      link: verifyLink(token),
+  await sendOrDiscardToken(db, token, () =>
+    sendEmail({
+      to: user.email,
+      ...buildVerifyEmail({
+        name: user.name,
+        businessName: user.businessName ?? "seu estabelecimento",
+        link: verifyLink(token),
+      }),
     }),
-  });
+  );
   return { status: "sent", email: user.email };
 }
 
@@ -104,10 +133,12 @@ export async function requestPasswordReset(
 
     const token = await reserveToken(db, user.id, "reset", now);
     if (token === null) return;
-    await sendEmail({
-      to: user.email,
-      ...buildResetEmail({ email: user.email, link: resetLink(token) }),
-    });
+    await sendOrDiscardToken(db, token, () =>
+      sendEmail({
+        to: user.email,
+        ...buildResetEmail({ email: user.email, link: resetLink(token) }),
+      }),
+    );
   } catch (error) {
     console.error("Falha ao enviar o e-mail de redefinição de senha", error);
   }

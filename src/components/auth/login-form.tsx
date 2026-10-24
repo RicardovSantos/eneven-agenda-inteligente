@@ -9,6 +9,9 @@ import { PasswordField } from "./password-field";
 import { SubmitButton } from "./submit-button";
 import { TextField } from "./text-field";
 
+/** Estado de antes do primeiro envio; depois dele o `alert` da URL some. */
+const INITIAL_STATE: AuthFormState = {};
+
 export function LoginForm({
   notice,
   alert,
@@ -22,12 +25,14 @@ export function LoginForm({
 }) {
   const [state, formAction, pending] = useActionState<AuthFormState, FormData>(
     loginAction,
-    {},
+    INITIAL_STATE,
   );
   const [email, setEmail] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   const errors = state.fieldErrors ?? {};
+  // O aviso vindo da URL (?erro=google) vale só até a pessoa tentar de novo.
+  const shownAlert = state === INITIAL_STATE ? alert : undefined;
 
   // Depois de um erro, leva o foco ao campo certo.
   useEffect(() => {
@@ -51,8 +56,8 @@ export function LoginForm({
           className="flex flex-col gap-4"
         >
           {notice ? <FormNotice>{notice}</FormNotice> : null}
-          {(state.error ?? alert) ? (
-            <FormAlert>{state.error ?? alert}</FormAlert>
+          {(state.error ?? shownAlert) ? (
+            <FormAlert>{state.error ?? shownAlert}</FormAlert>
           ) : null}
 
           <TextField

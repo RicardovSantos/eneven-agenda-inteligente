@@ -20,6 +20,7 @@ import {
   SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
   createSession,
+  destroySession,
 } from "@/server/auth/session";
 import { safeEqual } from "@/server/auth/signed-cookie";
 
@@ -100,5 +101,15 @@ async function handle(request: NextRequest, base: string): Promise<Outcome> {
 
   const tenantId = await resolveLoginTenantId(db, result.userId);
   const session = await createSession(db, result.userId, tenantId);
+
+  // Quem já tinha uma sessão neste navegador perde a antiga.
+  const oldSession = request.cookies.get(SESSION_COOKIE)?.value;
+  if (oldSession) {
+    try {
+      await destroySession(db, oldSession);
+    } catch (error) {
+      console.error("Falha ao apagar a sessão antiga", error);
+    }
+  }
   return { to: "/painel", session };
 }

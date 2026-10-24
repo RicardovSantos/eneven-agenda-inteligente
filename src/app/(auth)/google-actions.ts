@@ -3,7 +3,11 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
-import { sessionCookieOptions, setSessionCookie } from "@/server/auth/cookie";
+import {
+  destroyCurrentSession,
+  sessionCookieOptions,
+  setSessionCookie,
+} from "@/server/auth/cookie";
 import { AuthError } from "@/server/auth/errors";
 import {
   GOOGLE_ERROR_MESSAGE,
@@ -13,7 +17,11 @@ import {
   resolveGoogleUser,
 } from "@/server/auth/google";
 import { resolveLoginTenantId } from "@/server/auth/login";
+import { completeGoogleSchema } from "@/server/auth/schemas";
 import { createSession } from "@/server/auth/session";
+import { currentClientIp } from "@/server/security/client-ip";
+import { limitSignup } from "@/server/security/limits";
+import { rateLimitMessage } from "@/server/security/rate-limit";
 import type { AuthFormState } from "./actions";
 
 const GENERIC_ERROR = "Não foi possível concluir agora. Tente novamente em instantes.";
@@ -28,9 +36,10 @@ async function clearPendingCookie(): Promise<void> {
 }
 
 /**
- * "Completar cadastro": relê (e confere a assinatura de) `ea_google_pending`
- * no servidor, cria a conta com o perfil do Google, abre a sessão, apaga o
- * cookie pendente e vai para o painel. Sem cookie válido volta ao cadastro.
+ * "Completar cadastro": relê (e confere a assinatura de) o cookie do perfil
+ * pendente no servidor, cria a conta com o perfil do Google, abre a sessão,
+ * apaga o cookie pendente e vai para o painel. Sem cookie válido volta ao
+ * cadastro.
  */
 export async function completeGoogleSignupAction(
   _previous: AuthFormState,
@@ -38,6 +47,17 @@ export async function completeGoogleSignupAction(
 ): Promise<AuthFormState> {
   const profile = parsePendingProfile((await cookies()).get(GOOGLE_PENDING_COOKIE)?.value);
   if (!profile) redirect("/cadastro");
+
+  // Mesmo limite do cadastro com senha: 5 por hora por IP. Só dados válidos
+  // contam: um erro de digitação não gasta a tentativa.
+  const input = {
+    businessName: field(formData, "businessName"),
+    whatsapp: field(formData, "whatsapp"),
+  };
+  if (completeGoogleSchema.safeParse(input).success) {
+    const limit = limitSignup(await currentClientIp());
+    if (!limit.ok) return { error: rateLimitMessage(limit.retryAfterSec) };
+  }
 
   let token: string;
   try {
@@ -52,12 +72,10 @@ export async function completeGoogleSignupAction(
       const tenantId = await resolveLoginTenantId(db, resolved.userId);
       token = await createSession(db, resolved.userId, tenantId);
     } else {
-      const account = await completeGoogleSignup(db, profile, {
-        businessName: field(formData, "businessName"),
-        whatsapp: field(formData, "whatsapp"),
-      });
+      const account = await completeGoogleSignup(db, profile, input);
       token = await createSession(db, account.userId, account.tenantId);
     }
+    await destroyCurrentSession(db);
   } catch (error) {
     if (error instanceof AuthError) {
       if (error.code === "validation") return { fieldErrors: error.fieldErrors };

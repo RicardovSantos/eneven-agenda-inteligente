@@ -3,8 +3,12 @@ import { NextRequest, type NextResponse } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { memberships, sessions } from "@/db/schema";
 import type { Db } from "@/db/types";
-import { completeGoogleSignup, type GoogleProfile } from "@/server/auth/google";
-import { getSession, hashToken } from "@/server/auth/session";
+import {
+  GOOGLE_PENDING_PURPOSE,
+  completeGoogleSignup,
+  type GoogleProfile,
+} from "@/server/auth/google";
+import { createSession, getSession, hashToken } from "@/server/auth/session";
 import { verifyValue } from "@/server/auth/signed-cookie";
 import { signup } from "@/server/auth/signup";
 import { createTestDb } from "../helpers/test-db";
@@ -149,6 +153,72 @@ describe("rotas do Google", () => {
     });
   });
 
+  describe("em produção (nomes __Host-)", () => {
+    beforeEach(() => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.resetModules();
+    });
+
+    afterEach(() => {
+      // Os nomes dos cookies são fixados ao carregar o módulo: descarta os de produção.
+      vi.resetModules();
+    });
+
+    it("o início grava os cookies do fluxo com prefixo __Host-, Secure e sem Domain", async () => {
+      const { GET } = await import("@/app/api/auth/google/route");
+      const response = await GET(new NextRequest("http://interno:3000/api/auth/google?intent=signup"));
+      for (const [name, value] of [
+        ["__Host-ea_oauth_state", "state-fixo"],
+        ["__Host-ea_oauth_verifier", "verifier-fixo"],
+        ["__Host-ea_oauth_intent", "signup"],
+      ] as const) {
+        expect(response.cookies.get(name)).toMatchObject({
+          value,
+          secure: true,
+          path: "/",
+          httpOnly: true,
+        });
+        expect(response.cookies.get(name)?.domain).toBeUndefined();
+      }
+      expect(response.cookies.get("ea_oauth_state")).toBeUndefined();
+    });
+
+    it("o retorno lê os cookies __Host-, apaga os do fluxo e grava o pendente com __Host-", async () => {
+      const { GET } = await import("@/app/api/auth/google/callback/route");
+      const response = await GET(
+        callbackRequest({
+          query: goodQuery,
+          cookies: {
+            "__Host-ea_oauth_state": "state-fixo",
+            "__Host-ea_oauth_verifier": "verifier-fixo",
+            "__Host-ea_oauth_intent": "signup",
+          },
+        }),
+      );
+      expect(location(response)).toBe(`${APP_URL}/cadastro/completar`);
+      for (const name of [
+        "__Host-ea_oauth_state",
+        "__Host-ea_oauth_verifier",
+        "__Host-ea_oauth_intent",
+      ]) {
+        expect(response.cookies.get(name)).toMatchObject({ value: "", maxAge: 0, secure: true });
+      }
+      const pending = response.cookies.get("__Host-ea_google_pending");
+      expect(pending).toMatchObject({ secure: true, httpOnly: true, path: "/" });
+      expect(verifyValue(pending!.value, GOOGLE_PENDING_PURPOSE)).toMatchObject({
+        sub: "google-sub-1",
+      });
+    });
+
+    it("sem APP_URL não monta a URI de retorno a partir da requisição", async () => {
+      vi.stubEnv("APP_URL", "");
+      const { GET } = await import("@/app/api/auth/google/route");
+      await expect(
+        GET(new NextRequest("http://interno:3000/api/auth/google?intent=signup")),
+      ).rejects.toThrow(/APP_URL/);
+    });
+  });
+
   describe("GET /api/auth/google/callback", () => {
     const call = async (request: NextRequest) => {
       const { GET } = await import("@/app/api/auth/google/callback/route");
@@ -222,7 +292,7 @@ describe("rotas do Google", () => {
 
       const pending = response.cookies.get("ea_google_pending")!;
       expect(pending).toMatchObject({ httpOnly: true, sameSite: "lax", path: "/", maxAge: 900 });
-      expect(verifyValue<GoogleProfile>(pending.value)).toEqual({
+      expect(verifyValue<GoogleProfile>(pending.value, GOOGLE_PENDING_PURPOSE)).toEqual({
         sub: "google-sub-1",
         email: "bia@gmail.com",
         emailVerified: true,
@@ -252,6 +322,23 @@ describe("rotas do Google", () => {
         emailVerified: true,
       });
       expectOauthCookiesCleared(response);
+    });
+
+    it("quem já tinha um cookie de sessão antigo perde a sessão antiga ao entrar", async () => {
+      const account = await completeGoogleSignup(
+        db,
+        { sub: "google-sub-1", email: "bia@gmail.com", emailVerified: true, name: "Bia", picture: null },
+        { businessName: "Studio Bela", whatsapp: "11988887777" },
+      );
+      const old = await createSession(db, account.userId, account.tenantId);
+
+      const response = await call(
+        callbackRequest({ query: goodQuery, cookies: { ...goodCookies, ea_session: old } }),
+      );
+
+      expect(location(response)).toBe(`${APP_URL}/painel`);
+      expect(await getSession(db, old)).toBeNull();
+      expect(await getSession(db, response.cookies.get("ea_session")!.value)).not.toBeNull();
     });
 
     it("e-mail de conta com senha: vincula e entra no único estabelecimento", async () => {

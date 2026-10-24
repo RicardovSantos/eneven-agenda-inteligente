@@ -7,17 +7,21 @@ import { revokeUnusedEmailTokens } from "./email-tokens";
 import { AuthError } from "./errors";
 import { normalizeEmail } from "./login";
 import { completeGoogleSchema, toFieldErrors } from "./schemas";
+import { GOOGLE_PENDING_PURPOSE } from "./cookie-names";
 import { signValue, verifyValue } from "./signed-cookie";
 import { createTenantWithOwner } from "./signup";
 
 export const GOOGLE_PROVIDER = "google";
 export const GOOGLE_SCOPES = ["openid", "email", "profile"];
 
-/** Cookies do fluxo OAuth (vivem 10 min) e o perfil pendente (15 min). */
-export const OAUTH_STATE_COOKIE = "ea_oauth_state";
-export const OAUTH_VERIFIER_COOKIE = "ea_oauth_verifier";
-export const OAUTH_INTENT_COOKIE = "ea_oauth_intent";
-export const GOOGLE_PENDING_COOKIE = "ea_google_pending";
+// Nomes dos cookies do fluxo OAuth e do perfil pendente: ver `cookie-names.ts`.
+export {
+  GOOGLE_PENDING_COOKIE,
+  GOOGLE_PENDING_PURPOSE,
+  OAUTH_INTENT_COOKIE,
+  OAUTH_STATE_COOKIE,
+  OAUTH_VERIFIER_COOKIE,
+} from "./cookie-names";
 export const OAUTH_COOKIE_MAX_AGE_SECONDS = 10 * 60;
 export const GOOGLE_PENDING_MAX_AGE_SECONDS = 15 * 60;
 
@@ -44,9 +48,18 @@ export function isGoogleConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
-/** Endereço público para montar URLs absolutas (atrás de proxy o `request.url` é interno). */
+/**
+ * Endereço público para montar URLs absolutas (atrás de proxy o `request.url`
+ * é interno). Em produção `APP_URL` é obrigatório: a URI de retorno do Google
+ * nunca é montada a partir da origem da requisição. Fora de produção cai na
+ * origem recebida (desenvolvimento em localhost).
+ */
 export function publicBaseUrl(fallbackOrigin: string): string {
-  return (process.env.APP_URL || fallbackOrigin).replace(/\/+$/, "");
+  const configured = process.env.APP_URL;
+  if (!configured && process.env.NODE_ENV === "production") {
+    throw new Error("APP_URL não definido. Configure o endereço público da aplicação.");
+  }
+  return (configured || fallbackOrigin).replace(/\/+$/, "");
 }
 
 /** Cliente OAuth do Google, ou `null` sem credenciais. */
@@ -237,12 +250,12 @@ const pendingSchema = z.object({
 
 /** Assina o perfil para o cookie `ea_google_pending` (15 min). */
 export function signPendingProfile(profile: GoogleProfile): string {
-  return signValue(profile, GOOGLE_PENDING_MAX_AGE_SECONDS);
+  return signValue(profile, GOOGLE_PENDING_MAX_AGE_SECONDS, GOOGLE_PENDING_PURPOSE);
 }
 
 /** Perfil do cookie `ea_google_pending`, ou `null` se ausente, inválido ou vencido. */
 export function parsePendingProfile(value: string | undefined): GoogleProfile | null {
   if (!value) return null;
-  const parsed = pendingSchema.safeParse(verifyValue(value));
+  const parsed = pendingSchema.safeParse(verifyValue(value, GOOGLE_PENDING_PURPOSE));
   return parsed.success ? parsed.data : null;
 }

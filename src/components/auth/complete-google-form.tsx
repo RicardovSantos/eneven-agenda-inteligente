@@ -1,6 +1,5 @@
 "use client";
 
-import { UserRound } from "lucide-react";
 import { useActionState, useEffect, useRef, useState } from "react";
 import type { AuthFormState } from "@/app/(auth)/actions";
 import {
@@ -8,6 +7,7 @@ import {
   discardGooglePendingAction,
 } from "@/app/(auth)/google-actions";
 import { PUBLIC_HOST } from "@/lib/brand";
+import { initialOf } from "@/lib/initial";
 import { formatBrazilPhone } from "@/lib/phone";
 import { slugify } from "@/lib/slugify";
 import { FormAlert } from "./form-alert";
@@ -19,9 +19,12 @@ const FIELD_ORDER = ["businessName", "whatsapp"];
 /** Segunda etapa do cadastro de quem veio do Google: estabelecimento e WhatsApp. */
 export function CompleteGoogleForm({
   email,
+  name,
   picture,
 }: {
   email: string;
+  /** Nome da conta Google (a inicial vira o avatar quando não há foto). */
+  name: string;
   picture: string | null;
 }) {
   const [state, formAction, pending] = useActionState<AuthFormState, FormData>(
@@ -30,6 +33,7 @@ export function CompleteGoogleForm({
   );
   const [businessName, setBusinessName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [pictureFailed, setPictureFailed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const errors = state.fieldErrors ?? {};
@@ -49,7 +53,7 @@ export function CompleteGoogleForm({
       </div>
 
       <div className="flex items-center gap-3">
-        {picture ? (
+        {picture && !pictureFailed ? (
           // Foto do Google: imagem externa, sem repassar o endereço da página.
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -58,14 +62,19 @@ export function CompleteGoogleForm({
             width={32}
             height={32}
             referrerPolicy="no-referrer"
+            onError={() => setPictureFailed(true)}
+            // A imagem pode falhar antes da hidratação (o `onError` não dispara).
+            ref={(img) => {
+              if (img?.complete && img.naturalWidth === 0) setPictureFailed(true);
+            }}
             className="size-8 shrink-0 rounded-full bg-primary-soft object-cover"
           />
         ) : (
           <span
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary"
             aria-hidden="true"
           >
-            <UserRound className="size-4" />
+            {initialOf(name)}
           </span>
         )}
         <p className="min-w-0 flex-1 truncate text-ink-muted">{email}</p>

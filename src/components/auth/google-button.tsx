@@ -2,6 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 
 /** "G" colorido oficial do Google (18 px). */
 function GoogleLogo() {
@@ -79,10 +80,19 @@ export function GoogleButton({ intent }: { intent: "login" | "signup" }) {
   );
 }
 
-/** Divisor "ou" seguido do botão do Google (vai logo abaixo do formulário). */
-export function GoogleSection({ intent }: { intent: "login" | "signup" }) {
+/**
+ * Divisor "ou" seguido do botão do Google (vai logo abaixo do botão
+ * principal). Espaço de 24px acima e abaixo do divisor.
+ */
+export function GoogleSection({
+  intent,
+  className,
+}: {
+  intent: "login" | "signup";
+  className?: string;
+}) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className={cn("flex flex-col gap-6", className)}>
       <div
         className="flex items-center gap-3 text-[0.8125rem] text-ink-muted"
         role="separator"

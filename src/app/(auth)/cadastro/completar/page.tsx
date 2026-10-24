@@ -18,7 +18,11 @@ export default async function CompletarCadastroPage() {
 
   return (
     <AuthShell tagline="Seus clientes agendam sozinhos pelo link. Você só acompanha o dia.">
-      <CompleteGoogleForm email={profile.email} picture={profile.picture} />
+      <CompleteGoogleForm
+        email={profile.email}
+        name={profile.name}
+        picture={profile.picture}
+      />
     </AuthShell>
   );
 }

@@ -1,9 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { after } from "next/server";
 import { getDb } from "@/db/client";
-import { setSessionCookie } from "@/server/auth/cookie";
+import { runAfterResponse } from "@/server/after";
+import { destroyCurrentSession, setSessionCookie } from "@/server/auth/cookie";
 import {
   requestPasswordReset,
   sendVerificationEmail,
@@ -11,16 +11,20 @@ import {
 import { resetPassword } from "@/server/auth/email-tokens";
 import { AuthError } from "@/server/auth/errors";
 import { requireTenantSession } from "@/server/auth/guard";
-import { login, resolveLoginTenantId } from "@/server/auth/login";
+import { login, normalizeEmail, resolveLoginTenantId } from "@/server/auth/login";
 import {
   LOGIN_FAILED_MESSAGE,
   forgotPasswordSchema,
   loginSchema,
   resetPasswordSchema,
+  signupSchema,
   toFieldErrors,
 } from "@/server/auth/schemas";
 import { createSession } from "@/server/auth/session";
 import { signup } from "@/server/auth/signup";
+import { currentClientIp } from "@/server/security/client-ip";
+import { limitForgotPassword, limitLogin, limitSignup } from "@/server/security/limits";
+import { rateLimitMessage } from "@/server/security/rate-limit";
 
 export type AuthFormState = {
   /** Erro geral (faixa no topo do formulário). */
@@ -49,24 +53,37 @@ export async function signupAction(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  const input = {
+    businessName: field(formData, "businessName"),
+    ownerName: field(formData, "ownerName"),
+    whatsapp: field(formData, "whatsapp"),
+    email: field(formData, "email"),
+    password: field(formData, "password"),
+  };
+
+  // 5 cadastros por hora por IP. Só dados válidos contam: um erro de
+  // digitação não gasta a tentativa.
+  if (signupSchema.safeParse(input).success) {
+    const limit = limitSignup(await currentClientIp());
+    if (!limit.ok) return { error: rateLimitMessage(limit.retryAfterSec) };
+  }
+
   let token: string;
   try {
     const db = await getDb();
-    const account = await signup(db, {
-      businessName: field(formData, "businessName"),
-      ownerName: field(formData, "ownerName"),
-      whatsapp: field(formData, "whatsapp"),
-      email: field(formData, "email"),
-      password: field(formData, "password"),
-    });
+    const account = await signup(db, input);
     token = await createSession(db, account.userId, account.tenantId);
+    await destroyCurrentSession(db);
 
-    // Falha no envio não quebra o cadastro: "Reenviar e-mail" no painel tenta de novo.
-    try {
-      await sendVerificationEmail(db, account.userId);
-    } catch (error) {
-      console.error("Falha ao enviar o e-mail de confirmação", error);
-    }
+    // O e-mail sai depois da resposta (não segura o cadastro). Se falhar, o
+    // token emitido é apagado e "Reenviar e-mail" no painel tenta de novo na hora.
+    await runAfterResponse(async () => {
+      try {
+        await sendVerificationEmail(db, account.userId);
+      } catch (error) {
+        console.error("Falha ao enviar o e-mail de confirmação", error);
+      }
+    });
   } catch (error) {
     if (error instanceof AuthError) {
       if (error.code === "validation" || error.code === "email_taken") {
@@ -95,6 +112,10 @@ export async function loginAction(
   });
   if (!parsed.success) return { fieldErrors: toFieldErrors(parsed.error) };
 
+  // 10 tentativas por IP + e-mail e 30 por IP, a cada 15 min.
+  const limit = limitLogin(await currentClientIp(), normalizeEmail(parsed.data.email));
+  if (!limit.ok) return { error: rateLimitMessage(limit.retryAfterSec) };
+
   let token: string;
   try {
     const db = await getDb();
@@ -102,6 +123,7 @@ export async function loginAction(
     if (!result) return { error: LOGIN_FAILED_MESSAGE };
     const tenantId = await resolveLoginTenantId(db, result.userId);
     token = await createSession(db, result.userId, tenantId);
+    await destroyCurrentSession(db);
   } catch (error) {
     console.error("Falha no login", error);
     return { error: GENERIC_ERROR };
@@ -140,15 +162,14 @@ export async function forgotPasswordAction(
   const parsed = forgotPasswordSchema.safeParse({ email: field(formData, "email") });
   if (!parsed.success) return { fieldErrors: toFieldErrors(parsed.error) };
 
+  // 5 pedidos por hora por IP e por e-mail. Passou do limite: a resposta é a
+  // mesma (neutra), só que nada é processado. O bloqueio não é revelado.
+  const limit = limitForgotPassword(await currentClientIp(), normalizeEmail(parsed.data.email));
+  if (!limit.ok) return { sent: true };
+
   // A busca e o envio rodam depois da resposta, para que o tempo de resposta
   // não diga se a conta existe. `requestPasswordReset` nunca lança.
-  const job = async () => requestPasswordReset(await getDb(), parsed.data.email);
-  try {
-    after(job);
-  } catch {
-    // Fora de uma requisição (ex.: testes): roda na hora.
-    await job();
-  }
+  await runAfterResponse(async () => requestPasswordReset(await getDb(), parsed.data.email));
   return { sent: true };
 }
 

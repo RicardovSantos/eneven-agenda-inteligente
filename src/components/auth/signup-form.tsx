@@ -148,6 +148,10 @@ export function SignupForm({
               idleLabel="Criar minha agenda"
               pendingLabel="Criando sua agenda…"
             />
+            {googleEnabled ? (
+              // 16px do gap + 8px = 24px acima do divisor e abaixo do botão.
+              <GoogleSection intent="signup" className="my-2" />
+            ) : null}
             <p className="text-[0.8125rem] leading-snug text-ink-muted">
               Ao criar sua conta você concorda com os{" "}
               <Link
@@ -167,8 +171,6 @@ export function SignupForm({
             </p>
           </div>
         </form>
-
-        {googleEnabled ? <GoogleSection intent="signup" /> : null}
       </div>
 
       <p className="text-ink-muted">

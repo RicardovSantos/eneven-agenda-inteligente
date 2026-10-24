@@ -23,6 +23,7 @@ vi.mock("next/headers", () => ({
       name === "ea_session" && state.sessionToken ? { value: state.sessionToken } : undefined,
     set: vi.fn(),
   }),
+  headers: async () => new Headers(),
 }));
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
@@ -84,8 +85,59 @@ describe("server actions de e-mail", () => {
         ),
       ).rejects.toThrow("NEXT_REDIRECT:/painel");
 
+      await flush();
       expect(sendEmailMock).toHaveBeenCalledTimes(1);
       expect(sendEmailMock.mock.calls[0][0].to).toBe("bia@novo.com");
+    });
+
+    it("o envio roda depois da resposta (after) e não segura o cadastro", async () => {
+      let release!: () => void;
+      sendEmailMock.mockImplementation(
+        () => new Promise<void>((resolve) => (release = resolve)),
+      );
+
+      await expect(
+        actions.signupAction(
+          {},
+          form({
+            businessName: "Novo Studio",
+            ownerName: "Bia Lima",
+            whatsapp: "11988887777",
+            email: "bia@novo.com",
+            password: "senha-forte-1",
+          }),
+        ),
+      ).rejects.toThrow("NEXT_REDIRECT:/painel");
+
+      // A resposta já saiu e o e-mail ainda está "enviando".
+      expect(state.afterJobs).toHaveLength(1);
+      await vi.waitFor(() => expect(sendEmailMock).toHaveBeenCalledTimes(1));
+      release();
+      await flush();
+    });
+
+    it("se o envio falhar, o token é apagado e 'Reenviar e-mail' funciona na hora", async () => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      sendEmailMock.mockRejectedValueOnce(new Error("ZeptoMail fora do ar"));
+      state.sessionToken = undefined;
+
+      await expect(
+        actions.signupAction(
+          {},
+          form({
+            businessName: "Novo Studio",
+            ownerName: "Bia Lima",
+            whatsapp: "11988887777",
+            email: "bia@novo.com",
+            password: "senha-forte-1",
+          }),
+        ),
+      ).rejects.toThrow("NEXT_REDIRECT:/painel");
+      await flush();
+
+      const [created] = await db.select().from(users).where(eq(users.email, "bia@novo.com"));
+      expect(await db.select().from(emailTokens).where(eq(emailTokens.userId, created.id))).toHaveLength(0);
+      log.mockRestore();
     });
 
     it("falha ao enviar o e-mail NÃO quebra o cadastro", async () => {
@@ -105,6 +157,7 @@ describe("server actions de e-mail", () => {
         ),
       ).rejects.toThrow("NEXT_REDIRECT:/painel");
 
+      await flush();
       expect(log).toHaveBeenCalled();
       const [created] = await db.select().from(users).where(eq(users.email, "bia@novo.com"));
       expect(created).toBeDefined();

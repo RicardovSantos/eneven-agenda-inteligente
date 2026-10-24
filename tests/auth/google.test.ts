@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   auditLog,
   emailTokens,
@@ -12,9 +12,11 @@ import {
 import type { Db } from "@/db/types";
 import { AuthError } from "@/server/auth/errors";
 import {
+  GOOGLE_PENDING_PURPOSE,
   completeGoogleSignup,
   parseGoogleClaims,
   parsePendingProfile,
+  publicBaseUrl,
   resolveGoogleUser,
   type GoogleProfile,
 } from "@/server/auth/google";
@@ -319,14 +321,41 @@ describe("parseGoogleClaims", () => {
 
 describe("parsePendingProfile", () => {
   it("lê o perfil de um cookie assinado válido", () => {
-    expect(parsePendingProfile(signValue(newProfile, 900))).toEqual(newProfile);
+    expect(parsePendingProfile(signValue(newProfile, 900, GOOGLE_PENDING_PURPOSE))).toEqual(newProfile);
   });
 
   it("rejeita ausente, adulterado, vencido ou de formato errado", () => {
     expect(parsePendingProfile(undefined)).toBeNull();
     expect(parsePendingProfile("lixo")).toBeNull();
-    expect(parsePendingProfile(signValue(newProfile, -1))).toBeNull();
-    expect(parsePendingProfile(signValue({ foo: 1 }, 900))).toBeNull();
-    expect(parsePendingProfile(signValue({ ...newProfile, emailVerified: false }, 900))).toBeNull();
+    expect(parsePendingProfile(signValue(newProfile, -1, GOOGLE_PENDING_PURPOSE))).toBeNull();
+    expect(parsePendingProfile(signValue({ foo: 1 }, 900, GOOGLE_PENDING_PURPOSE))).toBeNull();
+    expect(parsePendingProfile(signValue({ ...newProfile, emailVerified: false }, 900, GOOGLE_PENDING_PURPOSE))).toBeNull();
+  });
+
+  it("rejeita um valor assinado para outro propósito (HMAC prefixado)", () => {
+    expect(parsePendingProfile(signValue(newProfile, 900, "ea_session"))).toBeNull();
+  });
+});
+
+describe("publicBaseUrl", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("usa APP_URL (sem barra final) quando definido", () => {
+    vi.stubEnv("APP_URL", "https://agenda.eneven.com.br/");
+    expect(publicBaseUrl("http://interno:3000")).toBe("https://agenda.eneven.com.br");
+  });
+
+  it("em desenvolvimento sem APP_URL cai na origem da requisição", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("APP_URL", "");
+    expect(publicBaseUrl("http://localhost:3000/")).toBe("http://localhost:3000");
+  });
+
+  it("em produção exige APP_URL: nunca usa a origem da requisição (atrás do proxy é interna)", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("APP_URL", "");
+    expect(() => publicBaseUrl("http://interno:3000")).toThrow(/APP_URL/);
   });
 });

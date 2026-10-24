@@ -3,7 +3,7 @@ import { and, eq, gt } from "drizzle-orm";
 import { memberships, sessions, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 
-export const SESSION_COOKIE = "ea_session";
+export { SESSION_COOKIE } from "./cookie-names";
 export const SESSION_DAYS = 30;
 export const SESSION_MAX_AGE_SECONDS = SESSION_DAYS * 24 * 60 * 60;
 
