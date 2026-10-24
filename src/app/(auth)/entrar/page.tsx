@@ -6,12 +6,16 @@ import { canAccessTenantPanel, getCurrentSession } from "@/server/auth/guard";
 
 export const metadata: Metadata = { title: "Entrar" };
 
-export default async function EntrarPage() {
+export default async function EntrarPage({ searchParams }: PageProps<"/entrar">) {
   if (canAccessTenantPanel(await getCurrentSession())) redirect("/painel");
+
+  const { senha } = await searchParams;
+  const notice =
+    senha === "redefinida" ? "Senha redefinida. Entre com a nova senha." : undefined;
 
   return (
     <AuthShell tagline="Sua agenda do dia, onde você estiver.">
-      <LoginForm />
+      <LoginForm notice={notice} />
     </AuthShell>
   );
 }

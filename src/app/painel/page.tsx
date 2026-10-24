@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Button } from "@/components/ui/button";
+import { ResendVerification } from "@/components/panel/resend-verification";
 import { formatDayMonth, trialDaysLeft } from "@/lib/trial";
 import { getPanelData } from "@/server/panel/data";
 
@@ -16,18 +16,7 @@ export default async function PainelPage() {
     <div className="flex min-h-[calc(100dvh-10rem)] flex-col gap-6 lg:min-h-[calc(100dvh-6rem)]">
       <div className="flex flex-col gap-3">
         {!data.session.emailVerified ? (
-          <div
-            role="status"
-            className="flex flex-col gap-3 rounded-field border-l-[3px] border-danger bg-danger-soft px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <p className="text-sm leading-snug">
-              Confirme seu e-mail para liberar seu link de agendamento. Enviamos para{" "}
-              <strong className="font-semibold break-all">{data.userEmail}</strong>.
-            </p>
-            <Button variant="outline" disabled className="shrink-0">
-              Reenviar e-mail
-            </Button>
-          </div>
+          <ResendVerification email={data.userEmail} />
         ) : null}
 
         {isTrial ? (

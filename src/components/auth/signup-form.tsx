@@ -104,7 +104,11 @@ export function SignupForm() {
                 <Link href="/entrar" className="font-semibold underline underline-offset-2">
                   Entre
                 </Link>{" "}
-                ou recupere a senha.
+                ou{" "}
+                <Link href="/recuperar-senha" className="font-semibold underline underline-offset-2">
+                  recupere a senha
+                </Link>
+                .
               </>
             ) : (
               errors.email

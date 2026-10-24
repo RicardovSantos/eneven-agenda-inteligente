@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { loginAction, type AuthFormState } from "@/app/(auth)/actions";
-import { FormAlert } from "./form-alert";
+import { FormAlert, FormNotice } from "./form-alert";
 import { PasswordField } from "./password-field";
 import { SubmitButton } from "./submit-button";
 import { TextField } from "./text-field";
 
-export function LoginForm() {
+export function LoginForm({ notice }: { notice?: string }) {
   const [state, formAction, pending] = useActionState<AuthFormState, FormData>(
     loginAction,
     {},
@@ -38,6 +38,7 @@ export function LoginForm() {
         noValidate
         className="flex flex-col gap-4"
       >
+        {notice ? <FormNotice>{notice}</FormNotice> : null}
         {state.error ? <FormAlert>{state.error}</FormAlert> : null}
 
         <TextField
