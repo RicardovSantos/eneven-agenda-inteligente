@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   customType,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -187,6 +188,12 @@ export const auditLog = pgTable(
   (t) => [index("audit_log_tenant_id_idx").on(t.tenantId)],
 );
 
+/**
+ * Isolamento entre tenants também nas referências: as FKs entre tabelas de
+ * tenant são compostas (`tenant_id`, `id`) e apontam para `UNIQUE (tenant_id, id)`.
+ * Sem isso, a checagem de FK (que roda como dono da tabela, ignorando RLS)
+ * deixaria um tenant referenciar linhas de outro.
+ */
 const tenantIdColumn = () =>
   uuid("tenant_id")
     .notNull()
@@ -233,7 +240,10 @@ export const professionals = pgTable(
     }),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
-  (t) => [index("professionals_tenant_id_idx").on(t.tenantId)],
+  (t) => [
+    index("professionals_tenant_id_idx").on(t.tenantId),
+    unique("professionals_tenant_id_id_unique").on(t.tenantId, t.id),
+  ],
 );
 
 /** Horário de trabalho de cada profissional (vários intervalos por dia). */
@@ -242,14 +252,17 @@ export const professionalHours = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: tenantIdColumn(),
-    professionalId: uuid("professional_id")
-      .notNull()
-      .references(() => professionals.id, { onDelete: "cascade" }),
+    professionalId: uuid("professional_id").notNull(),
     weekday: smallint("weekday").notNull(),
     startsAt: time("starts_at").notNull(),
     endsAt: time("ends_at").notNull(),
   },
   (t) => [
+    foreignKey({
+      name: "professional_hours_professional_fk",
+      columns: [t.tenantId, t.professionalId],
+      foreignColumns: [professionals.tenantId, professionals.id],
+    }).onDelete("cascade"),
     index("professional_hours_tenant_id_idx").on(t.tenantId),
     index("professional_hours_professional_id_idx").on(t.professionalId),
     check("professional_hours_weekday_range", sql`${t.weekday} between 0 and 6`),
@@ -276,6 +289,7 @@ export const services = pgTable(
   },
   (t) => [
     index("services_tenant_id_idx").on(t.tenantId),
+    unique("services_tenant_id_id_unique").on(t.tenantId, t.id),
     check("services_duration_positive", sql`${t.durationMin} > 0`),
     check("services_price_non_negative", sql`${t.priceCents} >= 0`),
   ],
@@ -286,15 +300,21 @@ export const professionalServices = pgTable(
   "professional_services",
   {
     tenantId: tenantIdColumn(),
-    professionalId: uuid("professional_id")
-      .notNull()
-      .references(() => professionals.id, { onDelete: "cascade" }),
-    serviceId: uuid("service_id")
-      .notNull()
-      .references(() => services.id, { onDelete: "cascade" }),
+    professionalId: uuid("professional_id").notNull(),
+    serviceId: uuid("service_id").notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.professionalId, t.serviceId] }),
+    foreignKey({
+      name: "professional_services_professional_fk",
+      columns: [t.tenantId, t.professionalId],
+      foreignColumns: [professionals.tenantId, professionals.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "professional_services_service_fk",
+      columns: [t.tenantId, t.serviceId],
+      foreignColumns: [services.tenantId, services.id],
+    }).onDelete("cascade"),
     index("professional_services_tenant_id_idx").on(t.tenantId),
     index("professional_services_service_id_idx").on(t.serviceId),
   ],
@@ -306,15 +326,19 @@ export const timeBlocks = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: tenantIdColumn(),
-    professionalId: uuid("professional_id").references(() => professionals.id, {
-      onDelete: "cascade",
-    }),
+    /** Nulo = estabelecimento todo (a FK composta não é checada com MATCH SIMPLE). */
+    professionalId: uuid("professional_id"),
     startsAt: timestamptz("starts_at").notNull(),
     endsAt: timestamptz("ends_at").notNull(),
     reason: text("reason"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [
+    foreignKey({
+      name: "time_blocks_professional_fk",
+      columns: [t.tenantId, t.professionalId],
+      foreignColumns: [professionals.tenantId, professionals.id],
+    }).onDelete("cascade"),
     index("time_blocks_tenant_starts_idx").on(t.tenantId, t.startsAt),
     check("time_blocks_interval_order", sql`${t.startsAt} < ${t.endsAt}`),
   ],
@@ -332,7 +356,10 @@ export const customers = pgTable(
     notes: text("notes"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
-  (t) => [unique("customers_tenant_phone_unique").on(t.tenantId, t.phone)],
+  (t) => [
+    unique("customers_tenant_phone_unique").on(t.tenantId, t.phone),
+    unique("customers_tenant_id_id_unique").on(t.tenantId, t.id),
+  ],
 );
 
 /**
@@ -346,12 +373,8 @@ export const bookings = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: tenantIdColumn(),
-    professionalId: uuid("professional_id")
-      .notNull()
-      .references(() => professionals.id, { onDelete: "restrict" }),
-    customerId: uuid("customer_id")
-      .notNull()
-      .references(() => customers.id, { onDelete: "restrict" }),
+    professionalId: uuid("professional_id").notNull(),
+    customerId: uuid("customer_id").notNull(),
     startsAt: timestamptz("starts_at").notNull(),
     /** Fim do atendimento. */
     endsAt: timestamptz("ends_at").notNull(),
@@ -372,6 +395,17 @@ export const bookings = pgTable(
     updatedAt: timestamptz("updated_at").notNull().defaultNow(),
   },
   (t) => [
+    foreignKey({
+      name: "bookings_professional_fk",
+      columns: [t.tenantId, t.professionalId],
+      foreignColumns: [professionals.tenantId, professionals.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "bookings_customer_fk",
+      columns: [t.tenantId, t.customerId],
+      foreignColumns: [customers.tenantId, customers.id],
+    }).onDelete("restrict"),
+    unique("bookings_tenant_id_id_unique").on(t.tenantId, t.id),
     unique("bookings_manage_token_hash_unique").on(t.manageTokenHash),
     index("bookings_tenant_starts_idx").on(t.tenantId, t.startsAt),
     index("bookings_professional_starts_idx").on(t.professionalId, t.startsAt),
@@ -389,18 +423,28 @@ export const bookingServices = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: tenantIdColumn(),
-    bookingId: uuid("booking_id")
-      .notNull()
-      .references(() => bookings.id, { onDelete: "cascade" }),
-    serviceId: uuid("service_id").references(() => services.id, {
-      onDelete: "set null",
-    }),
+    bookingId: uuid("booking_id").notNull(),
+    serviceId: uuid("service_id"),
     name: text("name").notNull(),
     durationMin: integer("duration_min").notNull(),
     priceCents: integer("price_cents").notNull(),
     position: integer("position").notNull(),
   },
   (t) => [
+    foreignKey({
+      name: "booking_services_booking_fk",
+      columns: [t.tenantId, t.bookingId],
+      foreignColumns: [bookings.tenantId, bookings.id],
+    }).onDelete("cascade"),
+    // ATENÇÃO: em 0002_agenda.sql esta FK foi ajustada à mão para
+    // `ON DELETE SET NULL (service_id)` (PostgreSQL 15+): o SET NULL padrão
+    // do drizzle-kit anularia também `tenant_id` (NOT NULL). Se 0002 for
+    // regerada, repita o ajuste.
+    foreignKey({
+      name: "booking_services_service_fk",
+      columns: [t.tenantId, t.serviceId],
+      foreignColumns: [services.tenantId, services.id],
+    }).onDelete("set null"),
     index("booking_services_tenant_id_idx").on(t.tenantId),
     index("booking_services_booking_id_idx").on(t.bookingId),
   ],

@@ -1,5 +1,5 @@
 {
-  "id": "d5a27eb3-350a-4326-893b-c0c2d3cff742",
+  "id": "370341eb-9ef5-4101-ab8c-342d88ff7747",
   "prevId": "004aa095-3cd6-4492-890b-f798b8bb6467",
   "version": "7",
   "dialect": "postgresql",
@@ -197,27 +197,31 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "booking_services_booking_id_bookings_id_fk": {
-          "name": "booking_services_booking_id_bookings_id_fk",
+        "booking_services_booking_fk": {
+          "name": "booking_services_booking_fk",
           "tableFrom": "booking_services",
           "tableTo": "bookings",
           "columnsFrom": [
+            "tenant_id",
             "booking_id"
           ],
           "columnsTo": [
+            "tenant_id",
             "id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "booking_services_service_id_services_id_fk": {
-          "name": "booking_services_service_id_services_id_fk",
+        "booking_services_service_fk": {
+          "name": "booking_services_service_fk",
           "tableFrom": "booking_services",
           "tableTo": "services",
           "columnsFrom": [
+            "tenant_id",
             "service_id"
           ],
           "columnsTo": [
+            "tenant_id",
             "id"
           ],
           "onDelete": "set null",
@@ -417,32 +421,6 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "bookings_professional_id_professionals_id_fk": {
-          "name": "bookings_professional_id_professionals_id_fk",
-          "tableFrom": "bookings",
-          "tableTo": "professionals",
-          "columnsFrom": [
-            "professional_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "bookings_customer_id_customers_id_fk": {
-          "name": "bookings_customer_id_customers_id_fk",
-          "tableFrom": "bookings",
-          "tableTo": "customers",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
         "bookings_created_by_user_id_users_id_fk": {
           "name": "bookings_created_by_user_id_users_id_fk",
           "tableFrom": "bookings",
@@ -455,10 +433,48 @@
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
+        },
+        "bookings_professional_fk": {
+          "name": "bookings_professional_fk",
+          "tableFrom": "bookings",
+          "tableTo": "professionals",
+          "columnsFrom": [
+            "tenant_id",
+            "professional_id"
+          ],
+          "columnsTo": [
+            "tenant_id",
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "bookings_customer_fk": {
+          "name": "bookings_customer_fk",
+          "tableFrom": "bookings",
+          "tableTo": "customers",
+          "columnsFrom": [
+            "tenant_id",
+            "customer_id"
+          ],
+          "columnsTo": [
+            "tenant_id",
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
+        "bookings_tenant_id_id_unique": {
+          "name": "bookings_tenant_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "id"
+          ]
+        },
         "bookings_manage_token_hash_unique": {
           "name": "bookings_manage_token_hash_unique",
           "nullsNotDistinct": false,
@@ -632,6 +648,14 @@
           "columns": [
             "tenant_id",
             "phone"
+          ]
+        },
+        "customers_tenant_id_id_unique": {
+          "name": "customers_tenant_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "id"
           ]
         }
       },
@@ -966,14 +990,16 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "professional_hours_professional_id_professionals_id_fk": {
-          "name": "professional_hours_professional_id_professionals_id_fk",
+        "professional_hours_professional_fk": {
+          "name": "professional_hours_professional_fk",
           "tableFrom": "professional_hours",
           "tableTo": "professionals",
           "columnsFrom": [
+            "tenant_id",
             "professional_id"
           ],
           "columnsTo": [
+            "tenant_id",
             "id"
           ],
           "onDelete": "cascade",
@@ -1064,27 +1090,31 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "professional_services_professional_id_professionals_id_fk": {
-          "name": "professional_services_professional_id_professionals_id_fk",
+        "professional_services_professional_fk": {
+          "name": "professional_services_professional_fk",
           "tableFrom": "professional_services",
           "tableTo": "professionals",
           "columnsFrom": [
+            "tenant_id",
             "professional_id"
           ],
           "columnsTo": [
+            "tenant_id",
             "id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "professional_services_service_id_services_id_fk": {
-          "name": "professional_services_service_id_services_id_fk",
+        "professional_services_service_fk": {
+          "name": "professional_services_service_fk",
           "tableFrom": "professional_services",
           "tableTo": "services",
           "columnsFrom": [
+            "tenant_id",
             "service_id"
           ],
           "columnsTo": [
+            "tenant_id",
             "id"
           ],
           "onDelete": "cascade",
@@ -1208,7 +1238,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "professionals_tenant_id_id_unique": {
+          "name": "professionals_tenant_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1322,7 +1361,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "services_tenant_id_id_unique": {
+          "name": "services_tenant_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "services_duration_positive": {
@@ -1699,14 +1747,16 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "time_blocks_professional_id_professionals_id_fk": {
-          "name": "time_blocks_professional_id_professionals_id_fk",
+        "time_blocks_professional_fk": {
+          "name": "time_blocks_professional_fk",
           "tableFrom": "time_blocks",
           "tableTo": "professionals",
           "columnsFrom": [
+            "tenant_id",
             "professional_id"
           ],
           "columnsTo": [
+            "tenant_id",
             "id"
           ],
           "onDelete": "cascade",

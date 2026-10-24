@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { bookings, users } from "@/db/schema";
+import { bookings, professionalServices, services, users } from "@/db/schema";
 import { isExclusionViolation } from "@/server/db-errors";
 import { withTenant } from "@/server/tenant-db";
 import {
@@ -10,6 +10,13 @@ import {
   seedProfessional,
   seedTenant,
 } from "../helpers/agenda-fixtures";
+import {
+  expectEveryAgendaAppTableHasRls,
+  expectRlsViolation,
+  failure,
+  queryRows,
+  sqlState,
+} from "../helpers/db-assertions";
 import { connectPg } from "./pg-db";
 
 const pg = connectPg();
@@ -88,11 +95,70 @@ describe("RLS com conexão superusuária (como em produção)", () => {
     expect(seenByA).toHaveLength(1);
     expect(seenByA[0].tenantId).toBe(a.id);
 
-    await expect(
+    const error = await failure(
       withTenant(db, a.id, (tx) =>
-        tx.insert(bookings).values(bookingValues(b.id, proB.id, custB.id, { startsAt: at("12:00"), endsAt: at("12:30"), blockedUntil: at("12:30") })),
+        tx.insert(bookings).values(
+          bookingValues(b.id, proB.id, custB.id, {
+            startsAt: at("12:00"),
+            endsAt: at("12:30"),
+            blockedUntil: at("12:30"),
+          }),
+        ),
       ),
-    ).rejects.toThrow();
+    );
+    expectRlsViolation(error);
+  });
+
+  it("o papel volta ao do usuário da sessão em todas as conexões do pool", async () => {
+    const { a } = await seed();
+    for (let i = 0; i < 10; i++) {
+      await withTenant(db, a.id, (tx) => tx.select().from(bookings));
+    }
+    const roles = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        queryRows<{ u: string; s: string }>(
+          db,
+          sql`select current_user as u, session_user as s, pg_sleep(0.05)`,
+        ),
+      ),
+    );
+    for (const [row] of roles) {
+      expect(row.u).toBe(row.s);
+      expect(row.u).not.toBe("agenda_app");
+    }
+  });
+
+  it("toda tabela acessível ao agenda_app (exceto tenants) tem RLS ativo, forçado e política", async () => {
+    await expectEveryAgendaAppTableHasRls(db);
+  });
+
+  it("FK composta: agendamento ou serviço do tenant A não referencia profissional/serviço do B", async () => {
+    const { a, b, proA, proB, custA } = await seed();
+    const booking = await failure(
+      withTenant(db, a.id, (tx) =>
+        tx.insert(bookings).values(
+          bookingValues(a.id, proB.id, custA.id, {
+            startsAt: at("15:00"),
+            endsAt: at("15:30"),
+            blockedUntil: at("15:30"),
+          }),
+        ),
+      ),
+    );
+    expect(sqlState(booking)).toBe("23503");
+
+    const [svcB] = await db
+      .insert(services)
+      .values({ tenantId: b.id, name: "Barba", durationMin: 30, priceCents: 3000 })
+      .returning();
+    const link = await failure(
+      withTenant(db, a.id, (tx) =>
+        tx
+          .insert(professionalServices)
+          .values({ tenantId: a.id, professionalId: proA.id, serviceId: svcB.id }),
+      ),
+    );
+    expect(sqlState(link)).toBe("23503");
   });
 
   it("agenda_app sem contexto de tenant não vê linhas e não acessa tabelas de autenticação", async () => {

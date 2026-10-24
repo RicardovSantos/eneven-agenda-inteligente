@@ -2,6 +2,13 @@ import { sql } from "drizzle-orm";
 import type { Db } from "@/db/types";
 
 /**
+ * Tipo da transação que `withTenant` entrega ao callback: a transação do
+ * Drizzle (e não o `Db` completo), então o código de negócio não alcança a
+ * conexão (`$client`) para sair do contexto do tenant.
+ */
+export type TenantTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/**
  * Acesso ao banco no contexto de um estabelecimento (tenant). TODA consulta a
  * tabela com `tenant_id` passa por aqui: dentro da transação o papel vira
  * `agenda_app` (sem privilégio de superusuário) e `app.tenant_id` define o que
@@ -14,11 +21,11 @@ import type { Db } from "@/db/types";
 export async function withTenant<T>(
   db: Db,
   tenantId: string,
-  fn: (tx: Db) => Promise<T>,
+  fn: (tx: TenantTx) => Promise<T>,
 ): Promise<T> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select set_config('app.tenant_id', ${tenantId}, true)`);
     await tx.execute(sql`set local role agenda_app`);
-    return fn(tx as unknown as Db);
+    return fn(tx);
   });
 }
