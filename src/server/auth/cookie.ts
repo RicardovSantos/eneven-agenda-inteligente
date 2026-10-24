@@ -3,7 +3,7 @@ import type { Db } from "@/db/types";
 import { SESSION_COOKIE } from "./cookie-names";
 import { SESSION_MAX_AGE_SECONDS, destroySession } from "./session";
 
-/** Opções do cookie `ea_session`: httpOnly, secure em produção, sameSite lax, path `/`. */
+/** Opções dos cookies de autenticação (`ea_session` etc.): httpOnly, secure em produção, sameSite lax, path `/`. */
 export function sessionCookieOptions(maxAge: number) {
   return {
     httpOnly: true,

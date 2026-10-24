@@ -41,7 +41,7 @@ As páginas públicas `/termos` e `/privacidade` vêm do texto em `src/content/l
 
 ## Limite de tentativas
 
-Login (10 tentativas por IP e e-mail e 30 por IP, a cada 15 minutos), cadastro (5 por hora por IP) e recuperação de senha (5 por hora por IP e por e-mail) têm limite. A contagem fica na memória do processo, o que basta enquanto o serviço roda em uma instância só (Easypanel); com mais de uma, troque por um armazenamento compartilhado (`src/server/security/`). O IP vem do primeiro item de `x-forwarded-for`, então o proxy na frente precisa sobrescrever esse cabeçalho (o Traefik do Easypanel faz isso).
+Login (10 tentativas por IP e e-mail e 30 por IP, a cada 15 minutos), cadastro (5 por hora por IP) e recuperação de senha (5 por hora por IP e por e-mail) têm limite. A contagem fica na memória do processo, o que basta enquanto o serviço roda em uma instância só (Easypanel); com mais de uma, troque por um armazenamento compartilhado (`src/server/security/`). O IP vem do **último** item de `x-forwarded-for`, que é o endereço que o Traefik do Easypanel viu na conexão (os itens anteriores podem ser forjados pelo cliente, por isso não valem). Isso vale com o DNS da Cloudflare só em modo DNS (nuvem cinza, um único salto de proxy). Se um dia ligar o proxy da Cloudflare (nuvem laranja), o último item passa a ser o IP da Cloudflare: troque a leitura em `getClientIp` (`src/server/security/rate-limit.ts`) para o cabeçalho `CF-Connecting-IP` e configure `trustedIPs` do Traefik com as faixas de IP da Cloudflare, para ninguém forjar esse cabeçalho. Sem `x-forwarded-for`, em produção, aparece um aviso no log e todos contam como o mesmo IP. Cada limitador guarda no máximo 10 000 chaves (as mais antigas saem primeiro).
 
 ## Entrar com o Google
 

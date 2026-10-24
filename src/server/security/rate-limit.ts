@@ -11,6 +11,8 @@ export type RateLimiter = {
 
 type Window = { count: number; resetAt: number };
 
+const DEFAULT_MAX_KEYS = 10_000;
+
 /**
  * Limitador de janela fixa, em memória. A aplicação roda num processo só
  * (Easypanel), então não precisa de Redis; reiniciar o processo zera as
@@ -19,10 +21,16 @@ type Window = { count: number; resetAt: number };
  * A janela abre na primeira tentativa da chave e vale `windowMs`. Passado o
  * `limit`, as tentativas são recusadas até a janela vencer (as recusadas não
  * estendem a janela). Chaves vencidas são varridas, no máximo uma vez por
- * janela, para o mapa não crescer sem limite.
+ * janela, e há um teto de `maxKeys` chaves (padrão 10 000): passou dele, as
+ * mais antigas (ordem de inserção do Map) são descartadas. Assim um atacante
+ * que inventa chaves não faz a memória crescer sem limite.
  */
-export function createRateLimiter(options: { limit: number; windowMs: number }): RateLimiter {
-  const { limit, windowMs } = options;
+export function createRateLimiter(options: {
+  limit: number;
+  windowMs: number;
+  maxKeys?: number;
+}): RateLimiter {
+  const { limit, windowMs, maxKeys = DEFAULT_MAX_KEYS } = options;
   const windows = new Map<string, Window>();
   let lastSweep = Number.NEGATIVE_INFINITY;
 
@@ -39,6 +47,13 @@ export function createRateLimiter(options: { limit: number; windowMs: number }):
       sweep(now);
       const current = windows.get(key);
       if (!current || current.resetAt <= now) {
+        // Reinserir (apagar e gravar) mantém a ordem do Map = ordem de abertura da janela.
+        windows.delete(key);
+        while (windows.size >= maxKeys) {
+          const oldest = windows.keys().next();
+          if (oldest.done) break;
+          windows.delete(oldest.value);
+        }
         windows.set(key, { count: 1, resetAt: now + windowMs });
         return { ok: true };
       }
@@ -56,14 +71,35 @@ export function createRateLimiter(options: { limit: number; windowMs: number }):
   };
 }
 
+let warnedAboutMissingForwardedFor = false;
+
 /**
- * IP do cliente pelo primeiro item de `x-forwarded-for` (o proxy do Easypanel
- * define o cabeçalho). Sem cabeçalho devolve `"unknown"`, que vira uma chave
- * única compartilhada (mais restritiva, nunca mais frouxa).
+ * IP do cliente pelo ÚLTIMO item (não vazio) de `x-forwarded-for`: é o
+ * endereço que o Traefik do Easypanel viu na conexão TCP. Os itens anteriores
+ * podem ter sido enviados pelo próprio cliente (forjados), então não valem
+ * como chave de limite. Não usa `x-real-ip`. Se o proxy da Cloudflare
+ * (nuvem laranja) for ligado, trocar por `CF-Connecting-IP` e configurar o
+ * `trustedIPs` do Traefik com as faixas da Cloudflare (ver README).
+ *
+ * Sem cabeçalho devolve `"unknown"`, uma chave única compartilhada (mais
+ * restritiva, nunca mais frouxa); em produção avisa uma vez no log, porque
+ * indica proxy mal configurado.
  */
 export function getClientIp(headers: { get(name: string): string | null }): string {
-  const first = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return first || "unknown";
+  const entries = (headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const last = entries.at(-1);
+  if (last) return last;
+
+  if (process.env.NODE_ENV === "production" && !warnedAboutMissingForwardedFor) {
+    warnedAboutMissingForwardedFor = true;
+    console.warn(
+      "x-forwarded-for ausente: todos os pedidos contam como o mesmo IP no limite de tentativas. Confira o proxy.",
+    );
+  }
+  return "unknown";
 }
 
 /** "Muitas tentativas. Tente de novo em N minutos." (N arredondado para cima, mínimo 1). */

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createRateLimiter,
   getClientIp,
@@ -59,6 +59,24 @@ describe("createRateLimiter", () => {
     expect(limiter.hit("a", 1).ok).toBe(true);
   });
 
+  it("limite duro de chaves: passou do máximo, descarta as mais antigas", () => {
+    const limiter = createRateLimiter({ limit: 1, windowMs: 60 * MIN, maxKeys: 100 });
+    for (let i = 0; i < 100; i++) limiter.hit(`k${i}`, i);
+    expect(limiter.size()).toBe(100);
+
+    limiter.hit("novo", 1000);
+    expect(limiter.size()).toBe(100);
+    // k0 (a mais antiga) foi descartada: volta a ser aceita; k99 continua contada.
+    expect(limiter.hit("k0", 1001).ok).toBe(true);
+    expect(limiter.hit("k99", 1002).ok).toBe(false);
+  });
+
+  it("o limite padrão é de 10 000 chaves", () => {
+    const limiter = createRateLimiter({ limit: 1, windowMs: 60 * MIN });
+    for (let i = 0; i < 10_050; i++) limiter.hit(`k${i}`, 0);
+    expect(limiter.size()).toBe(10_000);
+  });
+
   it("não acumula chaves vencidas na memória", () => {
     const limiter = createRateLimiter({ limit: 1, windowMs: MIN });
     for (let i = 0; i < 5000; i++) limiter.hit(`k${i}`, 0);
@@ -69,14 +87,55 @@ describe("createRateLimiter", () => {
 });
 
 describe("getClientIp", () => {
-  it("usa o primeiro item de x-forwarded-for", () => {
-    const headers = new Headers({ "x-forwarded-for": " 203.0.113.9 , 10.0.0.1" });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("usa o ÚLTIMO item de x-forwarded-for (o que o Traefik viu na conexão)", () => {
+    const headers = new Headers({ "x-forwarded-for": " 10.0.0.1 , 203.0.113.9 " });
     expect(getClientIp(headers)).toBe("203.0.113.9");
+    expect(getClientIp(new Headers({ "x-forwarded-for": "203.0.113.9" }))).toBe("203.0.113.9");
+  });
+
+  it("um primeiro item forjado pelo cliente não muda a chave", () => {
+    const real = "203.0.113.9";
+    const a = getClientIp(new Headers({ "x-forwarded-for": real }));
+    const b = getClientIp(new Headers({ "x-forwarded-for": `1.2.3.4, ${real}` }));
+    const c = getClientIp(new Headers({ "x-forwarded-for": `9.9.9.9, 8.8.8.8, ${real}` }));
+    expect(b).toBe(a);
+    expect(c).toBe(a);
+  });
+
+  it("ignora itens vazios no fim", () => {
+    expect(getClientIp(new Headers({ "x-forwarded-for": "10.0.0.1, 203.0.113.9, , " }))).toBe(
+      "203.0.113.9",
+    );
   });
 
   it("sem o cabeçalho (ou vazio) devolve unknown", () => {
     expect(getClientIp(new Headers())).toBe("unknown");
     expect(getClientIp(new Headers({ "x-forwarded-for": "  " }))).toBe("unknown");
+    expect(getClientIp(new Headers({ "x-forwarded-for": " , " }))).toBe("unknown");
+  });
+
+  it("em produção, cabeçalho ausente gera um aviso (uma vez só); fora dela, nenhum", async () => {
+    vi.resetModules();
+    const { getClientIp: fresh } = await import("@/server/security/rate-limit");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    fresh(new Headers());
+    expect(warn).not.toHaveBeenCalled();
+
+    vi.stubEnv("NODE_ENV", "production");
+    fresh(new Headers());
+    fresh(new Headers());
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("x-forwarded-for");
+
+    warn.mockClear();
+    fresh(new Headers({ "x-forwarded-for": "203.0.113.9" }));
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

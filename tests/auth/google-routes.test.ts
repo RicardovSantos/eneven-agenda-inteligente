@@ -210,6 +210,33 @@ describe("rotas do Google", () => {
       });
     });
 
+    it("login pelo Google grava __Host-ea_session e apaga a sessão antiga (também __Host-)", async () => {
+      const account = await completeGoogleSignup(
+        db,
+        { sub: "google-sub-1", email: "bia@gmail.com", emailVerified: true, name: "Bia", picture: null },
+        { businessName: "Studio Bela", whatsapp: "11988887777" },
+      );
+      const old = await createSession(db, account.userId, account.tenantId);
+      const { GET } = await import("@/app/api/auth/google/callback/route");
+      const response = await GET(
+        callbackRequest({
+          query: goodQuery,
+          cookies: {
+            "__Host-ea_oauth_state": "state-fixo",
+            "__Host-ea_oauth_verifier": "verifier-fixo",
+            "__Host-ea_oauth_intent": "login",
+            "__Host-ea_session": old,
+          },
+        }),
+      );
+      expect(location(response)).toBe(`${APP_URL}/painel`);
+      const cookie = response.cookies.get("__Host-ea_session");
+      expect(cookie).toMatchObject({ secure: true, httpOnly: true, path: "/" });
+      expect(response.cookies.get("ea_session")).toBeUndefined();
+      expect(await getSession(db, old)).toBeNull();
+      expect(await getSession(db, cookie!.value)).not.toBeNull();
+    });
+
     it("sem APP_URL não monta a URI de retorno a partir da requisição", async () => {
       vi.stubEnv("APP_URL", "");
       const { GET } = await import("@/app/api/auth/google/route");

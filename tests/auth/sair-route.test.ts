@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sessions } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { createSession, hashToken } from "@/server/auth/session";
@@ -81,6 +81,43 @@ describe("POST /sair", () => {
     );
     expect(response.status).toBe(303);
     expect(await sessionExists()).toBe(false);
+  });
+
+  describe("em produção (cookie __Host-ea_session)", () => {
+    beforeEach(async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.resetModules();
+      route = await import("@/app/sair/route");
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    });
+
+    const prodRequest = (cookie: string) =>
+      new NextRequest("http://interno:3000/sair", {
+        method: "POST",
+        headers: { host: HOST, origin: `https://${HOST}`, cookie },
+      });
+
+    it("lê, apaga no banco e limpa o cookie com o nome __Host-", async () => {
+      const response = await route.POST(prodRequest(`__Host-ea_session=${token}`));
+      expect(response.status).toBe(303);
+      expect(await sessionExists()).toBe(false);
+      expect(response.cookies.get("__Host-ea_session")).toMatchObject({
+        value: "",
+        maxAge: 0,
+        secure: true,
+        path: "/",
+      });
+      expect(response.cookies.get("ea_session")).toBeUndefined();
+    });
+
+    it("o cookie com o nome simples não vale em produção", async () => {
+      await route.POST(prodRequest(`ea_session=${token}`));
+      expect(await sessionExists()).toBe(true);
+    });
   });
 
   it("GET nunca desloga", async () => {

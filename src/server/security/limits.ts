@@ -23,24 +23,26 @@ function combine(results: RateLimitResult[]): RateLimitResult {
   return { ok: false, retryAfterSec: Math.max(...blocked.map((r) => r.retryAfterSec)) };
 }
 
-/** `email` já normalizado (minúsculas, sem espaços). Conta nos dois limites. */
+/**
+ * `email` já normalizado (minúsculas, sem espaços). Confere o IP primeiro: IP
+ * bloqueado não gasta nem cria chave por IP + e-mail (quem varre e-mails
+ * inventados não enche a memória).
+ */
 export function limitLogin(ip: string, email: string, now?: number): RateLimitResult {
-  return combine([
-    loginByIpAndEmailLimiter.hit(`${ip}|${email}`, now),
-    loginByIpLimiter.hit(ip, now),
-  ]);
+  const byIp = loginByIpLimiter.hit(ip, now);
+  if (!byIp.ok) return byIp;
+  return combine([byIp, loginByIpAndEmailLimiter.hit(`${ip}|${email}`, now)]);
 }
 
 export function limitSignup(ip: string, now?: number): RateLimitResult {
   return signupLimiter.hit(ip, now);
 }
 
-/** `email` já normalizado. Conta nos dois limites. */
+/** `email` já normalizado. IP primeiro; IP bloqueado não cria chave por e-mail. */
 export function limitForgotPassword(ip: string, email: string, now?: number): RateLimitResult {
-  return combine([
-    forgotPasswordByIpLimiter.hit(ip, now),
-    forgotPasswordByEmailLimiter.hit(email, now),
-  ]);
+  const byIp = forgotPasswordByIpLimiter.hit(ip, now);
+  if (!byIp.ok) return byIp;
+  return combine([byIp, forgotPasswordByEmailLimiter.hit(email, now)]);
 }
 
 /** Zera todos os limitadores (só para testes). */
