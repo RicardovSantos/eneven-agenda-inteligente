@@ -45,7 +45,7 @@ describe("sendEmail", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.zeptomail.com/v1.1/email");
+    expect(url).toBe("https://cpaas.zoho.com/v1.1/email");
     expect(init.method).toBe("POST");
     expect(init.headers).toMatchObject({
       Authorization: "Zoho-enczapikey segredo-123",
@@ -58,6 +58,54 @@ describe("sendEmail", () => {
       htmlbody: "<p>oi</p>",
       textbody: message.text,
     });
+  });
+
+  it("ZEPTOMAIL_URL troca o endereço da API", async () => {
+    vi.stubEnv("ZEPTOMAIL_TOKEN", "segredo-123");
+    vi.stubEnv("EMAIL_FROM", "nao-responda@eneven.com.br");
+    vi.stubEnv("ZEPTOMAIL_URL", "https://api.zeptomail.com/v1.1/email");
+    fetchMock.mockResolvedValue(new Response("{}", { status: 201 }));
+
+    await sendEmail(message);
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.zeptomail.com/v1.1/email");
+  });
+
+  it.each([
+    ["sem o prefixo", "segredo-123"],
+    ["com o prefixo do painel", "Zoho-enczapikey segredo-123"],
+    ["com o prefixo e espaços nas pontas", "  Zoho-enczapikey   segredo-123 \n"],
+  ])("token %s vai no cabeçalho uma única vez com o prefixo", async (_name, token) => {
+    vi.stubEnv("ZEPTOMAIL_TOKEN", token);
+    vi.stubEnv("EMAIL_FROM", "nao-responda@eneven.com.br");
+    fetchMock.mockResolvedValue(new Response("{}", { status: 201 }));
+
+    await sendEmail(message);
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe(
+      "Zoho-enczapikey segredo-123",
+    );
+  });
+
+  it("endereço da API que não é https é recusado (o token não sai em texto puro)", async () => {
+    vi.stubEnv("ZEPTOMAIL_TOKEN", "segredo-123");
+    vi.stubEnv("EMAIL_FROM", "nao-responda@eneven.com.br");
+    vi.stubEnv("ZEPTOMAIL_URL", "http://cpaas.zoho.com/v1.1/email");
+
+    await expect(sendEmail(message)).rejects.toThrow(/ZEPTOMAIL_URL/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("em produção sem token lança erro e não registra o link no console", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ZEPTOMAIL_TOKEN", "");
+    const log = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    await expect(sendEmail(message)).rejects.toThrow(/ZEPTOMAIL_TOKEN/);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
   });
 
   it("resposta fora de 2xx lança erro com o status", async () => {
