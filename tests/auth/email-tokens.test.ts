@@ -9,6 +9,7 @@ import {
   resetPassword,
   verifyEmail,
 } from "@/server/auth/email-tokens";
+import { resolveGoogleUser } from "@/server/auth/google";
 import { login } from "@/server/auth/login";
 import { createSession, getSession, hashToken } from "@/server/auth/session";
 import { signup } from "@/server/auth/signup";
@@ -152,6 +153,50 @@ describe("tokens de e-mail", () => {
 
       expect(await login(db, "ana@defendi.com", "nova-senha-123")).toEqual({ userId });
       expect(await login(db, "ana@defendi.com", "senha-forte-1")).toBeNull();
+    });
+
+    it("confirma o e-mail (quem recebeu o link prova a posse) e descarta links de confirmação pendentes", async () => {
+      const [before] = await db.select().from(users).where(eq(users.id, userId));
+      expect(before.emailVerifiedAt).toBeNull();
+      const verifyToken = await issueEmailToken(db, userId, "verify", now);
+
+      const t = await issueEmailToken(db, userId, "reset", now);
+      await resetPassword(db, t, "nova-senha-123", now);
+
+      const [after] = await db.select().from(users).where(eq(users.id, userId));
+      expect(after.emailVerifiedAt).toEqual(now);
+      expect(await checkEmailToken(db, verifyToken, "verify", now)).toEqual({
+        ok: false,
+        reason: "invalid",
+      });
+    });
+
+    it("não muda a data de um e-mail que já estava confirmado", async () => {
+      const earlier = new Date("2026-10-01T09:00:00Z");
+      await db.update(users).set({ emailVerifiedAt: earlier }).where(eq(users.id, userId));
+      const t = await issueEmailToken(db, userId, "reset", now);
+      await resetPassword(db, t, "nova-senha-123", now);
+      const [after] = await db.select().from(users).where(eq(users.id, userId));
+      expect(after.emailVerifiedAt).toEqual(earlier);
+    });
+
+    it("link inválido não confirma o e-mail", async () => {
+      await resetPassword(db, "lixo", "nova-senha-123", now);
+      const [after] = await db.select().from(users).where(eq(users.id, userId));
+      expect(after.emailVerifiedAt).toBeNull();
+    });
+
+    it("depois de redefinir, vincular o Google não apaga a senha nova (e-mail já confirmado)", async () => {
+      const t = await issueEmailToken(db, userId, "reset", now);
+      await resetPassword(db, t, "nova-senha-123", now);
+
+      const result = await resolveGoogleUser(
+        db,
+        { sub: "sub-ana", email: "ana@defendi.com", emailVerified: true, name: "Ana", picture: null },
+        now,
+      );
+      expect(result).toEqual({ kind: "existing", userId });
+      expect(await login(db, "ana@defendi.com", "nova-senha-123")).toEqual({ userId });
     });
 
     it("link só vale uma vez", async () => {

@@ -145,8 +145,12 @@ export async function verifyEmail(
 }
 
 /**
- * Consome um token `reset`, grava a nova senha e apaga TODAS as sessões do
- * usuário (quem tinha a senha antiga é deslogado), tudo numa transação. A
+ * Consome um token `reset`, grava a nova senha, apaga TODAS as sessões do
+ * usuário (quem tinha a senha antiga é deslogado) e marca o e-mail como
+ * confirmado (quem recebeu o link provou que controla a caixa de entrada; a
+ * data de uma confirmação anterior é mantida) descartando links de
+ * confirmação pendentes, tudo numa transação. Sem isso, vincular o Google
+ * depois apagaria a senha recém-criada (proteção contra pré-sequestro). A
  * senha é validada antes de gastar o link: senha inválida lança `AuthError`.
  */
 export async function resetPassword(
@@ -167,8 +171,13 @@ export async function resetPassword(
     if (!result.ok) return result;
 
     await tx.update(users).set({ passwordHash }).where(eq(users.id, result.userId));
+    await tx
+      .update(users)
+      .set({ emailVerifiedAt: now })
+      .where(and(eq(users.id, result.userId), isNull(users.emailVerifiedAt)));
     await tx.delete(sessions).where(eq(sessions.userId, result.userId));
     await revokeUnusedEmailTokens(tx, result.userId, "reset");
+    await revokeUnusedEmailTokens(tx, result.userId, "verify");
     return result;
   });
 }
