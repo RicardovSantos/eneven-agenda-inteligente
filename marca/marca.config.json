@@ -1,0 +1,6 @@
+{
+  "symbolRegion": { "left": 0.11, "top": 0.09, "width": 0.175, "height": 0.505 },
+  "background": "#FFFFFF",
+  "canvas": "#F7F6FC",
+  "gradient": ["#3E07D2", "#9429F7", "#F581FB"]
+}
