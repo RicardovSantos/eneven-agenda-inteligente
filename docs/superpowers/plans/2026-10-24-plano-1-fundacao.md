@@ -285,3 +285,33 @@ Pedido do Ricardo em 24-10-2026. Spec §6 e §12; telas em `docs/design/telas/en
 - [ ] **Step 5:** UI conforme `docs/design/telas/entrada.md`: botão do Google abaixo do formulário com divisor "ou", página `/cadastro/completar` (lê `ea_google_pending`; sem cookie válido → `/cadastro`), mensagem de erro em `/entrar?erro=google`.
 - [ ] **Step 6:** README: passo a passo para criar o cliente OAuth no Google Cloud (tela de consentimento externa, escopos `openid email profile`, URIs de redirecionamento `http://localhost:3000/api/auth/google/callback` e `https://agenda.eneven.com.br/api/auth/google/callback`).
 - [ ] **Step 7:** `pnpm test && pnpm typecheck && pnpm lint && pnpm build` verdes; commit `feat: entrar com o Google` e push.
+
+### Task 8: Endurecimento e polimento antes do deploy (executar ANTES da Task 6)
+
+Junta itens que as revisões das Tasks 1–7 deixaram anotados e decisões do controller (R16, R17, R18). Cada item tem teste quando for comportamento.
+
+**Files (principais):** `src/server/security/rate-limit.ts` (novo), `src/app/(auth)/actions.ts`, `src/app/sair/route.ts`, `src/server/auth/login.ts`, `src/server/auth/email-flows.ts`, `src/server/email/send.ts`, `src/app/termos/page.tsx` e `src/app/privacidade/page.tsx` (novos), `scripts/brand/*`, componentes de senha/botão, `.github/workflows/ci.yml`, `.env.example`, README.
+
+**Interfaces:**
+- `createRateLimiter(opts: { limit: number; windowMs: number }): { hit(key: string, now?: number): { ok: true } | { ok: false; retryAfterSec: number } }` — em memória (Map com expiração; um processo só no Easypanel), testável com `now` injetado.
+- IP do cliente: `getClientIp(headers): string` lendo `x-forwarded-for` (primeiro item) com fallback `"unknown"`.
+
+**Itens:**
+1. **Rate limit (R16):** login 10 tentativas / 15 min por IP+e-mail **e** 30 / 15 min por IP; cadastro (senha e Google completar) 5 / h por IP; recuperar senha 5 / h por IP **e** por e-mail; reenviar confirmação já tem 60 s. Ao estourar: mensagem "Muitas tentativas. Tente de novo em N minutos." (recuperar senha continua respondendo a mensagem neutra, sem revelar). Testes com `now` injetado.
+2. **Termos e Privacidade (R17):** páginas públicas `/termos` e `/privacidade` com o texto de `docs/legal/termos-e-privacidade.md` (renderizar o Markdown em build ou transcrever em JSX), layout de leitura (coluna de 68ch, Figtree, títulos Outfit, logo no topo, link "Voltar"), placeholders preenchidos por env `LEGAL_OWNER_NAME` (padrão "Ricardo Santos"), `LEGAL_CONTACT_EMAIL` (padrão "eneventech@gmail.com"); `LEGAL_OWNER_DOC` omitido se vazio. "Última atualização: dd/mm/aaaa" vindo de uma constante.
+3. **ZeptoMail (R18):** `ZEPTOMAIL_URL` (padrão `https://cpaas.zoho.com/v1.1/email`, o host que o painel do agente "Eneven-Agenda" mostra); token aceito com ou sem o prefixo `Zoho-enczapikey `; em `NODE_ENV=production` sem token → lançar erro na inicialização do envio (não logar links). `EMAIL_FROM` padrão no `.env.example`: `nao-responda@eneven.com.br`.
+4. **E-mail:** cadastro envia a confirmação com `after()` (não segura a resposta); se o envio falhar, apagar o token recém-emitido para não consumir o intervalo de 60 s; trocar o `SELECT ... FOR UPDATE` de `reserveToken` por `pg_advisory_xact_lock(hashtext(userId || ':' || purpose))` (evita deadlock com o consumo do token).
+5. **Sessão e login:** hash dummy do argon2 pré-computado ao carregar o módulo (sem promessa rejeitada em cache); ao fazer login/cadastro com cookie de sessão antigo, apagar a sessão antiga; `/sair` exige `Origin` igual ao host (senão 403).
+6. **Script de marca:** CLI em arquivo de entrada próprio (sem guarda `import.meta.url`); validar `marca.config.json` com zod; erro claro se `marca/logo.png` não existir; erro se a região do símbolo sair vazia/transparente ("A região do símbolo em marca/marca.config.json não contém a logo — ajuste symbolRegion").
+7. **Acessibilidade:** botão de mostrar senha sem `aria-pressed` (mantém o `aria-label` que muda); remover `role="status"` de dentro do botão de envio.
+8. **Testes que faltaram:** retry de slug do cadastro (stub devolvendo slug ocupado uma vez → sucesso; três vezes → erro "unavailable"); e-mail maiúsculo checando `cause.code === "23514"`.
+9. **CI:** `push` só em `main` + `pull_request`; `permissions: contents: read`; `concurrency` por ref com cancelamento.
+10. Remover código morto (`clearSessionCookie` se não usado; constantes de nome duplicadas — usar as de `src/lib/brand.ts` no layout).
+
+- [ ] **Step 1:** testes que falham para os itens 1, 3, 4, 5, 6 e 8.
+- [ ] **Step 2:** `pnpm test` → FAIL.
+- [ ] **Step 3:** implementar.
+- [ ] **Step 4:** `pnpm test && pnpm typecheck && pnpm lint && pnpm build` → verde.
+- [ ] **Step 5:** screenshots de `/termos` e `/privacidade` (390 e 1280, claro/escuro) e da mensagem de rate limit no login.
+- [ ] **Step 6:** commit(s) e push.
+11. **Itens da revisão da Task 7:** recusar o segredo de desenvolvimento do cookie assinado sempre que `APP_URL` for https; prefixar o HMAC com o propósito (`"ea_google_pending|" + body`); em produção usar nomes `__Host-` nos cookies de OAuth e no pendente; exigir `APP_URL` em produção para a URI de retorno (sem cair na origem da requisição); no `/cadastro`, mover o divisor "ou" e o botão do Google para logo abaixo do botão principal (antes do texto legal), conforme a spec; carregar a logo escura com `loading="lazy"`; fallback do avatar do Google (inicial do nome em círculo `--primary-soft`) se a imagem falhar; o alerta `?erro=google` some após um novo envio.
