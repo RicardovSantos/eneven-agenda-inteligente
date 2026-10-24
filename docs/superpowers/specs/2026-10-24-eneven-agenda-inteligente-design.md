@@ -70,6 +70,8 @@ Duas entradas, mesmo resultado:
 
 Primeiro acesso → **assistente de configuração** em passos: dados e logo/cor, horário de funcionamento, serviços (nome, duração, preço), profissionais (e quais serviços cada um faz). No fim aparece o link pronto para copiar e um texto sugerido para colocar no perfil do WhatsApp.
 
+**Entrar com o Google** (pedido do Ricardo em 24-10-2026): botão "Continuar com Google" abaixo do formulário, no cadastro e no login, no padrão de mercado. Conta nova pelo Google pula a senha e a confirmação de e-mail (o Google já confirma), mas passa por uma tela curta "Complete seu cadastro" com nome do estabelecimento e WhatsApp antes de cair no painel. Se o e-mail do Google já tem conta com senha, as duas formas passam a valer para a mesma conta. Funcionários convidados também podem entrar com o Google.
+
 O teste começa **sem pedir cartão** **[decisão do Claude]**; o cadastro self-service confirma o e-mail do dono antes de liberar a página pública.
 
 Teste: 14 dias, franquia de lembretes reduzida (**50 mensagens [decisão do Claude]**). Ao fim do teste sem assinatura: **modo somente leitura** (vê a agenda, não recebe agendamentos novos; a página pública mostra "agendamento indisponível, fale com o estabelecimento" com botão do WhatsApp). Dados preservados por **90 dias [decisão do Claude]**, depois anonimização/exclusão com aviso prévio.
@@ -190,7 +192,7 @@ Plano anual com 2 meses grátis e desconto para quem tem landing page da Eneven:
 - **Banco:** PostgreSQL com ORM tipado (Drizzle). Multiempresa com banco compartilhado e `tenant_id` em todas as tabelas do estabelecimento, acessadas por uma camada de consulta sempre filtrada por tenant, mais Row Level Security como segunda barreira.
 - **Dupla reserva:** constraint de exclusão no Postgres (`btree_gist`, intervalo `tstzrange` por profissional, ignorando cancelados). A garantia fica no banco, não só no código.
 - **Jobs** (lembretes, fila de envio, expiração de teste, reset da demo, cobrança): fila no próprio Postgres (pg-boss) num worker do mesmo projeto. O n8n não faz parte do núcleo.
-- **Autenticação:** e-mail e senha com recuperação por e-mail; sessões no banco.
+- **Autenticação:** e-mail e senha com recuperação por e-mail, mais login com Google (OAuth 2.0 / OpenID Connect com PKCE, biblioteca `arctic`, escopos `openid email profile`); sessões próprias no banco para os dois caminhos. Credenciais do Google Cloud criadas pelo Ricardo (conta da Eneven).
 - **E-mail transacional** (recuperação de senha, avisos de cobrança): ZeptoMail, que o Ricardo já usa.
 - **Testes** automatizados obrigatórios para disponibilidade de horários, dupla reserva concorrente e isolamento entre tenants.
 

@@ -65,6 +65,18 @@ Terça, 27 de outubro
 - Botão: "Entrar" / "Entrando…".
 - Rodapé: "Ainda não tem conta? Criar agenda grátis" → `/cadastro`.
 
+### Entrar com o Google (cadastro e login)
+- Logo abaixo do botão principal: divisor com a palavra "ou" centralizada entre duas linhas `--line` (texto `--ink-muted` 0.8125rem), margem 24px acima e abaixo.
+- Botão largura total, altura 48px, raio 10px, fundo `#FFFFFF`, borda 1px `#DADCE0`, texto `#1F1F1F` Figtree 500, com o **"G" oficial colorido do Google** (SVG de 18px, à esquerda do texto, 12px de espaço) — seguir as diretrizes de marca do Google; no tema escuro o botão continua com fundo branco (variante clara oficial).
+- Texto: login "Entrar com Google"; cadastro "Criar conta com Google". Durante o redirecionamento: desabilitado com spinner.
+- Erro de retorno (usuário cancelou ou falhou): faixa de erro geral "Não foi possível entrar com o Google. Tente de novo ou use seu e-mail."
+
+### Completar cadastro (`/cadastro/completar`) — só para conta nova vinda do Google
+- Mesmo layout de duas colunas. Título "Falta pouco", subtítulo "Conte qual é o seu estabelecimento para criarmos sua agenda."
+- Mostra a foto e o e-mail da conta Google em uma linha (avatar 32px + e-mail em `--ink-muted`), com "Usar outra conta" (volta para `/cadastro`).
+- Campos: "Nome do estabelecimento" (com a prévia do link) e "WhatsApp". O nome da pessoa vem do Google.
+- Botão "Criar minha agenda".
+
 ### Erros
 - Erro de campo: texto 0.8125rem em `#C2410C` (escuro `#FB923C`) abaixo do campo, campo com borda da mesma cor e `aria-invalid`, `aria-describedby`.
 - Erro geral (ex.: login inválido): faixa no topo do formulário, fundo `#FFF4ED` (escuro `#3A2418`), borda esquerda 3px `#C2410C`, texto: "E-mail ou senha incorretos." — nunca dizer qual dos dois está errado.

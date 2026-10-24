@@ -237,3 +237,51 @@
 - [ ] **Step 9: Verificação em produção:** `curl https://agenda.eneven.com.br/api/health` → `{"status":"ok"}`; `https://agenda.eneven.com.br/manifest.webmanifest` lista os ícones; ícones abrem em `/brand/*`; cadastro real → e-mail de confirmação chega → painel; Lighthouse/DevTools "Installable" ok; colar o link no WhatsApp mostra a prévia com imagem; Ricardo instala no iPhone e no Android e confere o ícone.
 - [ ] **Step 10:** Backup diário do `agenda-db`: ativar o backup agendado do Easypanel (retenção de 14 dias) ou, se indisponível, um serviço cron com `pg_dump` diário para volume; restaurar uma vez num banco de teste para provar que funciona.
 - [ ] **Step 11:** Cadastrar monitor no UptimeRobot para `https://agenda.eneven.com.br/api/health`. Atualizar README com a seção "Deploy". Commit `feat: pwa, metadados e deploy` e push.
+
+### Task 7: Entrar com o Google (executar ANTES da Task 6)
+
+Pedido do Ricardo em 24-10-2026. Spec §6 e §12; telas em `docs/design/telas/entrada.md` ("Entrar com o Google" e "Completar cadastro").
+
+**Files:**
+- Modify: `src/db/schema.ts` (`users.passwordHash` passa a aceitar nulo; nova tabela `oauthAccounts`), nova migração em `drizzle/`
+- Modify: `src/server/auth/signup.ts` (extrair `createTenantWithOwner` reutilizável), `src/server/auth/login.ts` (usuário sem senha → `null`)
+- Create: `src/server/auth/google.ts`, `src/server/auth/signed-cookie.ts`
+- Create: `src/app/api/auth/google/route.ts`, `src/app/api/auth/google/callback/route.ts`, `src/app/(auth)/cadastro/completar/page.tsx`, `src/components/auth/google-button.tsx`
+- Modify: telas `/entrar` e `/cadastro` (botão abaixo do formulário), `.env.example` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), README (como criar as credenciais)
+- Test: `tests/auth/google.test.ts`, `tests/auth/signed-cookie.test.ts`
+
+**Interfaces:**
+- Consumes: `getDb`, `Db`, schema, `generateUniqueSlug`, `createSession`, `normalizeBrazilPhone`, `hashPassword` (Tasks 3–4).
+- Produces:
+  - `oauthAccounts`: `provider text` (`"google"`), `providerUserId text`, `userId uuid fk → users (cascade)`, `email text`, `createdAt`; pk (`provider`, `providerUserId`); índice em `userId`.
+  - `createTenantWithOwner(db, input: { businessName; ownerName; email; whatsapp; passwordHash: string | null; emailVerifiedAt: Date | null }, now?): Promise<{ userId; tenantId; slug }>` — usado por `signup` e pelo cadastro via Google (mesma regra de 14 dias, slug com retry).
+  - `GoogleProfile = { sub: string; email: string; emailVerified: boolean; name: string; picture: string | null }`.
+  - `resolveGoogleUser(db, profile): Promise<{ kind: "existing"; userId: string } | { kind: "new" } | { kind: "error"; reason: "email_not_verified" }>` — 1) conta Google já vinculada (`sub`) → existing; 2) e-mail verificado que já tem usuário → vincula `oauthAccounts`, preenche `emailVerifiedAt` se nulo → existing; 3) e-mail não verificado → error; 4) senão → new.
+  - `completeGoogleSignup(db, profile, input: { businessName: string; whatsapp: string }, now?): Promise<{ userId; tenantId; slug }>` — cria tenant/usuário (`passwordHash: null`, `emailVerifiedAt: now`, nome do Google), membership `owner` e `oauthAccounts`, numa transação.
+  - `signValue(payload: object, maxAgeSeconds: number): string` e `verifyValue<T>(value: string): T | null` (HMAC-SHA256 com `SESSION_SECRET`; inválido, adulterado ou vencido → `null`).
+  - Rotas: `GET /api/auth/google?intent=login|signup` (gera state + PKCE com `arctic`, cookies httpOnly `ea_oauth_state`, `ea_oauth_verifier`, `ea_oauth_intent`, 10 min) → Google; `GET /api/auth/google/callback` (valida state, troca o código, lê o id_token) → existing: cria sessão (tenant único) e vai para `/painel`; new: grava `ea_google_pending` (perfil assinado, 15 min) e vai para `/cadastro/completar`; erro/cancelado: `/entrar?erro=google`.
+  - Sem `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` o botão não aparece (dev funciona sem Google).
+- [ ] **Step 1: Testes que falham:**
+  ```ts
+  // resolveGoogleUser
+  expect(await resolveGoogleUser(db, perfilNovo)).toEqual({ kind: "new" });
+  // usuário com senha e mesmo e-mail (verificado no Google) → vincula
+  expect(await resolveGoogleUser(db, { ...perfil, email: "ana@defendi.com" })).toEqual({ kind: "existing", userId });
+  // segunda vez acha pelo sub mesmo que o e-mail do Google mude
+  expect(await resolveGoogleUser(db, { ...perfil, email: "outro@gmail.com" })).toEqual({ kind: "existing", userId });
+  expect(await resolveGoogleUser(db, { ...perfilNovo, emailVerified: false, email: "ana@defendi.com" })).toEqual({ kind: "error", reason: "email_not_verified" });
+  // completeGoogleSignup
+  const r = await completeGoogleSignup(db, perfilNovo, { businessName: "Studio Bela", whatsapp: "(11) 98888-7777" }, now);
+  // tenant trial até now+14d, user.passwordHash === null, user.emailVerifiedAt === now, membership owner, oauthAccounts com sub
+  expect(await login(db, perfilNovo.email, "qualquer-senha")).toBeNull(); // conta só-Google não entra por senha
+  // signed cookie
+  expect(verifyValue(signValue({ a: 1 }, 60))).toEqual({ a: 1 });
+  expect(verifyValue(signValue({ a: 1 }, 60).replace(/.$/, "x"))).toBeNull(); // adulterado
+  expect(verifyValue(signValue({ a: 1 }, -1))).toBeNull(); // vencido
+  ```
+- [ ] **Step 2:** `pnpm test tests/auth` → FAIL.
+- [ ] **Step 3:** Implementar schema + migração (`pnpm db:generate`), `createTenantWithOwner` (refatorar `signup` para usá-lo sem mudar seus testes), `google.ts`, `signed-cookie.ts`, rotas.
+- [ ] **Step 4:** `pnpm test` → PASS (incluindo os testes antigos de signup/login).
+- [ ] **Step 5:** UI conforme `docs/design/telas/entrada.md`: botão do Google abaixo do formulário com divisor "ou", página `/cadastro/completar` (lê `ea_google_pending`; sem cookie válido → `/cadastro`), mensagem de erro em `/entrar?erro=google`.
+- [ ] **Step 6:** README: passo a passo para criar o cliente OAuth no Google Cloud (tela de consentimento externa, escopos `openid email profile`, URIs de redirecionamento `http://localhost:3000/api/auth/google/callback` e `https://agenda.eneven.com.br/api/auth/google/callback`).
+- [ ] **Step 7:** `pnpm test && pnpm typecheck && pnpm lint && pnpm build` verdes; commit `feat: entrar com o Google` e push.
