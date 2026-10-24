@@ -1,6 +1,14 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { memberships, oauthAccounts, tenants, users } from "@/db/schema";
+import {
+  auditLog,
+  emailTokens,
+  memberships,
+  oauthAccounts,
+  sessions,
+  tenants,
+  users,
+} from "@/db/schema";
 import type { Db } from "@/db/types";
 import { AuthError } from "@/server/auth/errors";
 import {
@@ -11,7 +19,9 @@ import {
   type GoogleProfile,
 } from "@/server/auth/google";
 import { login, resolveLoginTenantId } from "@/server/auth/login";
+import { issueEmailToken } from "@/server/auth/email-tokens";
 import { hashPassword } from "@/server/auth/password";
+import { createSession } from "@/server/auth/session";
 import { signValue } from "@/server/auth/signed-cookie";
 import { signup } from "@/server/auth/signup";
 import { createTestDb } from "../helpers/test-db";
@@ -49,7 +59,8 @@ describe("resolveGoogleUser", () => {
 
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     expect(user.emailVerifiedAt).toBeInstanceOf(Date);
-    expect(user.passwordHash).not.toBeNull();
+    // conta nunca confirmada: a senha antiga é descartada (detalhes no bloco R19)
+    expect(user.passwordHash).toBeNull();
     const links = await db.select().from(oauthAccounts).where(eq(oauthAccounts.userId, userId));
     expect(links).toHaveLength(1);
     expect(links[0]).toMatchObject({
@@ -64,6 +75,67 @@ describe("resolveGoogleUser", () => {
       userId,
     });
     expect(await db.select().from(oauthAccounts)).toHaveLength(1);
+  });
+
+  describe("proteção contra pré-sequestro (R19)", () => {
+    let tenantId: string;
+    const profile = { ...newProfile, sub: "sub-ana", email: "ana@defendi.com" };
+    const now = new Date("2026-10-24T12:00:00Z");
+
+    beforeEach(async () => {
+      [{ tenantId }] = await db
+        .select({ tenantId: memberships.tenantId })
+        .from(memberships)
+        .where(eq(memberships.userId, userId));
+    });
+
+    it("conta com senha nunca confirmada: zera a senha, derruba sessões e links, confirma e registra", async () => {
+      await createSession(db, userId, tenantId);
+      await createSession(db, userId, tenantId);
+      await issueEmailToken(db, userId, "verify", now);
+      await issueEmailToken(db, userId, "reset", now);
+      const [before] = await db.select().from(users).where(eq(users.id, userId));
+      expect(before.emailVerifiedAt).toBeNull();
+      expect(before.passwordHash).not.toBeNull();
+
+      expect(await resolveGoogleUser(db, profile, now)).toEqual({ kind: "existing", userId });
+
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      expect(user.passwordHash).toBeNull();
+      expect(user.emailVerifiedAt?.toISOString()).toBe(now.toISOString());
+      expect(await db.select().from(sessions).where(eq(sessions.userId, userId))).toHaveLength(0);
+      expect(
+        await db.select().from(emailTokens).where(eq(emailTokens.userId, userId)),
+      ).toHaveLength(0);
+      expect(await login(db, "ana@defendi.com", "senha-forte-1")).toBeNull();
+      expect(await db.select().from(oauthAccounts).where(eq(oauthAccounts.userId, userId))).toHaveLength(1);
+
+      const [entry] = await db.select().from(auditLog);
+      expect(entry).toMatchObject({
+        action: "google_link",
+        actorUserId: userId,
+        details: { clearedPassword: true },
+      });
+
+      // a pessoa ainda pode criar uma senha pelo "esqueci minha senha" (fluxo já existente)
+      expect(await resolveGoogleUser(db, profile, now)).toEqual({ kind: "existing", userId });
+      expect(await db.select().from(auditLog)).toHaveLength(1);
+    });
+
+    it("conta com e-mail já confirmado: mantém senha e sessões", async () => {
+      await db.update(users).set({ emailVerifiedAt: new Date("2026-01-01T00:00:00Z") }).where(eq(users.id, userId));
+      await createSession(db, userId, tenantId);
+
+      expect(await resolveGoogleUser(db, profile, now)).toEqual({ kind: "existing", userId });
+
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      expect(user.passwordHash).not.toBeNull();
+      expect(user.emailVerifiedAt?.toISOString()).toBe("2026-01-01T00:00:00.000Z");
+      expect(await db.select().from(sessions).where(eq(sessions.userId, userId))).toHaveLength(1);
+      expect(await login(db, "ana@defendi.com", "senha-forte-1")).toEqual({ userId });
+      const [entry] = await db.select().from(auditLog);
+      expect(entry).toMatchObject({ action: "google_link", details: { clearedPassword: false } });
+    });
   });
 
   it("não sobrescreve um emailVerifiedAt já preenchido", async () => {

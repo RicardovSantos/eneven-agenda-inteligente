@@ -1,8 +1,9 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Google } from "arctic";
 import { z } from "zod";
-import { oauthAccounts, users } from "@/db/schema";
+import { auditLog, oauthAccounts, sessions, users } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { revokeUnusedEmailTokens } from "./email-tokens";
 import { AuthError } from "./errors";
 import { normalizeEmail } from "./login";
 import { completeGoogleSchema, toFieldErrors } from "./schemas";
@@ -100,13 +101,16 @@ export function isIdTokenForUs(claims: object, clientId: string): boolean {
  * Decide o que fazer com um perfil do Google:
  * 1. conta Google já vinculada (`sub`) -> `existing`;
  * 2. e-mail não verificado no Google -> `error` (nunca vincula a ninguém);
- * 3. e-mail verificado que já tem usuário -> vincula, confirma o e-mail
- *    (se ainda não estava) e devolve `existing`;
+ * 3. e-mail verificado que já tem usuário -> vincula e devolve `existing`.
+ *    Se o e-mail da conta nunca tinha sido confirmado, a senha, as sessões e
+ *    os links de e-mail pendentes são descartados (proteção contra
+ *    pré-sequestro) e o e-mail passa a confirmado; sempre grava `audit_log`;
  * 4. senão -> `new` (falta criar o estabelecimento).
  */
 export async function resolveGoogleUser(
   db: Db,
   profile: GoogleProfile,
+  now: Date = new Date(),
 ): Promise<ResolveGoogleResult> {
   const [linked] = await db
     .select({ userId: oauthAccounts.userId })
@@ -131,7 +135,15 @@ export async function resolveGoogleUser(
   if (!user) return { kind: "new" };
 
   await db.transaction(async (tx) => {
-    await tx
+    // Trava o usuário: dois retornos simultâneos do Google não vinculam duas vezes.
+    const [locked] = await tx
+      .select({ emailVerifiedAt: users.emailVerifiedAt })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .for("update");
+    if (!locked) return;
+
+    const inserted = await tx
       .insert(oauthAccounts)
       .values({
         provider: GOOGLE_PROVIDER,
@@ -139,12 +151,28 @@ export async function resolveGoogleUser(
         userId: user.id,
         email,
       })
-      .onConflictDoNothing();
-    // O Google provou que o e-mail é da pessoa.
-    await tx
-      .update(users)
-      .set({ emailVerifiedAt: new Date() })
-      .where(and(eq(users.id, user.id), isNull(users.emailVerifiedAt)));
+      .onConflictDoNothing()
+      .returning({ userId: oauthAccounts.userId });
+    if (inserted.length === 0) return; // outro pedido já vinculou
+
+    // Se o e-mail da conta nunca foi confirmado, quem definiu a senha pode não
+    // ser o dono do e-mail (pré-sequestro). O Google prova a posse: a senha
+    // antiga, as sessões e os links pendentes deixam de valer.
+    const clearedPassword = locked.emailVerifiedAt === null;
+    if (clearedPassword) {
+      await tx
+        .update(users)
+        .set({ passwordHash: null, emailVerifiedAt: now })
+        .where(eq(users.id, user.id));
+      await tx.delete(sessions).where(eq(sessions.userId, user.id));
+      await revokeUnusedEmailTokens(tx, user.id, "verify");
+      await revokeUnusedEmailTokens(tx, user.id, "reset");
+    }
+    await tx.insert(auditLog).values({
+      actorUserId: user.id,
+      action: "google_link",
+      details: { clearedPassword },
+    });
   });
   return { kind: "existing", userId: user.id };
 }
