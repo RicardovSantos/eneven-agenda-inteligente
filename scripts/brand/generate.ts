@@ -1,20 +1,33 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { dirname, resolve } from "node:path";
 import pngToIco from "png-to-ico";
 import sharp from "sharp";
-import { extractLogo, extractSymbol, lightenDarkText, type Region } from "./crop";
+import { z } from "zod";
+import { extractLogo, extractSymbol, hasVisiblePixels, lightenDarkText } from "./crop";
 
-export type BrandConfig = {
-  /** Região do símbolo (o "E" com o ponto) em frações (0–1) da logo horizontal. */
-  symbolRegion: Region;
+const fraction = z.number().min(0).max(1);
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "use uma cor no formato #RRGGBB");
+
+/** Formato de `marca/marca.config.json`. */
+export const brandConfigSchema = z.object({
+  /** Região do símbolo (o "E" com o ponto) em frações (0-1) da logo horizontal. */
+  symbolRegion: z.object({
+    left: fraction,
+    top: fraction,
+    width: fraction.refine((n) => n > 0, "precisa ser maior que 0"),
+    height: fraction.refine((n) => n > 0, "precisa ser maior que 0"),
+  }),
   /** Fundo dos ícones opacos. */
-  background: string;
+  background: hexColor,
   /** Fundo da imagem de compartilhamento (OG). */
-  canvas: string;
+  canvas: hexColor,
   /** Degradê da marca, da esquerda para a direita. */
-  gradient: [string, string, string];
-};
+  gradient: z.tuple([hexColor, hexColor, hexColor]),
+});
+
+export type BrandConfig = z.infer<typeof brandConfigSchema>;
+
+export const EMPTY_SYMBOL_MESSAGE =
+  "A região do símbolo em marca/marca.config.json não contém a logo — ajuste symbolRegion";
 
 export type GenerateOptions = {
   logoPath: string;
@@ -111,6 +124,7 @@ export async function generateBrandAssets({
 
   const source = await readFile(logoPath);
   const symbol = await extractSymbol(source, config.symbolRegion);
+  if (!(await hasVisiblePixels(symbol))) throw new Error(EMPTY_SYMBOL_MESSAGE);
   const logo = await extractLogo(source);
 
   const outputs: Array<[name: string, data: Buffer]> = [
@@ -139,25 +153,4 @@ export async function generateBrandAssets({
     files.push(path);
   }
   return files;
-}
-
-async function main() {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-  const config = JSON.parse(
-    await readFile(resolve(root, "marca/marca.config.json"), "utf8"),
-  ) as BrandConfig;
-  const files = await generateBrandAssets({
-    logoPath: resolve(root, "marca/logo.png"),
-    outDir: resolve(root, "public/brand"),
-    config,
-  });
-  console.log(`brand: ${files.length} arquivos gerados em public/brand/`);
-}
-
-// Só roda como script (pnpm brand), não ao ser importado pelos testes.
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
 }

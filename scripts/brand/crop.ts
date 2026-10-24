@@ -65,6 +65,15 @@ export async function trimTransparent(input: Buffer): Promise<Buffer> {
     .toBuffer();
 }
 
+/** `true` se a imagem tem ao menos um pixel visível (alfa acima do limite de aparar). */
+export async function hasVisiblePixels(input: Buffer): Promise<boolean> {
+  const { data } = await toRgba(input);
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] > TRIM_ALPHA) return true;
+  }
+  return false;
+}
+
 /** Logo horizontal completa: quase-branco vira transparente e as bordas vazias são aparadas. */
 export async function extractLogo(input: Buffer): Promise<Buffer> {
   return trimTransparent(await whiteToTransparent(input));

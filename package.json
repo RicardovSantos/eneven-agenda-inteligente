@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "brand": "tsx scripts/brand/generate.ts",
+    "brand": "tsx scripts/brand/cli.ts",
     "predev": "pnpm brand",
     "dev": "next dev",
     "prebuild": "pnpm brand",
