@@ -92,6 +92,18 @@ describe("fluxos de e-mail", () => {
       expect(sendEmailMock).not.toHaveBeenCalled();
     });
 
+    it("pedidos simultâneos do mesmo usuário: só um envio e um token", async () => {
+      const results = await Promise.all(
+        Array.from({ length: 6 }, () => sendVerificationEmail(db, userId, now)),
+      );
+      expect(results.filter((r) => r.status === "sent")).toHaveLength(1);
+      expect(results.filter((r) => r.status === "cooldown")).toHaveLength(5);
+      expect(sendEmailMock).toHaveBeenCalledTimes(1);
+      expect(
+        await db.select().from(emailTokens).where(eq(emailTokens.userId, userId)),
+      ).toHaveLength(1);
+    });
+
     it("se o envio falha, a exceção sobe para quem chamou decidir", async () => {
       sendEmailMock.mockRejectedValueOnce(new Error("ZeptoMail 500"));
       await expect(sendVerificationEmail(db, userId, now)).rejects.toThrow("ZeptoMail 500");
@@ -130,6 +142,16 @@ describe("fluxos de e-mail", () => {
       const later = seconds(now, 120);
       await requestPasswordReset(db, "ana@defendi.com", later);
       expect(await consumeEmailToken(db, first, "reset", later)).toEqual({ ok: false, reason: "invalid" });
+    });
+
+    it("pedidos simultâneos (spam num e-mail) geram um único e-mail e um único token", async () => {
+      await Promise.all(
+        Array.from({ length: 6 }, () => requestPasswordReset(db, "ana@defendi.com", now)),
+      );
+      expect(sendEmailMock).toHaveBeenCalledTimes(1);
+      expect(
+        await db.select().from(emailTokens).where(eq(emailTokens.userId, userId)),
+      ).toHaveLength(1);
     });
 
     it("falha no envio é registrada, não lançada (não revela a conta)", async () => {

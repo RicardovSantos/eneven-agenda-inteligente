@@ -13,14 +13,29 @@ import { normalizeEmail } from "./login";
 /** Intervalo mínimo entre dois e-mails do mesmo tipo para o mesmo usuário. */
 export const RESEND_COOLDOWN_SECONDS = 60;
 
-async function inCooldown(
+/**
+ * Reserva o envio de um e-mail do usuário: dentro de uma transação, trava a
+ * linha do usuário (`FOR UPDATE`, serializa pedidos simultâneos do mesmo
+ * usuário), confere o intervalo de 60 s, invalida os links antigos e emite o
+ * novo. Devolve `null` se ainda está no intervalo. O e-mail é enviado por
+ * quem chama, depois do commit.
+ */
+async function reserveToken(
   db: Db,
   userId: string,
   purpose: "verify" | "reset",
   now: Date,
-): Promise<boolean> {
-  const last = await lastEmailTokenIssuedAt(db, userId, purpose);
-  return last !== null && now.getTime() - last.getTime() < RESEND_COOLDOWN_SECONDS * 1000;
+): Promise<string | null> {
+  return db.transaction(async (tx) => {
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
+
+    const last = await lastEmailTokenIssuedAt(tx, userId, purpose);
+    if (last !== null && now.getTime() - last.getTime() < RESEND_COOLDOWN_SECONDS * 1000) {
+      return null;
+    }
+    await revokeUnusedEmailTokens(tx, userId, purpose);
+    return issueEmailToken(tx, userId, purpose, now);
+  });
 }
 
 export type SendVerificationResult =
@@ -55,10 +70,9 @@ export async function sendVerificationEmail(
 
   if (!user) return { status: "not_found" };
   if (user.verifiedAt) return { status: "already_verified" };
-  if (await inCooldown(db, userId, "verify", now)) return { status: "cooldown" };
 
-  await revokeUnusedEmailTokens(db, userId, "verify");
-  const token = await issueEmailToken(db, userId, "verify", now);
+  const token = await reserveToken(db, userId, "verify", now);
+  if (token === null) return { status: "cooldown" };
   await sendEmail({
     to: user.email,
     ...buildVerifyEmail({
@@ -87,10 +101,9 @@ export async function requestPasswordReset(
       .where(eq(users.email, normalizeEmail(rawEmail)))
       .limit(1);
     if (!user) return;
-    if (await inCooldown(db, user.id, "reset", now)) return;
 
-    await revokeUnusedEmailTokens(db, user.id, "reset");
-    const token = await issueEmailToken(db, user.id, "reset", now);
+    const token = await reserveToken(db, user.id, "reset", now);
+    if (token === null) return;
     await sendEmail({
       to: user.email,
       ...buildResetEmail({ email: user.email, link: resetLink(token) }),
