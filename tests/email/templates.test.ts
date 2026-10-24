@@ -36,7 +36,9 @@ describe("buildVerifyEmail", () => {
       "O link vale por 48 horas. Se você não criou esta conta, ignore este e-mail.",
     );
     expect(mail.html).toContain(`href="${link}"`);
-    expect(mail.html).toContain("https://app.eneven.com.br/brand/logo.png");
+    expect(mail.html).toContain("https://app.eneven.com.br/brand/logo-email.png");
+    expect(mail.html).not.toContain("/brand/logo.png");
+    expect(mail.html).toMatch(/<img src="[^"]*logo-email\.png" width="160"/);
     expect(mail.html).toContain("Eneven Agendamentos Inteligentes");
     expect(mail.html).toContain("linear-gradient(90deg,#3E07D2,#9429F7,#F581FB)");
   });

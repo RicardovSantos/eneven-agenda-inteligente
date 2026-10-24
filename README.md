@@ -27,7 +27,7 @@ O `.env.example` lista todas. Em produção (`NODE_ENV=production`) algumas são
 | Variável | Para quê | Em produção |
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL | obrigatória |
-| `APP_URL` | endereço público (links dos e-mails e retorno do Google) | obrigatória |
+| `APP_URL` | endereço público (links dos e-mails e retorno do Google) | obrigatória: sem ela as páginas e os links dos e-mails falham com `APP_URL não definido` (o `next build` não exige) |
 | `SESSION_SECRET` | assina o cookie temporário do Google (`openssl rand -hex 32`) | obrigatória, e também sempre que `APP_URL` for https |
 | `ZEPTOMAIL_TOKEN` | envio de e-mails; pode ser colado com ou sem o prefixo `Zoho-enczapikey ` | obrigatória (sem ela o envio falha; em desenvolvimento o e-mail só aparece no console) |
 | `ZEPTOMAIL_URL` | endereço da API do ZeptoMail (padrão `https://cpaas.zoho.com/v1.1/email`, precisa ser https) | opcional |
@@ -70,7 +70,7 @@ O CI (`.github/workflows/ci.yml`) roda lint, typecheck e testes a cada push na `
 
 ## Como trocar a logo
 
-A logo oficial fica em `marca/logo.png`. Para trocá-la, substitua o arquivo mantendo o mesmo nome e formato e refaça o deploy. Ícones, favicons e imagens de compartilhamento são gerados por script (`pnpm brand`, que roda sozinho antes do `dev` e do `build`) a partir desse arquivo, em `public/brand/` (que não vai para o Git), então nada é editado à mão. O recorte do símbolo é configurado em `marca/marca.config.json`; o script valida o arquivo e avisa se a logo não existe ou se `symbolRegion` não pega o símbolo.
+A logo oficial fica em `marca/logo.png`. Para trocá-la, substitua o arquivo mantendo o mesmo nome e formato e refaça o deploy. Ícones, favicons, a logo leve dos e-mails (`logo-email.png`, 320 px) e as imagens de compartilhamento são gerados por script (`pnpm brand`, que roda sozinho antes do `dev` e do `build`) a partir desse arquivo, em `public/brand/` (que não vai para o Git), então nada é editado à mão. O mesmo script gera `public/sw.js` a partir de `scripts/pwa/sw.template.js`, com um hash dos arquivos de `public/brand/` no `CACHE_VERSION`: ao trocar a logo o cache do service worker se renova sozinho. O recorte do símbolo é configurado em `marca/marca.config.json`; o script valida o arquivo e avisa se a logo não existe ou se `symbolRegion` não pega o símbolo.
 
 ## Deploy
 
@@ -89,7 +89,7 @@ A aplicação roda em um container (`Dockerfile`, Node 24 Alpine) no Easypanel, 
 | `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` | opcionais |
 | `LEGAL_*` | opcionais |
 
-O `APP_URL` também entra no build como argumento (`ARG APP_URL`, padrão `https://agenda.eneven.com.br`), porque páginas estáticas como a inicial gravam nele o endereço da imagem de compartilhamento. Se o domínio mudar, passe `--build-arg APP_URL=...` (ou crie o argumento no Easypanel) e refaça o build.
+O `APP_URL` também é um argumento da imagem (`ARG APP_URL`, padrão `https://agenda.eneven.com.br`) nos estágios de build e final: no build grava o endereço nas páginas estáticas e, na imagem final, vira a variável de ambiente padrão (a variável do Easypanel, se existir, prevalece). Em produção a aplicação nunca cai em `localhost`: sem `APP_URL` ela falha em vez de mandar links errados. Localmente, `pnpm build` funciona sem `APP_URL` (a checagem é ignorada só durante o `next build`), porque páginas estáticas como a inicial gravam nele o endereço da imagem de compartilhamento. Se o domínio mudar, passe `--build-arg APP_URL=...` (ou crie o argumento no Easypanel) e refaça o build.
 
 **Domínio e DNS.** Registro `A agenda` apontando para o IP da VPS, com o proxy da Cloudflare desligado (nuvem cinza); o Easypanel emite o HTTPS. Domínio do serviço na porta 3000.
 
@@ -107,9 +107,9 @@ SUPER_ADMIN_PASSWORD='uma-senha-longa' node dist/create-super-admin.mjs email@ex
 
 **Gerar `dist/` localmente** (para testar fora do Docker): `pnpm build:migrate` e `pnpm build:admin`.
 
-**App instalável (PWA).** `/manifest.webmanifest` vem de `src/app/manifest.ts` e o service worker é `public/sw.js` (registrado só em produção). Ele guarda em cache apenas `/offline.html` e os ícones da marca; navegações vão sempre à rede e, sem conexão, mostram a página offline. Nada de `/api/*`, Server Actions ou páginas do painel entra no cache. Para forçar a atualização do cache (por exemplo, depois de trocar a logo), aumente `CACHE_VERSION` em `public/sw.js`.
+**App instalável (PWA).** `/manifest.webmanifest` vem de `src/app/manifest.ts` e o service worker é gerado em `public/sw.js` (modelo em `scripts/pwa/sw.template.js`; registrado só em produção). Ele guarda em cache apenas `/offline.html`, a logo leve e os ícones da marca; navegações vão sempre à rede e, sem conexão, mostram a página offline. Nada de `/api/*`, Server Actions ou páginas do painel entra no cache. A versão do cache (`CACHE_VERSION`) é o hash dos arquivos de `public/brand/`, calculado por `pnpm brand` (que roda no `predev` e no `prebuild`, inclusive no Docker): não há nada para aumentar à mão.
 
-**Depois do deploy:** confira `https://agenda.eneven.com.br/api/health` (`{"status":"ok"}`), o manifest, o cadastro com e-mail de confirmação e a prévia do link no WhatsApp. Cadastre o monitor no UptimeRobot em `/api/health` e ative o backup diário do banco no Easypanel.
+**Depois do deploy:** confira `https://agenda.eneven.com.br/api/health` (`{"status":"ok"}`), o manifest, o cadastro com e-mail de confirmação e a prévia do link no WhatsApp. `/api/health/db` confere o banco (`select 1`, 2 s; `503` se não responder). Cadastre o monitor no UptimeRobot em `/api/health` (e, se quiser, um segundo em `/api/health/db`) e ative o backup diário do banco no Easypanel.
 
 ## Documentação
 

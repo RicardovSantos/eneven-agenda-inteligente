@@ -46,6 +46,17 @@ const THREAD = { width: 360, height: 4, dot: 14, gap: 48 };
 
 const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
 
+/** Largura (px) da logo leve de e-mails e da página offline: exibida a 160 px, com folga para telas 2x. */
+const EMAIL_LOGO_WIDTH = 320;
+
+/** Logo horizontal (texto escuro, fundo transparente) reduzida e otimizada, para e-mails e para o service worker. */
+async function emailLogo(logo: Buffer): Promise<Buffer> {
+  return sharp(logo)
+    .resize({ width: EMAIL_LOGO_WIDTH })
+    .png({ compressionLevel: 9, palette: true, quality: 90, effort: 10 })
+    .toBuffer();
+}
+
 /** Centraliza o símbolo (mantendo a proporção) dentro de um quadrado `side`, ocupando `fill` do lado. */
 async function squareIcon(
   symbol: Buffer,
@@ -143,6 +154,7 @@ export async function generateBrandAssets({
     ],
     ["logo.png", logo],
     ["logo-dark.png", await lightenDarkText(logo)],
+    ["logo-email.png", await emailLogo(logo)],
     ["og-default.png", await ogImage(logo, config)],
   ];
 

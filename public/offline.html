@@ -52,10 +52,9 @@
     border-radius: 16px;
   }
   .logo { display: block; width: 148px; height: auto; margin: 0 0 32px; }
-  .logo-dark { display: none; }
+  /* A logo tem texto escuro: no tema escuro ela vai sobre uma plaquinha clara. */
   @media (prefers-color-scheme: dark) {
-    .logo-light { display: none; }
-    .logo-dark { display: block; }
+    .logo { box-sizing: content-box; padding: 8px 12px; border-radius: 10px; background: #ffffff; }
   }
   h1 {
     margin: 0 0 8px;
@@ -81,8 +80,7 @@
 </head>
 <body>
 <main>
-  <img class="logo logo-light" src="/brand/logo.png" alt="Eneven Agenda" width="148" height="52">
-  <img class="logo logo-dark" src="/brand/logo-dark.png" alt="" width="148" height="52">
+  <img class="logo" src="/brand/logo-email.png" alt="Eneven Agenda" width="148" height="52">
   <h1>Sem conexão</h1>
   <p>O agendamento precisa de internet. Verifique sua conexão e tente de novo.</p>
   <button type="button" onclick="location.reload()">Tentar de novo</button>

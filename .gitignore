@@ -5,6 +5,8 @@ node_modules/
 
 # project
 public/brand/
+# gerado por `pnpm brand` a partir de scripts/pwa/sw.template.js
+public/sw.js
 .data/
 
 # next / build artifacts

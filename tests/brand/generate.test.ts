@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
@@ -161,6 +161,36 @@ describe("generateBrandAssets", () => {
     }
     expect(leftOpaque).toBe(true);
     expect(nearWhiteOpaque).toBe(0);
+  });
+
+  it("logo-email.png é a logo horizontal com 320 px de largura, transparente e leve", async () => {
+    expect(wideFiles).toContain(`${outWide}/logo-email.png`);
+    const m = await sharp(`${outWide}/logo-email.png`).metadata();
+    expect(m.format).toBe("png");
+    expect(m.width).toBe(320);
+    const logo = await sharp(`${outWide}/logo.png`).metadata();
+    expect(m.height).toBe(Math.round((320 * logo.height!) / logo.width!));
+    expect(m.hasAlpha).toBe(true);
+    const p = await pixels(`${outWide}/logo-email.png`);
+    let transparent = 0;
+    let opaque = 0;
+    for (let y = 0; y < p.info.height; y++) {
+      for (let x = 0; x < p.info.width; x++) {
+        const a = p.at(x, y).a;
+        if (a === 0) transparent++;
+        if (a === 255) opaque++;
+      }
+    }
+    expect(transparent).toBeGreaterThan(0); // fundo transparente (sem retângulo branco)
+    expect(opaque).toBeGreaterThan(0);
+  });
+
+  it("logo-email.png da logo oficial tem 320 px e menos de 60 KB", async () => {
+    const real = JSON.parse(await readFile("marca/marca.config.json", "utf8"));
+    const out = join(dir, "out-real").replace(/\\/g, "/");
+    await generateBrandAssets({ logoPath: "marca/logo.png", outDir: out, config: real });
+    expect((await sharp(`${out}/logo-email.png`).metadata()).width).toBe(320);
+    expect((await stat(`${out}/logo-email.png`)).size).toBeLessThan(60 * 1024);
   });
 
   it("logo-dark.png recolore o texto escuro para claro e mantém o degradê roxo", async () => {

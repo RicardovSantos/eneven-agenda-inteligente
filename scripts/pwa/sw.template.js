@@ -8,16 +8,19 @@
  * - /api/*, Server Actions e qualquer requisição que não seja GET passam direto,
  *   sem o service worker tocar nelas.
  *
- * Para forçar a atualização do cache, aumente CACHE_VERSION.
+ * MODELO: `public/sw.js` é gerado por `pnpm brand` (predev e prebuild) a partir
+ * deste arquivo. O marcador de CACHE_VERSION vira um hash curto dos arquivos de
+ * public/brand/, então trocar a logo (ou qualquer ícone) muda o CACHE_VERSION sozinho e os
+ * navegadores baixam tudo de novo. Não edite public/sw.js (não vai para o Git).
  */
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "__BRAND_HASH__";
 const CACHE_NAME = `eneven-agenda-${CACHE_VERSION}`;
 
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_URLS = [
   OFFLINE_URL,
-  "/brand/logo.png",
-  "/brand/logo-dark.png",
+  // Logo leve (320 px) da página offline; as logos grandes não entram no cache.
+  "/brand/logo-email.png",
   "/brand/icon-192.png",
   "/brand/icon-512.png",
   "/brand/icon-maskable-512.png",
