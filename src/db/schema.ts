@@ -3,13 +3,18 @@ import {
   bigserial,
   boolean,
   check,
+  customType,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
   primaryKey,
+  smallint,
   text,
+  time,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -32,6 +37,25 @@ export const emailTokenPurpose = pgEnum("email_token_purpose", [
   "reset",
 ]);
 
+export const bookingStatus = pgEnum("booking_status", [
+  "scheduled",
+  "confirmed",
+  "completed",
+  "no_show",
+  "canceled",
+]);
+
+export const bookingSource = pgEnum("booking_source", ["public", "panel"]);
+
+export const canceledBy = pgEnum("canceled_by", ["customer", "staff"]);
+
+/** `bytea` como `Buffer` (usado para o logo do estabelecimento). */
+const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({
+  dataType: () => "bytea",
+  toDriver: (value) => value,
+  fromDriver: (value) => Buffer.from(value),
+});
+
 const timestamptz = (name: string) =>
   timestamp(name, { withTimezone: true, mode: "date" });
 
@@ -46,6 +70,18 @@ export const tenants = pgTable("tenants", {
   brandColor: text("brand_color"),
   logoUrl: text("logo_url"),
   whatsapp: text("whatsapp"),
+  address: text("address"),
+  instagram: text("instagram"),
+  about: text("about"),
+  /** Intervalo entre horários oferecidos na reserva online (minutos). */
+  slotIntervalMin: integer("slot_interval_min").notNull().default(15),
+  /** Antecedência mínima para reservar (minutos). */
+  minNoticeMin: integer("min_notice_min").notNull().default(60),
+  /** Até quantos dias à frente a agenda aceita reservas. */
+  maxDaysAhead: integer("max_days_ahead").notNull().default(60),
+  /** Janela antes do horário em que o cliente ainda pode cancelar sozinho (minutos). */
+  cancelWindowMin: integer("cancel_window_min").notNull().default(120),
+  onboardingCompletedAt: timestamptz("onboarding_completed_at"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
 });
 
@@ -151,7 +187,237 @@ export const auditLog = pgTable(
   (t) => [index("audit_log_tenant_id_idx").on(t.tenantId)],
 );
 
+const tenantIdColumn = () =>
+  uuid("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" });
+
+/** Logo enviado pelo estabelecimento (um por tenant). */
+export const tenantLogos = pgTable("tenant_logos", {
+  tenantId: uuid("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  mime: text("mime").notNull(),
+  data: bytea("data").notNull(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+});
+
+/** Horário de funcionamento (vários intervalos por dia; weekday 0 = domingo). */
+export const businessHours = pgTable(
+  "business_hours",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    weekday: smallint("weekday").notNull(),
+    startsAt: time("starts_at").notNull(),
+    endsAt: time("ends_at").notNull(),
+  },
+  (t) => [
+    index("business_hours_tenant_id_idx").on(t.tenantId),
+    check("business_hours_weekday_range", sql`${t.weekday} between 0 and 6`),
+    check("business_hours_interval_order", sql`${t.startsAt} < ${t.endsAt}`),
+  ],
+);
+
+export const professionals = pgTable(
+  "professionals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    name: text("name").notNull(),
+    color: text("color"),
+    active: boolean("active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("professionals_tenant_id_idx").on(t.tenantId)],
+);
+
+/** Horário de trabalho de cada profissional (vários intervalos por dia). */
+export const professionalHours = pgTable(
+  "professional_hours",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    professionalId: uuid("professional_id")
+      .notNull()
+      .references(() => professionals.id, { onDelete: "cascade" }),
+    weekday: smallint("weekday").notNull(),
+    startsAt: time("starts_at").notNull(),
+    endsAt: time("ends_at").notNull(),
+  },
+  (t) => [
+    index("professional_hours_tenant_id_idx").on(t.tenantId),
+    index("professional_hours_professional_id_idx").on(t.professionalId),
+    check("professional_hours_weekday_range", sql`${t.weekday} between 0 and 6`),
+    check("professional_hours_interval_order", sql`${t.startsAt} < ${t.endsAt}`),
+  ],
+);
+
+export const services = pgTable(
+  "services",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    name: text("name").notNull(),
+    description: text("description"),
+    durationMin: integer("duration_min").notNull(),
+    /** Intervalo de preparação depois do atendimento (bloqueia a agenda). */
+    bufferAfterMin: integer("buffer_after_min").notNull().default(0),
+    /** Preço em centavos. */
+    priceCents: integer("price_cents").notNull(),
+    visible: boolean("visible").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    archivedAt: timestamptz("archived_at"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("services_tenant_id_idx").on(t.tenantId),
+    check("services_duration_positive", sql`${t.durationMin} > 0`),
+    check("services_price_non_negative", sql`${t.priceCents} >= 0`),
+  ],
+);
+
+/** Quais serviços cada profissional executa. */
+export const professionalServices = pgTable(
+  "professional_services",
+  {
+    tenantId: tenantIdColumn(),
+    professionalId: uuid("professional_id")
+      .notNull()
+      .references(() => professionals.id, { onDelete: "cascade" }),
+    serviceId: uuid("service_id")
+      .notNull()
+      .references(() => services.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.professionalId, t.serviceId] }),
+    index("professional_services_tenant_id_idx").on(t.tenantId),
+    index("professional_services_service_id_idx").on(t.serviceId),
+  ],
+);
+
+/** Bloqueio de agenda (folga, almoço...). `professionalId` nulo = estabelecimento todo. */
+export const timeBlocks = pgTable(
+  "time_blocks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    professionalId: uuid("professional_id").references(() => professionals.id, {
+      onDelete: "cascade",
+    }),
+    startsAt: timestamptz("starts_at").notNull(),
+    endsAt: timestamptz("ends_at").notNull(),
+    reason: text("reason"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("time_blocks_tenant_starts_idx").on(t.tenantId, t.startsAt),
+    check("time_blocks_interval_order", sql`${t.startsAt} < ${t.endsAt}`),
+  ],
+);
+
+export const customers = pgTable(
+  "customers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    name: text("name").notNull(),
+    /** Telefone normalizado (`55` + DDD + número). */
+    phone: text("phone").notNull(),
+    email: text("email"),
+    notes: text("notes"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [unique("customers_tenant_phone_unique").on(t.tenantId, t.phone)],
+);
+
+/**
+ * Agendamento. A trava contra dupla reserva (`bookings_no_overlap`, EXCLUDE
+ * USING gist) é criada na migração `0003_rls.sql`, pois o drizzle-kit não
+ * expressa constraints de exclusão: o mesmo profissional não pode ter dois
+ * agendamentos não cancelados com `[starts_at, blocked_until)` sobrepostos.
+ */
+export const bookings = pgTable(
+  "bookings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    professionalId: uuid("professional_id")
+      .notNull()
+      .references(() => professionals.id, { onDelete: "restrict" }),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "restrict" }),
+    startsAt: timestamptz("starts_at").notNull(),
+    /** Fim do atendimento. */
+    endsAt: timestamptz("ends_at").notNull(),
+    /** Fim do atendimento + buffer: até quando o profissional fica ocupado. */
+    blockedUntil: timestamptz("blocked_until").notNull(),
+    status: bookingStatus("status").notNull().default("scheduled"),
+    source: bookingSource("source").notNull(),
+    totalCents: integer("total_cents").notNull(),
+    /** Hash do token do link de gerenciamento enviado ao cliente. */
+    manageTokenHash: text("manage_token_hash"),
+    notes: text("notes"),
+    canceledAt: timestamptz("canceled_at"),
+    canceledBy: canceledBy("canceled_by"),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    unique("bookings_manage_token_hash_unique").on(t.manageTokenHash),
+    index("bookings_tenant_starts_idx").on(t.tenantId, t.startsAt),
+    index("bookings_professional_starts_idx").on(t.professionalId, t.startsAt),
+    index("bookings_customer_id_idx").on(t.customerId),
+    check(
+      "bookings_interval_order",
+      sql`${t.startsAt} < ${t.endsAt} and ${t.endsAt} <= ${t.blockedUntil}`,
+    ),
+  ],
+);
+
+/** Serviços de um agendamento (nome, duração e preço copiados no momento da reserva). */
+export const bookingServices = pgTable(
+  "booking_services",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => bookings.id, { onDelete: "cascade" }),
+    serviceId: uuid("service_id").references(() => services.id, {
+      onDelete: "set null",
+    }),
+    name: text("name").notNull(),
+    durationMin: integer("duration_min").notNull(),
+    priceCents: integer("price_cents").notNull(),
+    position: integer("position").notNull(),
+  },
+  (t) => [
+    index("booking_services_tenant_id_idx").on(t.tenantId),
+    index("booking_services_booking_id_idx").on(t.bookingId),
+  ],
+);
+
 export type Tenant = typeof tenants.$inferSelect;
+export type TenantLogo = typeof tenantLogos.$inferSelect;
+export type BusinessHour = typeof businessHours.$inferSelect;
+export type Professional = typeof professionals.$inferSelect;
+export type ProfessionalHour = typeof professionalHours.$inferSelect;
+export type Service = typeof services.$inferSelect;
+export type NewService = typeof services.$inferInsert;
+export type TimeBlock = typeof timeBlocks.$inferSelect;
+export type Customer = typeof customers.$inferSelect;
+export type Booking = typeof bookings.$inferSelect;
+export type NewBooking = typeof bookings.$inferInsert;
+export type BookingService = typeof bookingServices.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

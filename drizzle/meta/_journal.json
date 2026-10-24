@@ -15,6 +15,20 @@
       "when": 1792854979086,
       "tag": "0001_oauth_google",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792873562715,
+      "tag": "0002_agenda",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792873566804,
+      "tag": "0003_rls",
+      "breakpoints": true
     }
   ]
 }

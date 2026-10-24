@@ -1,4 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
+import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { drizzle } from "drizzle-orm/pglite";
 import { runMigrations } from "@/db/migrate";
 import * as schema from "@/db/schema";
@@ -13,7 +14,7 @@ let template: Promise<Blob | File> | undefined;
 const open = new Set<PGlite>();
 
 async function buildTemplate(): Promise<Blob | File> {
-  const base = new PGlite();
+  const base = new PGlite({ extensions: { btree_gist } });
   await runMigrations(drizzle(base, { schema }));
   const dump = await base.dumpDataDir("none");
   await base.close();
@@ -23,7 +24,10 @@ async function buildTemplate(): Promise<Blob | File> {
 /** Banco PGlite em memória, isolado, com as mesmas migrações de `drizzle/`. */
 export async function createTestDb(): Promise<Db> {
   template ??= buildTemplate();
-  const client = new PGlite({ loadDataDir: await template });
+  const client = new PGlite({
+    loadDataDir: await template,
+    extensions: { btree_gist },
+  });
   open.add(client);
   return drizzle(client, { schema });
 }

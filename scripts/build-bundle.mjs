@@ -33,7 +33,7 @@ if (!target) {
 const pgliteStub = {
   name: "stub-pglite",
   setup(b) {
-    b.onResolve({ filter: /^(@electric-sql\/pglite|drizzle-orm\/pglite)$/ }, (args) => ({
+    b.onResolve({ filter: /^(@electric-sql\/pglite(\/.*)?|drizzle-orm\/pglite)$/ }, (args) => ({
       path: args.path,
       namespace: "pglite-stub",
     }));

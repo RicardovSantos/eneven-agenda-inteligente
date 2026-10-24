@@ -29,13 +29,17 @@ async function createDb(): Promise<Db> {
   }
 
   // Desenvolvimento sem Postgres: PGlite persistido em disco.
-  const [{ PGlite }, { drizzle }] = await Promise.all([
+  const [{ PGlite }, { drizzle }, { btree_gist }] = await Promise.all([
     import("@electric-sql/pglite"),
     import("drizzle-orm/pglite"),
+    // Necessária para a trava de dupla reserva (EXCLUDE USING gist).
+    import("@electric-sql/pglite/contrib/btree_gist"),
   ]);
   const dataDir = path.resolve(process.cwd(), PGLITE_DATA_DIR);
   mkdirSync(dataDir, { recursive: true });
-  const db = drizzle(new PGlite(dataDir), { schema });
+  const db = drizzle(new PGlite(dataDir, { extensions: { btree_gist } }), {
+    schema,
+  });
   await runMigrations(db);
   return db;
 }

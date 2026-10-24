@@ -12,6 +12,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:pg": "node scripts/test-pg.mjs",
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",

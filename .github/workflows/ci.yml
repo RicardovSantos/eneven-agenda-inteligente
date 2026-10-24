@@ -28,3 +28,34 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+
+  # Testes contra um PostgreSQL real, com o mesmo usuário superusuário de
+  # produção: confirma que `withTenant` (SET LOCAL ROLE agenda_app) faz o RLS
+  # valer e que a trava de dupla reserva resiste a conexões concorrentes.
+  test-pg:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: agenda
+          POSTGRES_PASSWORD: agenda
+          POSTGRES_DB: agenda_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agenda -d agenda_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://agenda:agenda@localhost:5432/agenda_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm i --frozen-lockfile
+      - run: pnpm test:pg
