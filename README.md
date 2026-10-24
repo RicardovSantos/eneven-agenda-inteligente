@@ -20,6 +20,20 @@ pnpm dev
 
 A aplicação abre em http://localhost:3000. A verificação de saúde responde em `GET /api/health` com `{"status":"ok"}`.
 
+## Entrar com o Google
+
+O botão "Entrar com Google" e "Criar conta com Google" só aparece quando `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` estão no `.env`. Sem eles tudo funciona só com e-mail e senha. Para criar as credenciais:
+
+1. Acesse o [Google Cloud Console](https://console.cloud.google.com/), crie (ou escolha) um projeto e abra **APIs e serviços**.
+2. Em **Tela de permissão OAuth** (ou "Google Auth Platform"), escolha o tipo de usuário **Externo**, preencha o nome do app (Eneven Agendamentos Inteligentes), o e-mail de suporte e o domínio `eneven.com.br`. Em **Escopos** adicione `openid`, `email` e `profile` (são os escopos básicos, não exigem verificação do app). Enquanto o app estiver em "Teste", adicione os e-mails de quem vai testar; para liberar a qualquer pessoa, clique em **Publicar app**.
+3. Em **Credenciais**, clique em **Criar credenciais > ID do cliente OAuth** e escolha o tipo **Aplicativo da Web**.
+4. Em **URIs de redirecionamento autorizados** cadastre exatamente:
+   - `http://localhost:3000/api/auth/google/callback`
+   - `https://agenda.eneven.com.br/api/auth/google/callback`
+5. Copie o **ID do cliente** e a **chave secreta** para `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` no `.env` (em produção, nas variáveis do serviço). `APP_URL` precisa ter o endereço público da aplicação, porque o redirecionamento é montado a partir dele, e `SESSION_SECRET` assina o cookie temporário do cadastro (gere com `openssl rand -hex 32`).
+
+Quem entra pelo Google com um e-mail que já tem conta na Eneven é ligado a essa conta; quem é novo informa só o nome do estabelecimento e o WhatsApp.
+
 ## Como testar
 
 ```bash

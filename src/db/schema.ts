@@ -55,13 +55,34 @@ export const users = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     /** Sempre em minúsculas (garantido por constraint). */
     email: text("email").notNull().unique(),
-    passwordHash: text("password_hash").notNull(),
+    /** Nulo em contas criadas só com o Google (entram pelo Google; podem criar senha em "esqueci minha senha"). */
+    passwordHash: text("password_hash"),
     name: text("name").notNull(),
     isSuperAdmin: boolean("is_super_admin").notNull().default(false),
     emailVerifiedAt: timestamptz("email_verified_at"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [check("users_email_lowercase", sql`${t.email} = lower(${t.email})`)],
+);
+
+/** Conta de um provedor de login externo (hoje só `"google"`) ligada a um usuário. */
+export const oauthAccounts = pgTable(
+  "oauth_accounts",
+  {
+    provider: text("provider").notNull(),
+    /** Identificador estável do usuário no provedor (`sub` do Google). */
+    providerUserId: text("provider_user_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** E-mail da conta no provedor no momento do vínculo (informativo). */
+    email: text("email").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.provider, t.providerUserId] }),
+    index("oauth_accounts_user_id_idx").on(t.userId),
+  ],
 );
 
 export const memberships = pgTable(
@@ -135,5 +156,6 @@ export type NewTenant = typeof tenants.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Membership = typeof memberships.$inferSelect;
+export type OauthAccount = typeof oauthAccounts.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type EmailToken = typeof emailTokens.$inferSelect;

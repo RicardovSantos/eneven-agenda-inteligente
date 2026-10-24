@@ -69,3 +69,9 @@ export function toFieldErrors(error: z.ZodError): Record<string, string> {
   }
   return result;
 }
+
+/** Dados pedidos depois do Google: o nome e o e-mail da pessoa já vêm de lá. */
+export const completeGoogleSchema = signupSchema.pick({
+  businessName: true,
+  whatsapp: true,
+});

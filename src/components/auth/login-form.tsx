@@ -4,11 +4,22 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { loginAction, type AuthFormState } from "@/app/(auth)/actions";
 import { FormAlert, FormNotice } from "./form-alert";
+import { GoogleSection } from "./google-button";
 import { PasswordField } from "./password-field";
 import { SubmitButton } from "./submit-button";
 import { TextField } from "./text-field";
 
-export function LoginForm({ notice }: { notice?: string }) {
+export function LoginForm({
+  notice,
+  alert,
+  googleEnabled = false,
+}: {
+  notice?: string;
+  /** Erro geral vindo da URL (ex.: falha ao entrar com o Google). */
+  alert?: string;
+  /** Mostra "Entrar com Google" (só quando as credenciais estão configuradas). */
+  googleEnabled?: boolean;
+}) {
   const [state, formAction, pending] = useActionState<AuthFormState, FormData>(
     loginAction,
     {},
@@ -32,53 +43,62 @@ export function LoginForm({ notice }: { notice?: string }) {
     <div className="flex flex-col gap-8">
       <h1 className="text-[1.75rem] font-semibold">Entrar na sua agenda</h1>
 
-      <form
-        ref={formRef}
-        action={formAction}
-        noValidate
-        className="flex flex-col gap-4"
-      >
-        {notice ? <FormNotice>{notice}</FormNotice> : null}
-        {state.error ? <FormAlert>{state.error}</FormAlert> : null}
+      <div className="flex flex-col gap-6">
+        <form
+          ref={formRef}
+          action={formAction}
+          noValidate
+          className="flex flex-col gap-4"
+        >
+          {notice ? <FormNotice>{notice}</FormNotice> : null}
+          {(state.error ?? alert) ? (
+            <FormAlert>{state.error ?? alert}</FormAlert>
+          ) : null}
 
-        <TextField
-          name="email"
-          label="E-mail"
-          type="email"
-          autoComplete="email"
-          autoCapitalize="none"
-          spellCheck={false}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-        />
-
-        <PasswordField
-          label="Senha"
-          autoComplete="current-password"
-          error={errors.password}
-          labelAside={
-            <Link
-              href="/recuperar-senha"
-              className="text-sm font-medium text-primary underline-offset-2 hover:underline"
-            >
-              Esqueci minha senha
-            </Link>
-          }
-        />
-
-        <div className="pt-1">
-          <SubmitButton
-            pending={pending}
-            idleLabel="Entrar"
-            pendingLabel="Entrando…"
+          <TextField
+            name="email"
+            label="E-mail"
+            type="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={errors.email}
           />
-        </div>
-      </form>
+
+          <PasswordField
+            label="Senha"
+            autoComplete="current-password"
+            error={errors.password}
+            labelAside={
+              <Link
+                href="/recuperar-senha"
+                className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+              >
+                Esqueci minha senha
+              </Link>
+            }
+          />
+
+          <div className="pt-1">
+            <SubmitButton
+              pending={pending}
+              idleLabel="Entrar"
+              pendingLabel="Entrando…"
+            />
+          </div>
+        </form>
+
+        {googleEnabled ? <GoogleSection intent="login" /> : null}
+      </div>
 
       <p className="text-ink-muted">
         Ainda não tem conta?{" "}
-        <Link href="/cadastro" className="font-semibold text-primary underline-offset-2 hover:underline">
+        <Link
+          href="/cadastro"
+          className="font-semibold text-primary underline-offset-2 hover:underline"
+        >
           Criar agenda grátis
         </Link>
       </p>

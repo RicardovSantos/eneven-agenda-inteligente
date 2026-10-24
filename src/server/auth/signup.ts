@@ -52,30 +52,84 @@ export async function signup(
   if (existing) throw emailTaken();
 
   const passwordHash = await hashPassword(data.password);
+  return createTenantWithOwner(
+    db,
+    {
+      businessName: data.businessName,
+      ownerName: data.ownerName,
+      email: data.email,
+      whatsapp: data.whatsapp,
+      passwordHash,
+      emailVerifiedAt: null,
+    },
+    now,
+  );
+}
+
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+export type NewTenantOwner = {
+  businessName: string;
+  ownerName: string;
+  /** Já validado e em minúsculas. */
+  email: string;
+  /** Já normalizado (`55` + DDD + número). */
+  whatsapp: string;
+  /** `null` em contas criadas pelo Google (sem senha). */
+  passwordHash: string | null;
+  emailVerifiedAt: Date | null;
+};
+
+/**
+ * Cria o estabelecimento (em teste por 14 dias), o usuário e o vínculo
+ * `owner` numa única transação. É a regra única de cadastro, usada pelo
+ * cadastro com senha e pelo cadastro com o Google.
+ *
+ * `inTransaction` roda dentro da mesma transação, depois das linhas criadas
+ * (o cadastro com o Google grava o vínculo `oauth_accounts` ali). Lança
+ * `AuthError` se o e-mail já tem conta. Uma colisão de slug por corrida é
+ * repetida até 3 vezes.
+ */
+export async function createTenantWithOwner(
+  db: Db,
+  input: NewTenantOwner,
+  now: Date = new Date(),
+  inTransaction?: (
+    tx: Tx,
+    created: { userId: string; tenantId: string },
+  ) => Promise<void>,
+): Promise<{ userId: string; tenantId: string; slug: string }> {
   const trialEndsAt = new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
 
   for (let attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt++) {
-    const slug = await generateUniqueSlug(db, data.businessName);
+    const slug = await generateUniqueSlug(db, input.businessName);
     try {
       return await db.transaction(async (tx) => {
         const [tenant] = await tx
           .insert(tenants)
           .values({
             slug,
-            name: data.businessName,
+            name: input.businessName,
             status: "trial",
             trialEndsAt,
-            whatsapp: data.whatsapp,
+            whatsapp: input.whatsapp,
           })
           .returning({ id: tenants.id });
         const [user] = await tx
           .insert(users)
-          .values({ email: data.email, passwordHash, name: data.ownerName })
+          .values({
+            email: input.email,
+            passwordHash: input.passwordHash,
+            name: input.ownerName,
+            emailVerifiedAt: input.emailVerifiedAt,
+          })
           .returning({ id: users.id });
         await tx
           .insert(memberships)
           .values({ userId: user.id, tenantId: tenant.id, role: "owner" });
-        return { userId: user.id, tenantId: tenant.id, slug };
+        const created = { userId: user.id, tenantId: tenant.id };
+        await inTransaction?.(tx, created);
+        return { ...created, slug };
       });
     } catch (error) {
       if (isUniqueViolation(error, "users_email_unique")) throw emailTaken();

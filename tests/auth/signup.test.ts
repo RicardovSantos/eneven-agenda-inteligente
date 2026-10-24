@@ -40,7 +40,7 @@ describe("signup", () => {
     expect(user.isSuperAdmin).toBe(false);
     expect(user.emailVerifiedAt).toBeNull();
     expect(user.passwordHash).not.toContain("senha-forte-1");
-    expect(await verifyPassword(user.passwordHash, "senha-forte-1")).toBe(true);
+    expect(await verifyPassword(user.passwordHash!, "senha-forte-1")).toBe(true);
 
     const rows = await db.select().from(memberships).where(eq(memberships.userId, r.userId));
     expect(rows).toEqual([{ userId: r.userId, tenantId: r.tenantId, role: "owner" }]);

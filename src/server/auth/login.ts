@@ -26,7 +26,9 @@ export async function login(
     .where(eq(users.email, normalizeEmail(email)))
     .limit(1);
 
-  if (!user) {
+  // Sem usuário, ou conta só do Google (sem senha): gasta o mesmo tempo de uma
+  // conferência de verdade e responde como senha incorreta.
+  if (!user || user.passwordHash === null) {
     dummyHash ??= hashPassword("senha-descartavel-para-equalizar-tempo");
     await verifyPassword(await dummyHash, password);
     return null;
