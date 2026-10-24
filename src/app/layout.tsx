@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Figtree, Outfit } from "next/font/google";
+import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from "@/lib/brand";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -18,8 +19,8 @@ const figtree = Figtree({
 
 export const metadata: Metadata = {
   title: {
-    default: "Eneven Agendamentos Inteligentes",
-    template: "%s · Eneven Agenda",
+    default: PRODUCT_NAME,
+    template: `%s · ${PRODUCT_SHORT_NAME}`,
   },
   description: "Agenda online para salões, estúdios e clínicas de estética.",
   icons: {

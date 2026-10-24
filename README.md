@@ -20,6 +20,29 @@ pnpm dev
 
 A aplicação abre em http://localhost:3000. A verificação de saúde responde em `GET /api/health` com `{"status":"ok"}`.
 
+## Variáveis de ambiente
+
+O `.env.example` lista todas. Em produção (`NODE_ENV=production`) algumas são obrigatórias:
+
+| Variável | Para quê | Em produção |
+|---|---|---|
+| `DATABASE_URL` | PostgreSQL | obrigatória |
+| `APP_URL` | endereço público (links dos e-mails e retorno do Google) | obrigatória |
+| `SESSION_SECRET` | assina o cookie temporário do Google (`openssl rand -hex 32`) | obrigatória, e também sempre que `APP_URL` for https |
+| `ZEPTOMAIL_TOKEN` | envio de e-mails; pode ser colado com ou sem o prefixo `Zoho-enczapikey ` | obrigatória (sem ela o envio falha; em desenvolvimento o e-mail só aparece no console) |
+| `ZEPTOMAIL_URL` | endereço da API do ZeptoMail (padrão `https://cpaas.zoho.com/v1.1/email`, precisa ser https) | opcional |
+| `EMAIL_FROM` | remetente (`nao-responda@eneven.com.br`) | obrigatória com o token |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | botão "Entrar com Google" | opcionais |
+| `LEGAL_OWNER_NAME`, `LEGAL_OWNER_DOC`, `LEGAL_CONTACT_EMAIL` | responsável, CPF ou CNPJ (omitido se vazio) e e-mail de contato nas páginas `/termos` e `/privacidade` | opcionais (padrões: Ricardo Santos e eneventech@gmail.com) |
+
+## Termos de uso e política de privacidade
+
+As páginas públicas `/termos` e `/privacidade` vêm do texto em `src/content/legal.ts` (transcrito do rascunho em `docs/legal/termos-e-privacidade.md`, que pede revisão jurídica). Ao mudar o texto, atualize `LEGAL_LAST_UPDATED` no mesmo arquivo; as variáveis `LEGAL_*` são lidas a cada acesso, sem novo build.
+
+## Limite de tentativas
+
+Login (10 tentativas por IP e e-mail e 30 por IP, a cada 15 minutos), cadastro (5 por hora por IP) e recuperação de senha (5 por hora por IP e por e-mail) têm limite. A contagem fica na memória do processo, o que basta enquanto o serviço roda em uma instância só (Easypanel); com mais de uma, troque por um armazenamento compartilhado (`src/server/security/`). O IP vem do primeiro item de `x-forwarded-for`, então o proxy na frente precisa sobrescrever esse cabeçalho (o Traefik do Easypanel faz isso).
+
 ## Entrar com o Google
 
 O botão "Entrar com Google" e "Criar conta com Google" só aparece quando `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` estão no `.env`. Sem eles tudo funciona só com e-mail e senha. Para criar as credenciais:
@@ -43,11 +66,11 @@ pnpm typecheck   # TypeScript
 pnpm build       # build de produção
 ```
 
-O CI (`.github/workflows/ci.yml`) roda lint, typecheck e testes a cada push e pull request.
+O CI (`.github/workflows/ci.yml`) roda lint, typecheck e testes a cada push na `main` e em todo pull request (uma nova execução na mesma branch cancela a anterior).
 
 ## Como trocar a logo
 
-A logo oficial fica em `marca/logo.png`. Para trocá-la, substitua o arquivo mantendo o mesmo nome e formato e refaça o deploy. Ícones, favicons e imagens de compartilhamento são gerados por script a partir desse arquivo (em `public/brand/`, que não vai para o Git), então nada é editado à mão.
+A logo oficial fica em `marca/logo.png`. Para trocá-la, substitua o arquivo mantendo o mesmo nome e formato e refaça o deploy. Ícones, favicons e imagens de compartilhamento são gerados por script (`pnpm brand`, que roda sozinho antes do `dev` e do `build`) a partir desse arquivo, em `public/brand/` (que não vai para o Git), então nada é editado à mão. O recorte do símbolo é configurado em `marca/marca.config.json`; o script valida o arquivo e avisa se a logo não existe ou se `symbolRegion` não pega o símbolo.
 
 ## Documentação
 

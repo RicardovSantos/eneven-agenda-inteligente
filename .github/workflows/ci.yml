@@ -2,7 +2,17 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+# O CI só lê o código: nenhuma permissão de escrita no repositório.
+permissions:
+  contents: read
+
+# Um novo envio na mesma branch ou PR cancela a execução anterior.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   qualidade:

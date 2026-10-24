@@ -16,7 +16,7 @@ export function SubmitButton({
       {pending ? (
         <>
           <Loader2 className="animate-spin" aria-hidden="true" />
-          <span role="status">{pendingLabel}</span>
+          {pendingLabel}
         </>
       ) : (
         idleLabel
