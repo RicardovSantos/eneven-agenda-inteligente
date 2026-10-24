@@ -4,6 +4,7 @@ import {
   forgotPasswordByIpLimiter,
   limitForgotPassword,
   limitLogin,
+  loginByEmailLimiter,
   loginByIpAndEmailLimiter,
   loginByIpLimiter,
   resetRateLimitsForTests,
@@ -32,6 +33,25 @@ describe("limitLogin", () => {
     for (let i = 0; i < 30; i++) limitLogin("1.1.1.1", `p${i}@x.com`, 0);
     const result = limitLogin("1.1.1.1", "ana@x.com", 60_000);
     expect(result).toEqual({ ok: false, retryAfterSec: 14 * 60 });
+  });
+
+  it("100 tentativas por e-mail em 24 h, venham de onde vierem; a 101ª é recusada", () => {
+    for (let i = 0; i < 100; i++) {
+      expect(limitLogin(`10.0.0.${i}`, "ana@x.com", 0).ok).toBe(true);
+    }
+    const blocked = limitLogin("10.9.9.9", "ana@x.com", 60_000);
+    expect(blocked).toEqual({ ok: false, retryAfterSec: 24 * 3600 - 60 });
+    // outro e-mail, mesmo IP, não é afetado
+    expect(limitLogin("10.9.9.9", "outra@x.com", 60_000).ok).toBe(true);
+    // passadas 24 h a conta volta a poder tentar
+    expect(limitLogin("10.9.9.9", "ana@x.com", 24 * 3600_000 + 1).ok).toBe(true);
+  });
+
+  it("o teto por e-mail só conta depois do IP: IP bloqueado não gasta tentativas da conta", () => {
+    for (let i = 0; i < 30; i++) limitLogin("1.1.1.1", `p${i}@x.com`, 0);
+    expect(loginByEmailLimiter.size()).toBe(30);
+    for (let i = 0; i < 50; i++) expect(limitLogin("1.1.1.1", "alvo@x.com", 1).ok).toBe(false);
+    expect(loginByEmailLimiter.size()).toBe(30);
   });
 
   it("chaves por IP + e-mail têm limite duro de 10 000", () => {
