@@ -25,9 +25,26 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** URL pública da aplicação, sem barra no final. */
+/**
+ * URL pública da aplicação, sem barra no final. Em produção `APP_URL` é
+ * obrigatório: sem ele os links dos e-mails apontariam para localhost.
+ *
+ * Exceção: durante o `next build` (`NEXT_PHASE=phase-production-build`, que
+ * roda com NODE_ENV=production) a ausência não lança, para `pnpm build`
+ * funcionar localmente sem configurar nada. No Docker o build recebe
+ * `APP_URL` (ARG) e o endereço entra no HTML estático; o servidor em
+ * produção sempre confere.
+ */
 export function appUrl(): string {
-  return (process.env.APP_URL?.trim() || "http://localhost:3000").replace(/\/+$/, "");
+  const configured = process.env.APP_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, "");
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.NEXT_PHASE !== "phase-production-build"
+  ) {
+    throw new Error("APP_URL não definido");
+  }
+  return "http://localhost:3000";
 }
 
 export const verifyLink = (token: string) =>
@@ -60,7 +77,7 @@ function renderLayout({ heading, bodyHtml, buttonLabel, link, noteHtml }: Layout
 <tr><td align="center" style="padding:24px 16px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
 <tr><td style="background:#FFFFFF;border-radius:16px;padding:32px;font-family:${FONT};color:${COLORS.ink};">
-<img src="${escapeHtml(appUrl())}/brand/logo.png" width="160" alt="Eneven Agendamentos Inteligentes" style="display:block;width:160px;height:auto;border:0;outline:none;text-decoration:none;">
+<img src="${escapeHtml(appUrl())}/brand/logo-email.png" width="160" alt="Eneven Agendamentos Inteligentes" style="display:block;width:160px;height:auto;border:0;outline:none;text-decoration:none;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 24px 0;"><tr><td width="120" height="3" style="width:120px;height:3px;font-size:0;line-height:0;border-radius:999px;background:${COLORS.accent};background-image:${FIO_GRADIENT};">&nbsp;</td></tr></table>
 <h1 style="margin:0 0 16px 0;font-family:${FONT};font-size:22px;line-height:1.3;font-weight:bold;color:${COLORS.ink};">${escapeHtml(heading)}</h1>
 <p style="margin:0 0 24px 0;font-family:${FONT};font-size:16px;line-height:1.5;color:${COLORS.ink};">${bodyHtml}</p>

@@ -35,6 +35,13 @@ RUN pnpm build && pnpm build:migrate && pnpm build:admin
 FROM node:24-alpine AS runtime
 WORKDIR /app
 
+# Endereço público em tempo de execução (links dos e-mails, retorno do Google).
+# ARG não passa de um estágio para o outro, então é declarado de novo aqui. O
+# padrão cobre o deploy normal; a variável do Easypanel, se existir, prevalece.
+# Em produção a aplicação recusa subir sem APP_URL (ver `appUrl()`).
+ARG APP_URL=https://agenda.eneven.com.br
+ENV APP_URL=$APP_URL
+
 ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
