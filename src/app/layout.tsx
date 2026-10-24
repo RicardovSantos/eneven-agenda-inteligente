@@ -1,29 +1,51 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Figtree, Outfit } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const outfit = Outfit({
+  variable: "--font-outfit",
   subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const figtree = Figtree({
+  variable: "--font-figtree",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Eneven Agendamentos Inteligentes",
+  title: {
+    default: "Eneven Agendamentos Inteligentes",
+    template: "%s · Eneven Agenda",
+  },
   description: "Agenda online para salões, estúdios e clínicas de estética.",
+  icons: {
+    icon: [
+      { url: "/brand/favicon.ico", sizes: "any" },
+      { url: "/brand/icon-32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: "/brand/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7f6fc" },
+    { media: "(prefers-color-scheme: dark)", color: "#15131f" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${outfit.variable} ${figtree.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }
