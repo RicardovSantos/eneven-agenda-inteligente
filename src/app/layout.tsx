@@ -1,7 +1,9 @@
-import type { Metadata, Viewport } from "next";
 import { Figtree, Outfit } from "next/font/google";
-import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from "@/lib/brand";
+import { RegisterSw } from "@/components/pwa/register-sw";
 import "./globals.css";
+
+// Metadados e viewport vivem em site-metadata.ts (testáveis fora do next/font).
+export { metadata, viewport } from "./site-metadata";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -17,36 +19,16 @@ const figtree = Figtree({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: PRODUCT_NAME,
-    template: `%s · ${PRODUCT_SHORT_NAME}`,
-  },
-  description: "Agenda online para salões, estúdios e clínicas de estética.",
-  icons: {
-    icon: [
-      { url: "/brand/favicon.ico", sizes: "any" },
-      { url: "/brand/icon-32.png", type: "image/png", sizes: "32x32" },
-    ],
-    apple: "/brand/apple-touch-icon.png",
-  },
-};
-
-export const viewport: Viewport = {
-  colorScheme: "light dark",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f6fc" },
-    { media: "(prefers-color-scheme: dark)", color: "#15131f" },
-  ],
-};
-
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="pt-BR"
       className={`${outfit.variable} ${figtree.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <RegisterSw />
+      </body>
     </html>
   );
 }

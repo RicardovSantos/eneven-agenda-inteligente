@@ -1,3 +1,4 @@
+import { InstallHint } from "@/components/pwa/install-hint";
 import { PanelShell } from "@/components/panel/panel-shell";
 import { getPanelData } from "@/server/panel/data";
 
@@ -8,6 +9,7 @@ export default async function PainelLayout({
   return (
     <PanelShell userName={userName} tenantName={tenantName}>
       {children}
+      <InstallHint />
     </PanelShell>
   );
 }

@@ -1,0 +1,24 @@
+# Fora da imagem: dependências, artefatos de build, segredos e arquivos locais.
+# `marca/` e `scripts/` PRECISAM entrar: o `prebuild` gera os ícones a partir
+# de marca/ (scripts/brand) e o build gera os scripts de produção.
+node_modules
+.next
+dist
+.data
+.git
+.github
+.superpowers
+.claude
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+coverage
+npm-debug.log*
+.DS_Store
+*.pem
+Dockerfile
+.dockerignore
+docs
+tests

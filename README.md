@@ -72,6 +72,45 @@ O CI (`.github/workflows/ci.yml`) roda lint, typecheck e testes a cada push na `
 
 A logo oficial fica em `marca/logo.png`. Para trocá-la, substitua o arquivo mantendo o mesmo nome e formato e refaça o deploy. Ícones, favicons e imagens de compartilhamento são gerados por script (`pnpm brand`, que roda sozinho antes do `dev` e do `build`) a partir desse arquivo, em `public/brand/` (que não vai para o Git), então nada é editado à mão. O recorte do símbolo é configurado em `marca/marca.config.json`; o script valida o arquivo e avisa se a logo não existe ou se `symbolRegion` não pega o símbolo.
 
+## Deploy
+
+A aplicação roda em um container (`Dockerfile`, Node 24 Alpine) no Easypanel, em `https://agenda.eneven.com.br`, com um serviço PostgreSQL ao lado.
+
+**Como a imagem é feita.** O estágio de build instala todas as dependências dentro do Alpine, roda `pnpm build` (que antes gera os ícones em `public/brand/` a partir de `marca/logo.png`) e compila os dois scripts de operação em `dist/`. A imagem final leva só o servidor standalone do Next, `public/`, `drizzle/` e `dist/`, roda como usuário sem privilégios na porta 3000 e tem `HEALTHCHECK` em `/api/health`. Ao subir, `scripts/start.sh` aplica as migrações pendentes (`node dist/migrate.mjs`) e só então inicia o servidor; se a migração falhar, o container não sobe.
+
+**Variáveis do serviço (Easypanel)**
+
+| Variável | Valor |
+|---|---|
+| `DATABASE_URL` | endereço interno do PostgreSQL (`postgres://usuario:senha@agenda-db:5432/banco`) |
+| `APP_URL` | `https://agenda.eneven.com.br` |
+| `SESSION_SECRET` | aleatório (`openssl rand -hex 32`) |
+| `ZEPTOMAIL_TOKEN` e `EMAIL_FROM` | envio de e-mails |
+| `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` | opcionais |
+| `LEGAL_*` | opcionais |
+
+O `APP_URL` também entra no build como argumento (`ARG APP_URL`, padrão `https://agenda.eneven.com.br`), porque páginas estáticas como a inicial gravam nele o endereço da imagem de compartilhamento. Se o domínio mudar, passe `--build-arg APP_URL=...` (ou crie o argumento no Easypanel) e refaça o build.
+
+**Domínio e DNS.** Registro `A agenda` apontando para o IP da VPS, com o proxy da Cloudflare desligado (nuvem cinza); o Easypanel emite o HTTPS. Domínio do serviço na porta 3000.
+
+**Migrações à mão** (dentro do container, no terminal do Easypanel):
+
+```bash
+node dist/migrate.mjs
+```
+
+**Criar o super-admin** (dono da plataforma; a senha vem só da variável de ambiente, com 12 caracteres ou mais):
+
+```bash
+SUPER_ADMIN_PASSWORD='uma-senha-longa' node dist/create-super-admin.mjs email@exemplo.com "Nome"
+```
+
+**Gerar `dist/` localmente** (para testar fora do Docker): `pnpm build:migrate` e `pnpm build:admin`.
+
+**App instalável (PWA).** `/manifest.webmanifest` vem de `src/app/manifest.ts` e o service worker é `public/sw.js` (registrado só em produção). Ele guarda em cache apenas `/offline.html` e os ícones da marca; navegações vão sempre à rede e, sem conexão, mostram a página offline. Nada de `/api/*`, Server Actions ou páginas do painel entra no cache. Para forçar a atualização do cache (por exemplo, depois de trocar a logo), aumente `CACHE_VERSION` em `public/sw.js`.
+
+**Depois do deploy:** confira `https://agenda.eneven.com.br/api/health` (`{"status":"ok"}`), o manifest, o cadastro com e-mail de confirmação e a prévia do link no WhatsApp. Cadastre o monitor no UptimeRobot em `/api/health` e ative o backup diário do banco no Easypanel.
+
 ## Documentação
 
 - Documento de projeto: [docs/superpowers/specs/2026-10-24-eneven-agenda-inteligente-design.md](docs/superpowers/specs/2026-10-24-eneven-agenda-inteligente-design.md)
