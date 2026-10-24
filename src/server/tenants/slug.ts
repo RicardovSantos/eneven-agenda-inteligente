@@ -1,6 +1,11 @@
 import { inArray } from "drizzle-orm";
 import { tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { MAX_SLUG_LENGTH, slugify, truncateSlug } from "@/lib/slugify";
+
+// `slugify` mora em `src/lib/slugify.ts` (sem imports de servidor) para a
+// prévia do cadastro usar a mesma regra no navegador. Reexportado aqui.
+export { FALLBACK_SLUG, MAX_SLUG_LENGTH, slugify } from "@/lib/slugify";
 
 export const RESERVED_SLUGS: readonly string[] = [
   "painel",
@@ -21,30 +26,6 @@ export const RESERVED_SLUGS: readonly string[] = [
   "_next",
 ];
 
-export const FALLBACK_SLUG = "estabelecimento";
-export const MAX_SLUG_LENGTH = 48;
-
-/** Corta em `max` caracteres, preferindo o último hífen (sem cortar palavra). */
-function truncate(slug: string, max: number): string {
-  if (slug.length <= max) return slug;
-  const cut = slug.slice(0, max);
-  if (slug[max] === "-") return cut.replace(/-+$/, "");
-  const lastHyphen = cut.lastIndexOf("-");
-  const result = lastHyphen > 0 ? cut.slice(0, lastHyphen) : cut;
-  return result.replace(/-+$/, "");
-}
-
-export function slugify(name: string): string {
-  const slug = name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/['’`´]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return truncate(slug, MAX_SLUG_LENGTH) || FALLBACK_SLUG;
-}
-
 /**
  * Gera um slug livre: não reservado e ainda não usado por outro
  * estabelecimento. Em colisão acrescenta `-2`, `-3`, ...
@@ -60,7 +41,7 @@ export async function generateUniqueSlug(
   const candidate = (n: number) =>
     n === 1
       ? base
-      : `${truncate(base, MAX_SLUG_LENGTH - `-${n}`.length)}-${n}`;
+      : `${truncateSlug(base, MAX_SLUG_LENGTH - `-${n}`.length)}-${n}`;
 
   const batchSize = 20;
   for (let start = 1; ; start += batchSize) {
