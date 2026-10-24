@@ -1,12 +1,7 @@
-import { PRODUCT_NAME } from "@/lib/brand";
+import { redirect } from "next/navigation";
+import { getCurrentSession, homePathFor } from "@/server/auth/guard";
 
-export default function Home() {
-  return (
-    <main className="flex flex-1 flex-col items-start justify-center gap-2 px-6 py-16">
-      <h1 className="text-3xl font-semibold tracking-tight">
-        {PRODUCT_NAME}
-      </h1>
-      <p className="text-muted-foreground">Em construção.</p>
-    </main>
-  );
+/** A raiz não tem conteúdo próprio: quem já entrou vai ao seu painel; os demais, a `/entrar`. */
+export default async function Home() {
+  redirect(homePathFor(await getCurrentSession()) ?? "/entrar");
 }

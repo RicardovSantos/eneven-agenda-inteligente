@@ -16,7 +16,7 @@ import {
   parsePendingProfile,
   resolveGoogleUser,
 } from "@/server/auth/google";
-import { resolveLoginTenantId } from "@/server/auth/login";
+import { resolveLoginTarget } from "@/server/auth/login";
 import { completeGoogleSchema } from "@/server/auth/schemas";
 import { createSession } from "@/server/auth/session";
 import { currentClientIp } from "@/server/security/client-ip";
@@ -60,6 +60,7 @@ export async function completeGoogleSignupAction(
   }
 
   let token: string;
+  let redirectTo = "/painel";
   try {
     const db = await getDb();
 
@@ -69,8 +70,9 @@ export async function completeGoogleSignupAction(
     if (resolved.kind === "error") return { error: GOOGLE_ERROR_MESSAGE };
 
     if (resolved.kind === "existing") {
-      const tenantId = await resolveLoginTenantId(db, resolved.userId);
-      token = await createSession(db, resolved.userId, tenantId);
+      const target = await resolveLoginTarget(db, resolved.userId);
+      redirectTo = target.redirectTo;
+      token = await createSession(db, resolved.userId, target.tenantId);
     } else {
       const account = await completeGoogleSignup(db, profile, input);
       token = await createSession(db, account.userId, account.tenantId);
@@ -87,7 +89,7 @@ export async function completeGoogleSignupAction(
 
   await setSessionCookie(token);
   await clearPendingCookie();
-  redirect("/painel");
+  redirect(redirectTo);
 }
 
 /** "Usar outra conta": esquece o perfil do Google e volta ao cadastro. */

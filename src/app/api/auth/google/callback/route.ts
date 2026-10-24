@@ -15,7 +15,7 @@ import {
   resolveGoogleUser,
   signPendingProfile,
 } from "@/server/auth/google";
-import { resolveLoginTenantId } from "@/server/auth/login";
+import { resolveLoginTarget } from "@/server/auth/login";
 import {
   SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
@@ -35,19 +35,23 @@ type Outcome =
  * cancelamento: `/entrar?erro=google`. Os cookies do fluxo são sempre apagados.
  */
 export async function GET(request: NextRequest) {
-  const base = publicBaseUrl(request.nextUrl.origin);
-
+  let base: string | null = null;
   let outcome: Outcome;
   try {
+    // Dentro do try: sem APP_URL em produção cai em `/entrar?erro=google`, não num 500.
+    base = publicBaseUrl(request.nextUrl.origin);
     outcome = await handle(request, base);
   } catch (error) {
     console.error("Falha no retorno do Google", error);
     outcome = { to: "error" };
   }
 
-  const response = NextResponse.redirect(
-    `${base}${outcome.to === "error" ? "/entrar?erro=google" : outcome.to}`,
-  );
+  const destination = outcome.to === "error" ? "/entrar?erro=google" : outcome.to;
+  // Sem endereço público confiável (APP_URL ausente) o redirecionamento é
+  // relativo: a origem da requisição, atrás do proxy, é a interna.
+  const response = base
+    ? NextResponse.redirect(`${base}${destination}`)
+    : new NextResponse(null, { status: 307, headers: { Location: destination } });
   for (const name of [OAUTH_STATE_COOKIE, OAUTH_VERIFIER_COOKIE, OAUTH_INTENT_COOKIE]) {
     response.cookies.set(name, "", sessionCookieOptions(0));
   }
@@ -99,7 +103,7 @@ async function handle(request: NextRequest, base: string): Promise<Outcome> {
     return { to: "/cadastro/completar", pending: signPendingProfile(profile) };
   }
 
-  const tenantId = await resolveLoginTenantId(db, result.userId);
+  const { tenantId, redirectTo } = await resolveLoginTarget(db, result.userId);
   const session = await createSession(db, result.userId, tenantId);
 
   // Quem já tinha uma sessão neste navegador perde a antiga.
@@ -111,5 +115,5 @@ async function handle(request: NextRequest, base: string): Promise<Outcome> {
       console.error("Falha ao apagar a sessão antiga", error);
     }
   }
-  return { to: "/painel", session };
+  return { to: redirectTo, session };
 }

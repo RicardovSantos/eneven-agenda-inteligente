@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { memberships, sessions, tenants, users } from "@/db/schema";
 import type { Db } from "@/db/types";
-import { login, resolveLoginTenantId } from "@/server/auth/login";
+import { login, resolveLoginTarget, resolveLoginTenantId } from "@/server/auth/login";
 import { hashPassword, verifyPassword } from "@/server/auth/password";
 import {
   createSession,
@@ -55,6 +55,34 @@ describe("login e sessão", () => {
       .values({ email: "root@eneven.com", passwordHash: "x", name: "Root", isSuperAdmin: true })
       .returning();
     expect(await resolveLoginTenantId(db, admin.id)).toBeNull();
+  });
+
+  it("destino do login: estabelecimento -> /painel; super-admin sem vínculo -> /admin", async () => {
+    expect(await resolveLoginTarget(db, r.userId)).toEqual({
+      tenantId: r.tenantId,
+      redirectTo: "/painel",
+    });
+    const [admin] = await db
+      .insert(users)
+      .values({ email: "root@eneven.com", passwordHash: "x", name: "Root", isSuperAdmin: true })
+      .returning();
+    expect(await resolveLoginTarget(db, admin.id)).toEqual({ tenantId: null, redirectTo: "/admin" });
+  });
+
+  it("super-admin que também tem um estabelecimento continua indo ao painel dele", async () => {
+    await db.update(users).set({ isSuperAdmin: true }).where(eq(users.id, r.userId));
+    expect(await resolveLoginTarget(db, r.userId)).toEqual({
+      tenantId: r.tenantId,
+      redirectTo: "/painel",
+    });
+  });
+
+  it("sem vínculo e sem ser super-admin: sessão sem tenant, vai a /painel (que manda para /entrar)", async () => {
+    const [nobody] = await db
+      .insert(users)
+      .values({ email: "sem@vinculo.com", passwordHash: "x", name: "Sem" })
+      .returning();
+    expect(await resolveLoginTarget(db, nobody.id)).toEqual({ tenantId: null, redirectTo: "/painel" });
   });
 
   it("cria sessão, grava só o hash do token e devolve o papel", async () => {

@@ -3,12 +3,13 @@ import { redirect } from "next/navigation";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/login-form";
 import { GOOGLE_ERROR_MESSAGE, isGoogleConfigured } from "@/server/auth/google";
-import { canAccessTenantPanel, getCurrentSession } from "@/server/auth/guard";
+import { getCurrentSession, homePathFor } from "@/server/auth/guard";
 
 export const metadata: Metadata = { title: "Entrar" };
 
 export default async function EntrarPage({ searchParams }: PageProps<"/entrar">) {
-  if (canAccessTenantPanel(await getCurrentSession())) redirect("/painel");
+  const home = homePathFor(await getCurrentSession());
+  if (home) redirect(home);
 
   const { senha, erro } = await searchParams;
   const notice =

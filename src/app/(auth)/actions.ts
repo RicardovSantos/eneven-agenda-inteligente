@@ -11,7 +11,7 @@ import {
 import { resetPassword } from "@/server/auth/email-tokens";
 import { AuthError } from "@/server/auth/errors";
 import { requireTenantSession } from "@/server/auth/guard";
-import { login, normalizeEmail, resolveLoginTenantId } from "@/server/auth/login";
+import { login, normalizeEmail, resolveLoginTarget } from "@/server/auth/login";
 import {
   LOGIN_FAILED_MESSAGE,
   forgotPasswordSchema,
@@ -117,12 +117,14 @@ export async function loginAction(
   if (!limit.ok) return { error: rateLimitMessage(limit.retryAfterSec) };
 
   let token: string;
+  let redirectTo: string;
   try {
     const db = await getDb();
     const result = await login(db, parsed.data.email, parsed.data.password);
     if (!result) return { error: LOGIN_FAILED_MESSAGE };
-    const tenantId = await resolveLoginTenantId(db, result.userId);
-    token = await createSession(db, result.userId, tenantId);
+    const target = await resolveLoginTarget(db, result.userId);
+    redirectTo = target.redirectTo;
+    token = await createSession(db, result.userId, target.tenantId);
     await destroyCurrentSession(db);
   } catch (error) {
     console.error("Falha no login", error);
@@ -130,7 +132,7 @@ export async function loginAction(
   }
 
   await setSessionCookie(token);
-  redirect("/painel");
+  redirect(redirectTo);
 }
 
 /** Usada com `useActionState`; não precisa do estado anterior nem do formulário. */

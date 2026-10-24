@@ -62,3 +62,34 @@ export async function resolveLoginTenantId(
     .limit(2);
   return rows.length === 1 ? rows[0].tenantId : null;
 }
+
+/** Para onde o login leva: o painel do estabelecimento ou o painel da plataforma. */
+export type LoginTarget = {
+  tenantId: string | null;
+  redirectTo: "/painel" | "/admin";
+};
+
+/**
+ * Tenant da sessão e destino depois de entrar. Super-admin sem nenhum
+ * vínculo com estabelecimento vai para `/admin`; os demais, para `/painel`
+ * (quem não tem vínculo nem é super-admin é mandado de volta a `/entrar`
+ * pelo guard do painel).
+ */
+export async function resolveLoginTarget(db: Db, userId: string): Promise<LoginTarget> {
+  const memberRows = await db
+    .select({ tenantId: memberships.tenantId })
+    .from(memberships)
+    .where(eq(memberships.userId, userId))
+    .limit(2);
+  const tenantId = memberRows.length === 1 ? memberRows[0].tenantId : null;
+
+  if (memberRows.length === 0) {
+    const [user] = await db
+      .select({ isSuperAdmin: users.isSuperAdmin })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (user?.isSuperAdmin) return { tenantId: null, redirectTo: "/admin" };
+  }
+  return { tenantId, redirectTo: "/painel" };
+}

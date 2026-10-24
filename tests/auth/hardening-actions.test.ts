@@ -146,6 +146,37 @@ describe("ações de autenticação: rate limit e sessão antiga", () => {
       );
     });
 
+    it("super-admin sem estabelecimento vai para /admin, com a sessão criada", async () => {
+      const { hashPassword } = await import("@/server/auth/password");
+      const [admin] = await db
+        .insert(users)
+        .values({
+          email: "root@eneven.com",
+          passwordHash: await hashPassword("senha-forte-1"),
+          name: "Root",
+          isSuperAdmin: true,
+        })
+        .returning();
+      await expect(login("root@eneven.com", "senha-forte-1")).rejects.toThrow(
+        "NEXT_REDIRECT:/admin",
+      );
+      const rows = await db.select().from(sessions).where(eq(sessions.userId, admin.id));
+      expect(rows).toHaveLength(1);
+      expect(rows[0].tenantId).toBeNull();
+      expect(state.jar.has("ea_session")).toBe(true);
+    });
+
+    it("limite por conta: 100 tentativas por e-mail em 24 h, mesmo trocando de IP", async () => {
+      for (let i = 0; i < 100; i++) {
+        state.ip = `203.0.113.${i}`;
+        limits.limitLogin(state.ip, "ana@defendi.com");
+      }
+      state.ip = "198.51.100.200";
+      expect(await login("ana@defendi.com", "senha-forte-1")).toEqual({
+        error: "Muitas tentativas. Tente de novo em 1440 minutos.",
+      });
+    });
+
     it("dados inválidos não gastam tentativas", async () => {
       for (let i = 0; i < 40; i++) {
         expect((await login("nao-e-email", "x")).fieldErrors?.email).toBeDefined();

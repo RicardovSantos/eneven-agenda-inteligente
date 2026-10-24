@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextRequest, type NextResponse } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { memberships, sessions } from "@/db/schema";
+import { memberships, sessions, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import {
   GOOGLE_PENDING_PURPOSE,
@@ -237,6 +237,35 @@ describe("rotas do Google", () => {
       expect(await getSession(db, cookie!.value)).not.toBeNull();
     });
 
+    it("o retorno sem APP_URL redireciona para /entrar?erro=google (não é um 500) e apaga os cookies", async () => {
+      vi.stubEnv("APP_URL", "");
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { GET } = await import("@/app/api/auth/google/callback/route");
+      const response = await GET(
+        callbackRequest({
+          query: goodQuery,
+          cookies: {
+            "__Host-ea_oauth_state": "state-fixo",
+            "__Host-ea_oauth_verifier": "verifier-fixo",
+            "__Host-ea_oauth_intent": "login",
+          },
+        }),
+      );
+      spy.mockRestore();
+      expect(response.status).toBe(307);
+      // Sem APP_URL não há endereço público confiável: o redirecionamento é relativo.
+      expect(location(response)).toBe("/entrar?erro=google");
+      expect(state.exchange).not.toHaveBeenCalled();
+      expect(response.cookies.get("__Host-ea_session")).toBeUndefined();
+      for (const name of [
+        "__Host-ea_oauth_state",
+        "__Host-ea_oauth_verifier",
+        "__Host-ea_oauth_intent",
+      ]) {
+        expect(response.cookies.get(name)).toMatchObject({ value: "", maxAge: 0 });
+      }
+    });
+
     it("sem APP_URL não monta a URI de retorno a partir da requisição", async () => {
       vi.stubEnv("APP_URL", "");
       const { GET } = await import("@/app/api/auth/google/route");
@@ -383,6 +412,20 @@ describe("rotas do Google", () => {
       const [row] = await db.select().from(sessions).where(eq(sessions.id, hashToken(token)));
       expect(row.userId).toBe(ana.userId);
       expect(row.tenantId).toBe(ana.tenantId);
+    });
+
+    it("super-admin sem estabelecimento: cria a sessão e vai para /admin", async () => {
+      const [admin] = await db
+        .insert(users)
+        .values({ email: "root@eneven.com", passwordHash: null, name: "Root", isSuperAdmin: true })
+        .returning();
+      state.claims = claims({ sub: "sub-root", email: "root@eneven.com" });
+      const response = await call(callbackRequest({ query: goodQuery, cookies: goodCookies }));
+      expect(location(response)).toBe(`${APP_URL}/admin`);
+      const token = (response.cookies.get("ea_session") as { value: string }).value;
+      const [row] = await db.select().from(sessions).where(eq(sessions.id, hashToken(token)));
+      expect(row.userId).toBe(admin.id);
+      expect(row.tenantId).toBeNull();
     });
 
     it("usuário com vários estabelecimentos (ou nenhum): sessão sem tenant, como no login por senha", async () => {

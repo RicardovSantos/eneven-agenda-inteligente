@@ -18,6 +18,23 @@ export function canAccessTenantPanel(
   );
 }
 
+/** Pura: a área da plataforma (`/admin`) exige sessão de super-admin. */
+export function canAccessAdmin(
+  session: SessionInfo | null,
+): session is SessionInfo & { isSuperAdmin: true } {
+  return session !== null && session.isSuperAdmin;
+}
+
+/**
+ * Pura: para onde mandar quem já está logado. Estabelecimento -> `/painel`;
+ * super-admin sem estabelecimento -> `/admin`; sem acesso a nada -> `null`.
+ */
+export function homePathFor(session: SessionInfo | null): "/painel" | "/admin" | null {
+  if (canAccessTenantPanel(session)) return "/painel";
+  if (canAccessAdmin(session)) return "/admin";
+  return null;
+}
+
 /** Sessão da requisição atual (lida do cookie), ou `null`. Uma consulta por requisição. */
 export const getCurrentSession = cache(
   async (): Promise<SessionInfo | null> => {
@@ -37,5 +54,17 @@ export async function requireTenantSession(): Promise<
 > {
   const session = await getCurrentSession();
   if (!canAccessTenantPanel(session)) redirect("/entrar");
+  return session;
+}
+
+/**
+ * Garante uma sessão de super-admin; senão redireciona para `/entrar`. Chame
+ * na página (e em cada página nova) de `/admin`.
+ */
+export async function requireSuperAdminSession(): Promise<
+  SessionInfo & { isSuperAdmin: true }
+> {
+  const session = await getCurrentSession();
+  if (!canAccessAdmin(session)) redirect("/entrar");
   return session;
 }
