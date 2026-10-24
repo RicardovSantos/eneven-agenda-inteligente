@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Agenda no celular</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;family=Outfit:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: #F7F6FC; color: #29303C; font-family: 'Figtree', system-ui, sans-serif; display: flex; flex-direction: column;">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E6E3F0; padding: 16px 16px 12px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <span style="font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 20px;">Studio Defendi</span>
+        <span style="font-size: 13px; color: #5E6475;">Outubro 2026</span>
+      </div>
+      <button type="button" aria-label="Notificações" style="width: 44px; height: 44px; border: 1px solid #E6E3F0; border-radius: 12px; background: #FFFFFF; color: #29303C; display: grid; place-items: center; position: relative;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+        <span style="position: absolute; top: 9px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: #F581FB; box-shadow: 0 0 0 2px #FFFFFF;"></span>
+      </button>
+    </div>
+    <div role="tablist" aria-label="Dias da semana" style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px;">
+      <sc-for list="{{week}}" as="d" hint-placeholder-count="7">
+        <button type="button" role="tab" aria-selected="{{d.sel}}" aria-label="{{d.label}}" style="{{d.style}}">
+          <span style="{{d.wdStyle}}">{{d.wd}}</span>
+          <span style="font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 17px;" class="num">{{d.n}}</span>
+          <span style="{{d.dotStyle}}"></span>
+        </button>
+      </sc-for>
+    </div>
+  </header>
+
+  <div style="flex: 1; overflow: hidden; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between;">
+      <h1 style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 18px;">Terça, 27</h1>
+      <span style="font-size: 13px; color: #5E6475;" class="num">6 agendamentos · R$ 470</span>
+    </div>
+    <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;">
+      <sc-for list="{{items}}" as="it" hint-placeholder-count="6">
+        <sc-if value="{{it.isNow}}" hint-placeholder-val="{{false}}">
+          <li aria-label="Agora, 13:40" style="display: flex; align-items: center; padding: 2px 0;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #3E07D2; flex: none;"></span>
+            <span style="flex: 1; height: 3px; border-radius: 999px; background: linear-gradient(90deg, #3E07D2, #9429F7, #F581FB);"></span>
+            <span style="font-size: 12px; font-weight: 600; color: #3E07D2; margin-left: 8px;" class="num">13:40</span>
+          </li>
+        </sc-if>
+        <sc-if value="{{it.isItem}}" hint-placeholder-val="{{true}}">
+          <li>
+            <a href="Detalhe.dc.html" style="{{it.cardStyle}}">
+              <span style="font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 16px; width: 46px; flex: none;" class="num">{{it.time}}</span>
+              <span style="display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0;">
+                <span style="{{it.nameStyle}}">{{it.name}}</span>
+                <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #5E6475;">{{it.service}} <span style="{{it.dotStyle}}"></span> {{it.pro}}</span>
+              </span>
+              <span style="{{it.badgeStyle}}">{{it.status}}</span>
+            </a>
+          </li>
+        </sc-if>
+      </sc-for>
+    </ol>
+  </div>
+
+  <a href="#" aria-label="Novo agendamento" style="position: absolute; right: 18px; bottom: 92px; width: 56px; height: 56px; border-radius: 18px; background: #3E07D2; color: #FFFFFF; display: grid; place-items: center; box-shadow: 0 12px 32px -12px rgb(62 7 210 / 0.6);">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+  </a>
+
+  <nav aria-label="Menu" style="height: 72px; box-sizing: border-box; background: #FFFFFF; border-top: 1px solid #E6E3F0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 6px 4px 10px;">
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #3E07D2; text-decoration: none; font-size: 12px; font-weight: 600;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>Agenda
+    </a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #5E6475; text-decoration: none; font-size: 12px; font-weight: 500;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path></svg>Clientes
+    </a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #5E6475; text-decoration: none; font-size: 12px; font-weight: 500;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 20V10M12 20V4M6 20v-6"></path></svg>Painel
+    </a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #5E6475; text-decoration: none; font-size: 12px; font-weight: 500;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>Mais
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var wds = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    var load = [0, 1, 3, 2, 2, 3, 3];
+    var week = [];
+    for (var i = 0; i < 7; i++) {
+      var n = 25 + i;
+      var sel = n === 27;
+      week.push({
+        wd: wds[i], n: n, sel: sel ? 'true' : 'false',
+        label: wds[i] + ' ' + n + (load[i] ? '' : ', fechado'),
+        style: 'display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 64px; padding: 8px 0; border: 0; border-radius: 14px; cursor: pointer; font-family: inherit; ' + (sel ? 'background: #3E07D2; color: #FFFFFF;' : 'background: transparent; color: #29303C;'),
+        wdStyle: 'font-size: 12px; font-weight: 500; ' + (sel ? 'color: rgb(255 255 255 / 0.85);' : 'color: #5E6475;'),
+        dotStyle: 'display: flex; gap: 2px; width: ' + (load[i] * 5) + 'px; height: 4px; border-radius: 999px; background: ' + (sel ? '#F581FB' : '#B9A6F4') + ';'
+      });
+    }
+    var proColor = { Bia: '#B4237A', 'Léo': '#0E7C86' };
+    var st = {
+      Atendido: { card: 'background: #FFFFFF; border: 1px solid #EEEBF6; opacity: 0.85;', badge: 'color: #5E6475; background: #EEEBF6;' },
+      Faltou: { card: 'background: #FFFFFF; border: 1px solid #E6E3F0; box-shadow: inset 3px 0 0 #C2410C;', badge: 'color: #9A3412; background: #FFF4ED;' },
+      Confirmado: { card: 'background: #FFFFFF; border: 1px solid #E6E3F0; box-shadow: inset 3px 0 0 #0F9D58;', badge: 'color: #0B7A44; background: #E8F7EF;' },
+      Agendado: { card: 'background: #FFFFFF; border: 1.5px solid #3E07D2;', badge: 'color: #3E07D2; background: #EEE8FD;' }
+    };
+    var raw = [
+      { time: '09:00', name: 'Ana Souza', service: 'Piercing hélix', pro: 'Bia', status: 'Atendido' },
+      { time: '10:00', name: 'Carla Lima', service: 'Anodização', pro: 'Léo', status: 'Faltou' },
+      { time: '11:30', name: 'Juliana Reis', service: 'Troca de joia', pro: 'Bia', status: 'Atendido' },
+      { now: true },
+      { time: '14:00', name: 'Marina Costa', service: 'Piercing tragus', pro: 'Léo', status: 'Confirmado' },
+      { time: '15:30', name: 'Paula Mendes', service: 'Piercing septo', pro: 'Bia', status: 'Agendado' },
+      { time: '17:00', name: 'Renata Alves', service: 'Anodização', pro: 'Léo', status: 'Confirmado' }
+    ];
+    var items = raw.map(function (r) {
+      if (r.now) return { isNow: true, isItem: false };
+      var s = st[r.status];
+      return {
+        isNow: false, isItem: true, time: r.time, name: r.name, service: r.service, pro: r.pro, status: r.status,
+        cardStyle: 'display: flex; align-items: center; gap: 10px; min-height: 64px; box-sizing: border-box; padding: 10px 12px; border-radius: 14px; text-decoration: none; color: #29303C; ' + s.card,
+        nameStyle: 'font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;',
+        dotStyle: 'display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: ' + proColor[r.pro] + ';',
+        badgeStyle: 'flex: none; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 999px; ' + s.badge
+      };
+    });
+    return { week: week, items: items };
+  }
+}
+</script>
+</body>
+</html>

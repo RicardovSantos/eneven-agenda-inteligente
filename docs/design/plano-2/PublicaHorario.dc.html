@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Agendar no Studio Defendi — horário</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;family=Outfit:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: #FFFFFF; color: #29303C; font-family: 'Figtree', system-ui, sans-serif; display: flex; flex-direction: column;">
+
+  <header style="padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid #E6E3F0;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <a href="PublicaServico.dc.html" aria-label="Voltar" style="width: 44px; height: 44px; margin-left: -10px; border-radius: 12px; display: grid; place-items: center; color: #29303C;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+      </a>
+      <div aria-hidden="true" style="width: 36px; height: 36px; border-radius: 11px; background: {{brand}}; color: #FFFFFF; display: grid; place-items: center; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 14px;">SD</div>
+      <span style="font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 17px;">Studio Defendi</span>
+    </div>
+    <ol aria-label="Etapas do agendamento" style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));">
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+        <li aria-current="{{s.current}}" style="display: flex; flex-direction: column; gap: 8px;">
+          <span style="display: flex; align-items: center;">
+            <span style="{{s.dotStyle}}"></span>
+            <span style="{{s.lineStyle}}"></span>
+          </span>
+          <span style="{{s.labelStyle}}">{{s.label}}</span>
+        </li>
+      </sc-for>
+    </ol>
+  </header>
+
+  <div style="flex: 1; overflow: hidden; padding: 18px 20px 0; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 19px;">Escolha o dia e o horário</h2>
+      <span style="font-size: 13px; color: #5E6475;">Piercing hélix · 30 min · com Bia</span>
+    </div>
+
+    <div role="tablist" aria-label="Dias" style="display: flex; gap: 8px; margin-right: -20px;">
+      <sc-for list="{{dates}}" as="d" hint-placeholder-count="6">
+        <button type="button" role="tab" aria-selected="{{d.sel}}" aria-label="{{d.label}}" style="{{d.style}}">
+          <span style="{{d.wdStyle}}">{{d.wd}}</span>
+          <span style="font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 18px;" class="num">{{d.n}}</span>
+        </button>
+      </sc-for>
+    </div>
+
+    <sc-for list="{{periods}}" as="p" hint-placeholder-count="3">
+      <section style="display: flex; flex-direction: column; gap: 10px;">
+        <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #5E6475;">{{p.name}}</h3>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;">
+          <sc-for list="{{p.slots}}" as="t" hint-placeholder-count="4">
+            <button type="button" aria-pressed="{{t.sel}}" style="{{t.style}}" class="num">{{t.time}}</button>
+          </sc-for>
+        </div>
+      </section>
+    </sc-for>
+  </div>
+
+  <div style="padding: 14px 20px 20px; border-top: 1px solid #E6E3F0; display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; justify-content: space-between; font-size: 14px;">
+      <span style="color: #5E6475;">Quarta, 28 de outubro</span>
+      <span style="font-weight: 700;" class="num">14:30</span>
+    </div>
+    <a href="PublicaConfirmado.dc.html" style="display: flex; align-items: center; justify-content: center; min-height: 50px; border-radius: 12px; background: {{brand}}; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 16px;">Continuar</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"brand":{"editor":"color","default":"#B4237A","options":["#B4237A","#3E07D2","#0E7C86","#8A5A00"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var brand = this.props.brand ?? '#B4237A';
+    var labels = ['Serviço', 'Profissional', 'Horário', 'Seus dados'];
+    var current = 2;
+    var steps = labels.map(function (l, i) {
+      var done = i < current, cur = i === current;
+      return {
+        label: l, current: cur ? 'step' : 'false',
+        dotStyle: 'width: 12px; height: 12px; border-radius: 50%; flex: none; ' + (cur || done ? 'background: #3E07D2;' : 'background: #FFFFFF; box-shadow: inset 0 0 0 2px #D9D5E6;'),
+        lineStyle: 'flex: 1; height: 3px; ' + (i === labels.length - 1 ? 'background: transparent;' : (done ? (i === 0 ? 'background: linear-gradient(90deg, #3E07D2, #6A18E4);' : 'background: linear-gradient(90deg, #6A18E4, #9429F7);') : (cur ? 'background: linear-gradient(90deg, #9429F7, #F581FB 40%, #EEEBF6 40%);' : 'background: #EEEBF6;'))),
+        labelStyle: 'font-size: 12px; ' + (cur ? 'font-weight: 600; color: #29303C;' : (done ? 'color: #5E6475;' : 'color: #8A8FA0;'))
+      };
+    });
+    var wds = ['Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Seg'];
+    var nums = [27, 28, 29, 30, 31, 2];
+    var dates = wds.map(function (w, i) {
+      var sel = nums[i] === 28;
+      return {
+        wd: w, n: nums[i], sel: sel ? 'true' : 'false', label: w + ' ' + nums[i],
+        style: 'display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; flex: none; width: 56px; height: 64px; border-radius: 14px; cursor: pointer; font-family: inherit; ' + (sel ? 'border: 0; background: ' + brand + '; color: #FFFFFF;' : 'border: 1px solid #E6E3F0; background: #FFFFFF; color: #29303C;'),
+        wdStyle: 'font-size: 12px; ' + (sel ? 'color: rgb(255 255 255 / 0.85);' : 'color: #5E6475;')
+      };
+    });
+    function slot(t, sel) {
+      return {
+        time: t, sel: sel ? 'true' : 'false',
+        style: 'min-height: 44px; border-radius: 999px; cursor: pointer; font: 600 15px Figtree, sans-serif; ' + (sel ? 'border: 0; background: ' + brand + '; color: #FFFFFF;' : 'border: 1px solid #E6E3F0; background: #FFFFFF; color: #29303C;')
+      };
+    }
+    var periods = [
+      { name: 'Manhã', slots: [slot('09:00'), slot('09:30'), slot('10:30'), slot('11:00')] },
+      { name: 'Tarde', slots: [slot('13:30'), slot('14:30', true), slot('15:00'), slot('16:30')] },
+      { name: 'Noite', slots: [slot('18:00'), slot('18:30')] }
+    ];
+    return { brand: brand, steps: steps, dates: dates, periods: periods };
+  }
+}
+</script>
+</body>
+</html>

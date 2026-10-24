@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Serviços do estabelecimento</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;family=Outfit:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F7F6FC}
+a{color:#3E07D2}a:hover{color:#2C0597}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="min-height: 900px; display: flex; flex-wrap: wrap; background: #F7F6FC; color: #29303C; font-family: 'Figtree', system-ui, sans-serif;">
+
+  <nav aria-label="Menu principal" style="flex: 0 0 232px; box-sizing: border-box; background: #FFFFFF; border-right: 1px solid #E6E3F0; display: flex; flex-direction: column; padding: 24px 12px; gap: 4px;">
+    <img src="/_blob/f034b5c6798f4774c7fa440a3c51b5b2" alt="Eneven Agendamentos Inteligentes" style="width: 140px; margin: 0 8px 28px;">
+    <a href="Main.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; color: #5E6475; text-decoration: none; font-size: 15px; font-weight: 500;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>
+      Agenda
+    </a>
+    <a href="#" style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; color: #5E6475; text-decoration: none; font-size: 15px; font-weight: 500;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+      Clientes
+    </a>
+    <a href="#" aria-current="page" style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: #EEE8FD; color: #3E07D2; font-weight: 600; text-decoration: none; font-size: 15px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"></path></svg>
+      Serviços
+    </a>
+    <a href="#" style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; color: #5E6475; text-decoration: none; font-size: 15px; font-weight: 500;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="5"></circle><path d="M20 21a8 8 0 0 0-16 0"></path></svg>
+      Equipe
+    </a>
+    <a href="#" style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; color: #5E6475; text-decoration: none; font-size: 15px; font-weight: 500;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 20V10M12 20V4M6 20v-6"></path></svg>
+      Painel
+    </a>
+    <a href="#" style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; color: #5E6475; text-decoration: none; font-size: 15px; font-weight: 500;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"></path></svg>
+      Configurações
+    </a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <h1 style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 28px;">Serviços</h1>
+        <p style="margin: 0; font-size: 14px; color: #5E6475;">O que aparece na sua página de agendamento, com duração e preço.</p>
+      </div>
+      <a href="#" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 10px; background: #3E07D2; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 15px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+        Novo serviço
+      </a>
+    </div>
+
+    <div style="background: #FFFFFF; border: 1px solid #E6E3F0; border-radius: 16px; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 15px; min-width: 620px;">
+        <thead>
+          <tr style="text-align: left; color: #5E6475; font-size: 13px;">
+            <th scope="col" style="padding: 14px 20px; font-weight: 600; border-bottom: 1px solid #E6E3F0;">Serviço</th>
+            <th scope="col" style="padding: 14px 12px; font-weight: 600; border-bottom: 1px solid #E6E3F0;">Duração</th>
+            <th scope="col" style="padding: 14px 12px; font-weight: 600; border-bottom: 1px solid #E6E3F0;">Preço</th>
+            <th scope="col" style="padding: 14px 12px; font-weight: 600; border-bottom: 1px solid #E6E3F0;">Quem faz</th>
+            <th scope="col" style="padding: 14px 20px; font-weight: 600; border-bottom: 1px solid #E6E3F0;">Na página</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+            <tr style="{{r.rowStyle}}">
+              <td style="padding: 14px 20px; border-bottom: 1px solid #EEEBF6; font-weight: 600;">{{r.name}}</td>
+              <td style="padding: 14px 12px; border-bottom: 1px solid #EEEBF6;" class="num">{{r.duration}}</td>
+              <td style="padding: 14px 12px; border-bottom: 1px solid #EEEBF6;" class="num">{{r.price}}</td>
+              <td style="padding: 14px 12px; border-bottom: 1px solid #EEEBF6;">
+                <span style="display: flex; gap: 6px;">
+                  <sc-for list="{{r.pros}}" as="p" hint-placeholder-count="2">
+                    <span style="{{p.style}}"><span style="{{p.dot}}"></span>{{p.name}}</span>
+                  </sc-for>
+                </span>
+              </td>
+              <td style="padding: 14px 20px; border-bottom: 1px solid #EEEBF6;">
+                <span style="{{r.badgeStyle}}">{{r.active}}</span>
+              </td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <aside aria-labelledby="titulo-editar" style="flex: 1 1 380px; max-width: 420px; box-sizing: border-box; background: #FFFFFF; border-left: 1px solid #E6E3F0; padding: 28px 24px; display: flex; flex-direction: column; gap: 18px;">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <h2 id="titulo-editar" style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 22px;">Editar serviço</h2>
+      <button type="button" aria-label="Fechar" style="width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: #5E6475; display: grid; place-items: center; cursor: pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+    </div>
+    <form style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="s-nome" style="font-size: 14px; font-weight: 600;">Nome</label>
+        <input id="s-nome" value="Piercing hélix" style="min-height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #E6E3F0; border-radius: 10px; font: 400 15px 'Figtree', sans-serif; color: #29303C;">
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="s-desc" style="font-size: 14px; font-weight: 600;">Descrição <span style="font-weight: 400; color: #5E6475;">(opcional)</span></label>
+        <textarea id="s-desc" rows="2" style="box-sizing: border-box; padding: 10px 14px; border: 1px solid #E6E3F0; border-radius: 10px; font: 400 15px 'Figtree', sans-serif; color: #29303C; resize: none;">Joia de titânio inclusa.</textarea>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="s-dur" style="font-size: 14px; font-weight: 600;">Duração</label>
+          <select id="s-dur" style="min-height: 44px; padding: 0 12px; border: 1px solid #E6E3F0; border-radius: 10px; font: 400 15px 'Figtree', sans-serif; color: #29303C; background: #FFFFFF;"><option>30 min</option></select>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="s-preco" style="font-size: 14px; font-weight: 600;">Preço</label>
+          <input id="s-preco" value="R$ 90,00" inputmode="decimal" class="num" style="min-height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #E6E3F0; border-radius: 10px; font: 400 15px 'Figtree', sans-serif; color: #29303C;">
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="s-int" style="font-size: 14px; font-weight: 600;">Intervalo depois do atendimento</label>
+        <select id="s-int" style="min-height: 44px; padding: 0 12px; border: 1px solid #E6E3F0; border-radius: 10px; font: 400 15px 'Figtree', sans-serif; color: #29303C; background: #FFFFFF;"><option>10 min para limpeza</option></select>
+        <span style="font-size: 13px; color: #5E6475;">Esse tempo fica bloqueado na agenda, mas o cliente não vê.</span>
+      </div>
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px;">
+        <legend style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">Quem faz este serviço</legend>
+        <label style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 1px solid #E6E3F0; border-radius: 10px; cursor: pointer;"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #3E07D2;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #B4237A;"></span>Bia</label>
+        <label style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 1px solid #E6E3F0; border-radius: 10px; cursor: pointer;"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #3E07D2;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #0E7C86;"></span>Léo</label>
+      </fieldset>
+      <label style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; cursor: pointer;">
+        <span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 600;">Mostrar na página de agendamento</span><span style="font-size: 13px; color: #5E6475;">Desligado, só a equipe consegue agendar.</span></span>
+        <input type="checkbox" checked role="switch" style="width: 22px; height: 22px; accent-color: #3E07D2;">
+      </label>
+      <div style="display: flex; gap: 10px; padding-top: 4px;">
+        <button type="submit" style="flex: 1; min-height: 46px; border: 0; border-radius: 10px; background: #3E07D2; color: #FFFFFF; font: 600 15px 'Figtree', sans-serif; cursor: pointer;">Salvar alterações</button>
+        <button type="button" style="min-height: 46px; padding: 0 18px; border: 1px solid #E6E3F0; border-radius: 10px; background: #FFFFFF; color: #29303C; font: 600 15px 'Figtree', sans-serif; cursor: pointer;">Cancelar</button>
+      </div>
+    </form>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var color = { Bia: '#B4237A', 'Léo': '#0E7C86' };
+    function pros(list) {
+      return list.map(function (n) {
+        return {
+          name: n,
+          style: 'display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #F7F6FC; font-size: 13px; font-weight: 500;',
+          dot: 'width: 7px; height: 7px; border-radius: 50%; background: ' + color[n] + ';'
+        };
+      });
+    }
+    var raw = [
+      { name: 'Piercing hélix', duration: '30 min', price: 'R$ 90,00', pros: ['Bia', 'Léo'], on: true, editing: true },
+      { name: 'Piercing tragus', duration: '30 min', price: 'R$ 100,00', pros: ['Bia', 'Léo'], on: true },
+      { name: 'Piercing septo', duration: '40 min', price: 'R$ 120,00', pros: ['Bia'], on: true },
+      { name: 'Piercing nostril', duration: '30 min', price: 'R$ 90,00', pros: ['Bia', 'Léo'], on: true },
+      { name: 'Troca de joia', duration: '15 min', price: 'R$ 30,00', pros: ['Bia', 'Léo'], on: true },
+      { name: 'Anodização', duration: '20 min', price: 'R$ 40,00', pros: ['Léo'], on: true },
+      { name: 'Retirada de joia', duration: '10 min', price: 'R$ 20,00', pros: ['Léo'], on: false }
+    ];
+    var rows = raw.map(function (r) {
+      return {
+        name: r.name, duration: r.duration, price: r.price, pros: pros(r.pros),
+        active: r.on ? 'Visível' : 'Oculto',
+        rowStyle: r.editing ? 'background: #F4F0FE; box-shadow: inset 3px 0 0 #3E07D2;' : '',
+        badgeStyle: 'font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; ' + (r.on ? 'color: #0B7A44; background: #E8F7EF;' : 'color: #5E6475; background: #EEEBF6;')
+      };
+    });
+    return { rows: rows };
+  }
+}
+</script>
+</body>
+</html>

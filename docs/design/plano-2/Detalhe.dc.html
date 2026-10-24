@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Detalhe do agendamento</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;family=Outfit:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: #F7F6FC; color: #29303C; font-family: 'Figtree', system-ui, sans-serif;">
+
+  <div aria-hidden="true" style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="height: 52px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E6E3F0;"></div>
+    <div style="height: 64px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E6E3F0;"></div>
+    <div style="height: 64px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E6E3F0;"></div>
+    <div style="height: 64px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E6E3F0;"></div>
+  </div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgb(21 19 31 / 0.45);"></div>
+
+  <section role="dialog" aria-modal="true" aria-labelledby="titulo-detalhe" style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-radius: 22px 22px 0 0; box-shadow: 0 -12px 32px -12px rgb(41 48 60 / 0.35); padding: 10px 20px 24px; display: flex; flex-direction: column; gap: 18px;">
+    <span aria-hidden="true" style="align-self: center; width: 40px; height: 4px; border-radius: 999px; background: #D9D5E6;"></span>
+
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span style="align-self: flex-start; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; color: #3E07D2; background: #EEE8FD;">Agendado</span>
+        <h2 id="titulo-detalhe" style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 22px;">Paula Mendes</h2>
+        <span style="font-size: 14px; color: #5E6475;" class="num">(11) 98765-4321 · 3ª visita</span>
+      </div>
+      <a href="#" aria-label="Conversar com Paula no WhatsApp" style="display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #CDEBDB; background: #E8F7EF; color: #0B7A44; text-decoration: none; font-weight: 600; font-size: 14px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg>
+        WhatsApp
+      </a>
+    </div>
+
+    <dl style="margin: 0; display: grid; grid-template-columns: 104px minmax(0, 1fr); row-gap: 12px; column-gap: 12px; padding: 16px; border-radius: 16px; background: #F7F6FC; font-size: 15px;">
+      <dt style="color: #5E6475;">Serviço</dt>
+      <dd style="margin: 0; font-weight: 600;">Piercing septo</dd>
+      <dt style="color: #5E6475;">Quando</dt>
+      <dd style="margin: 0; font-weight: 600;" class="num">Terça, 27/10 · 15:30 às 16:10</dd>
+      <dt style="color: #5E6475;">Profissional</dt>
+      <dd style="margin: 0; font-weight: 600; display: flex; align-items: center; gap: 8px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #B4237A;"></span>Bia</dd>
+      <dt style="color: #5E6475;">Valor</dt>
+      <dd style="margin: 0; font-weight: 600;" class="num">R$ 120,00</dd>
+    </dl>
+
+    <p style="margin: -4px 0 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #5E6475;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+      Lembrete enviado ontem às 15:30 · ainda sem resposta
+    </p>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <button type="button" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border: 0; border-radius: 12px; background: #3E07D2; color: #FFFFFF; font: 600 16px 'Figtree', sans-serif; cursor: pointer;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+        Confirmar presença
+      </button>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+        <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 64px; border: 1px solid #E6E3F0; border-radius: 12px; background: #FFFFFF; color: #29303C; font: 600 13px 'Figtree', sans-serif; cursor: pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+          Remarcar
+        </button>
+        <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 64px; border: 1px solid #E6E3F0; border-radius: 12px; background: #FFFFFF; color: #29303C; font: 600 13px 'Figtree', sans-serif; cursor: pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="5"></circle><path d="M20 21a8 8 0 0 0-16 0"></path></svg>
+          Atendido
+        </button>
+        <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 64px; border: 1px solid #E6E3F0; border-radius: 12px; background: #FFFFFF; color: #29303C; font: 600 13px 'Figtree', sans-serif; cursor: pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+          Faltou
+        </button>
+      </div>
+      <button type="button" style="min-height: 44px; border: 0; background: transparent; color: #C2410C; font: 600 15px 'Figtree', sans-serif; cursor: pointer;">Cancelar agendamento</button>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
