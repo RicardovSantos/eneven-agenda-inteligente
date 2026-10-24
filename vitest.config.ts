@@ -6,6 +6,10 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     globals: true,
+    setupFiles: ["tests/helpers/setup.ts"],
+    // PGlite leva alguns segundos para iniciar no primeiro uso de cada worker.
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
   },
   resolve: {
     alias: {
