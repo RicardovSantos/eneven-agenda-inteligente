@@ -31,7 +31,9 @@ export async function withTenant<T>(
  * do cadastro, que cria o estabelecimento e já grava horário e profissional).
  * Troca o papel para `agenda_app` e define `app.tenant_id` só para o bloco e
  * devolve a transação ao papel original ao terminar, para o que vier depois
- * na mesma transação seguir como antes. Se `fn` lançar erro a transação
+ * na mesma transação seguir como antes. Atenção: `RESET ROLE` volta ao papel
+ * da sessão (a conexão), que não é necessariamente o papel que a transação
+ * tinha ao entrar. Se `fn` lançar erro a transação
  * inteira é desfeita, então não há o que restaurar.
  */
 export async function withTenantTx<T>(

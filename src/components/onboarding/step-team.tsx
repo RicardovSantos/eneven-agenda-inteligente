@@ -95,18 +95,18 @@ export function StepTeam({
           aria-label="Equipe"
           className="flex flex-col divide-y divide-line rounded-field border border-line"
         >
-          {professionals.map((p, index) => (
+          {professionals.map((p) => (
             <li key={p.id} className="flex items-center gap-3 py-1 pl-4 pr-1">
               <ColorDot color={p.color} size={12} />
               <p className="min-w-0 flex-1 truncate py-3 font-semibold">
                 {p.name}
-                {index === 0 ? (
+                {p.isOwner ? (
                   <span className="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">
                     Você
                   </span>
                 ) : null}
               </p>
-              {index === 0 ? (
+              {p.isOwner ? (
                 <span className="size-11 shrink-0" aria-hidden="true" />
               ) : (
                 <button

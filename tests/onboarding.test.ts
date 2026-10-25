@@ -1,10 +1,14 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   businessHours,
+  memberships,
   professionalHours,
   professionals,
   tenants,
+  users,
 } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { createTenantWithOwner, signup } from "@/server/auth/signup";
@@ -14,6 +18,7 @@ import {
   onboardingRedirect,
   skipOnboarding,
 } from "@/server/onboarding";
+import { ensureTenantDefaults } from "@/server/tenants/defaults";
 import { saveService } from "@/server/catalog";
 import { updateBranding, uploadLogo } from "@/server/settings";
 import { withTenant, withTenantTx } from "@/server/tenant-db";
@@ -209,6 +214,65 @@ describe("onboardingRedirect (painel redireciona até concluir ou pular)", () =>
     for (const role of ["reception", "staff"] as const) {
       expect(onboardingRedirect({ role, completed: false, page: "panel" })).toBeNull();
       expect(onboardingRedirect({ role, completed: false, page: "wizard" })).toBe("/painel");
+    }
+  });
+});
+
+describe("ensureTenantDefaults (estabelecimentos anteriores ao seed)", () => {
+  it("semeia horário e dono uma vez só, mesmo com chamadas repetidas e simultâneas", async () => {
+    const db = await createTestDb();
+    const [tenant] = await db
+      .insert(tenants)
+      .values({ slug: "antigo", name: "Antigo", trialEndsAt: new Date(Date.now() + 86_400_000) })
+      .returning();
+    const [user] = await db
+      .insert(users)
+      .values({ email: "velho@x.com", name: "Dona Velha", passwordHash: null })
+      .returning();
+    await db
+      .insert(memberships)
+      .values({ userId: user.id, tenantId: tenant.id, role: "owner" });
+
+    await Promise.all([
+      ensureTenantDefaults(db, tenant.id),
+      ensureTenantDefaults(db, tenant.id),
+    ]);
+    await ensureTenantDefaults(db, tenant.id);
+
+    const hours = await withTenant(db, tenant.id, (tx) => tx.select().from(businessHours));
+    const pros = await withTenant(db, tenant.id, (tx) => tx.select().from(professionals));
+    const proHours = await withTenant(db, tenant.id, (tx) => tx.select().from(professionalHours));
+    expect(hours).toHaveLength(6);
+    expect(pros).toHaveLength(1);
+    expect(pros[0]).toMatchObject({ name: "Dona Velha", userId: user.id, color: "#3E07D2" });
+    expect(proHours).toHaveLength(6);
+  });
+
+  it("não mexe em quem já tem horário e profissionais", async () => {
+    const db = await createTestDb();
+    const { tenantId } = await signup(db, input);
+    await ensureTenantDefaults(db, tenantId);
+    const pros = await withTenant(db, tenantId, (tx) => tx.select().from(professionals));
+    const hours = await withTenant(db, tenantId, (tx) => tx.select().from(businessHours));
+    expect(pros).toHaveLength(1);
+    expect(hours).toHaveLength(6);
+  });
+});
+
+describe("guarda: páginas do painel exigem o assistente concluído", () => {
+  const root = path.resolve(__dirname, "../src/app/painel");
+  const pages = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const full = path.join(dir, name);
+      if (statSync(full).isDirectory()) return pages(full);
+      return name === "page.tsx" ? [full] : [];
+    });
+
+  it("toda page.tsx (menos comecar) chama requireOnboarded", () => {
+    const list = pages(root).filter((f) => !f.includes(`${path.sep}comecar${path.sep}`));
+    expect(list.length).toBeGreaterThan(0);
+    for (const file of list) {
+      expect(readFileSync(file, "utf8"), file).toContain("requireOnboarded(");
     }
   });
 });

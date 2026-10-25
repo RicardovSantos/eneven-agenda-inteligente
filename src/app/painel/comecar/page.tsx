@@ -9,6 +9,9 @@ import {
   type WizardService,
 } from "@/components/onboarding/wizard";
 import { listProfessionals, listServices } from "@/server/catalog";
+import { ensureTenantDefaults } from "@/server/tenants/defaults";
+import { withTenant } from "@/server/tenant-db";
+import { professionals as professionalsTable } from "@/db/schema";
 import { getOnboardingState, onboardingRedirect } from "@/server/onboarding";
 import { getPanelData } from "@/server/panel/data";
 import { getBusinessHours } from "@/server/settings";
@@ -27,6 +30,8 @@ export default async function ComecarPage() {
 
   const tenantId = data.session.tenantId;
   const db = await getDb();
+  // Estabelecimentos anteriores ao seed do cadastro: completa horário e dono (idempotente).
+  await ensureTenantDefaults(db, tenantId);
   const state = await getOnboardingState(db, tenantId);
   if (state.step === "done") redirect("/painel");
 
@@ -45,9 +50,16 @@ export default async function ComecarPage() {
     durationMin: s.durationMin,
     priceCents: s.priceCents,
   }));
+  const ownerRows = await withTenant(db, tenantId, (tx) =>
+    tx
+      .select({ id: professionalsTable.id })
+      .from(professionalsTable)
+      .where(eq(professionalsTable.userId, data.session.userId)),
+  );
+  const ownerIds = new Set(ownerRows.map((r) => r.id));
   const professionals: WizardProfessional[] = professionalRows
     .filter((p) => p.active)
-    .map((p) => ({ id: p.id, name: p.name, color: p.color }));
+    .map((p) => ({ id: p.id, name: p.name, color: p.color, isOwner: ownerIds.has(p.id) }));
 
   return (
     <OnboardingWizard

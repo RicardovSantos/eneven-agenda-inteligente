@@ -62,8 +62,13 @@ export function StepDone({
         <h2 id="link-title" className="text-sm font-semibold text-ink-muted">
           Seu link de agendamento
         </h2>
-        <p className="font-display text-xl font-semibold leading-snug break-all sm:text-2xl">
-          {shown}
+        <p className="font-display leading-snug">
+          <span className="block text-sm font-medium text-ink-muted sm:text-base">
+            {PUBLIC_HOST}/
+          </span>
+          <span className="block text-xl font-semibold [overflow-wrap:anywhere] sm:text-2xl">
+            {slug}
+          </span>
         </p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <CopyButton text={url} label="Copiar link" toastMessage="Link copiado" variant="default" />

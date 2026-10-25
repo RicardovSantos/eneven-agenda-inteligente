@@ -34,7 +34,11 @@ export function StepCard({
       className="flex flex-col gap-6 rounded-panel border border-line bg-surface p-5 sm:p-6"
     >
       <header className="flex flex-col gap-1">
-        <h1 id="step-title" className="text-[1.375rem] font-semibold sm:text-2xl">
+        <h1
+          id="step-title"
+          tabIndex={-1}
+          className="text-[1.375rem] font-semibold outline-none sm:text-2xl"
+        >
           {title}
         </h1>
         <p className="text-sm leading-snug text-ink-muted">{description}</p>

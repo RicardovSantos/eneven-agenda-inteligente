@@ -58,6 +58,10 @@ export function OnboardingWizard({
   const go = (next: number) => {
     setStep(next);
     window.scrollTo({ top: 0 });
+    // Leitores de tela: o foco vai para o título da nova etapa (depois da renderização).
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => document.getElementById("step-title")?.focus({ preventScroll: true }));
+    });
   };
 
   /**
