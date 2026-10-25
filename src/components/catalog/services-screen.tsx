@@ -156,7 +156,7 @@ export function ServicesScreen({
                   <th scope="col" className="border-b border-line px-3 py-3.5 font-semibold">Duração</th>
                   <th scope="col" className="border-b border-line px-3 py-3.5 font-semibold">Preço</th>
                   <th scope="col" className="border-b border-line px-3 py-3.5 font-semibold">Quem faz</th>
-                  <th scope="col" className="border-b border-line px-5 py-3.5 font-semibold">Na página</th>
+                  <th scope="col" className="border-b border-line px-5 py-3.5 whitespace-nowrap font-semibold">Na página</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,10 +179,10 @@ export function ServicesScreen({
                         {s.name}
                       </button>
                     </td>
-                    <td className="border-b border-line/60 px-3 py-3.5 tabular-nums">
+                    <td className="border-b border-line/60 px-3 py-3.5 whitespace-nowrap tabular-nums">
                       {formatDuration(s.durationMin)}
                     </td>
-                    <td className="border-b border-line/60 px-3 py-3.5 tabular-nums">
+                    <td className="border-b border-line/60 px-3 py-3.5 whitespace-nowrap tabular-nums">
                       {formatBRL(s.priceCents)}
                     </td>
                     <td className="border-b border-line/60 px-3 py-3.5">
@@ -538,7 +538,7 @@ function ServiceForm({
 
         <div className="flex min-h-11 items-center justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <span id="s-visivel" className="text-sm font-semibold">
+            <span className="text-sm font-semibold">
               Mostrar na página de agendamento
             </span>
             <span className="text-[0.8125rem] text-ink-muted">
@@ -550,7 +550,6 @@ function ServiceForm({
             onCheckedChange={setVisible}
             label="Mostrar na página de agendamento"
             disabled={readOnly || pending}
-           
           />
         </div>
       </fieldset>

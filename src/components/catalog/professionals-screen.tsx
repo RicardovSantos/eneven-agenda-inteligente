@@ -153,7 +153,7 @@ export function ProfessionalsScreen({
                     <td className="border-b border-line/60 px-3 py-3.5">
                       <ServiceChips ids={p.serviceIds} names={serviceName} />
                     </td>
-                    <td className="border-b border-line/60 px-3 py-3.5 text-[0.8125rem]">
+                    <td className="border-b border-line/60 px-3 py-3.5 text-[0.8125rem] whitespace-nowrap">
                       {summarizeWeek(p.hours)}
                     </td>
                     <td className="border-b border-line/60 px-5 py-3.5">
@@ -209,7 +209,7 @@ export function ProfessionalsScreen({
         <p className="text-sm text-ink-muted">Este profissional não existe mais.</p>
       ) : (
         <ProfessionalForm
-          key={selection.kind === "new" ? "new" : selection.id}
+          key={selection.kind === "new" ? "new" : `${selection.id}-${editing?.active}`}
           professional={editing}
           professionals={professionals}
           services={services}
@@ -448,7 +448,6 @@ function ProfessionalForm({
             onCheckedChange={onActiveChange}
             label="Ativo"
             disabled={readOnly || pending}
-           
           />
         </div>
       </fieldset>

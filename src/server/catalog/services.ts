@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, max } from "drizzle-orm";
 import { professionalServices, professionals, services } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { withTenant } from "@/server/tenant-db";
-import { notFoundError, validationError } from "./errors";
+import { CatalogError, notFoundError, validationError } from "./errors";
 
 export const SERVICE_NAME_MAX = 80;
 export const SERVICE_DESCRIPTION_MAX = 300;
@@ -159,9 +159,23 @@ export async function saveService(
       const updated = await tx
         .update(services)
         .set(values)
-        .where(and(eq(services.tenantId, tenantId), eq(services.id, input.id)))
+        .where(
+          and(
+            eq(services.tenantId, tenantId),
+            eq(services.id, input.id),
+            isNull(services.archivedAt),
+          ),
+        )
         .returning({ id: services.id });
-      if (updated.length === 0) throw notFoundError();
+      if (updated.length === 0) {
+        const [existing] = await tx
+          .select({ id: services.id })
+          .from(services)
+          .where(and(eq(services.tenantId, tenantId), eq(services.id, input.id)));
+        throw existing
+          ? new CatalogError("not_found", "Serviço arquivado. Restaure para editar.")
+          : notFoundError();
+      }
       id = updated[0].id;
     } else {
       const [{ top }] = await tx

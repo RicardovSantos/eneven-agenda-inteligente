@@ -56,7 +56,13 @@ export async function loadAvailabilityContext(
     const rows = await tx
       .select()
       .from(services)
-      .where(and(eq(services.tenantId, tenantId), inArray(services.id, opts.serviceIds)));
+      .where(
+        and(
+          eq(services.tenantId, tenantId),
+          inArray(services.id, opts.serviceIds),
+          isNull(services.archivedAt),
+        ),
+      );
     if (rows.length === 0) throw new Error("Nenhum serviço encontrado");
     durationMin = rows.reduce((s, r) => s + r.durationMin, 0);
     bufferAfterMin = Math.max(...rows.map((r) => r.bufferAfterMin));

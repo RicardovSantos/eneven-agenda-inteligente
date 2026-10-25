@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { professionalServices, services } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { BookingError, createBooking } from "@/server/agenda/bookings";
 import { loadAvailabilityContext } from "@/server/agenda/load";
 import { updateBusinessHours } from "@/server/settings";
 import {
@@ -234,5 +235,52 @@ describe("serviço na página pública (via motor de disponibilidade)", () => {
 
   it("com profissional ativo que o faz, é oferecido", async () => {
     expect(await offered(await setup(true))).toBe(1);
+  });
+});
+
+describe("serviço arquivado", () => {
+  it("não pode ser editado: pede para restaurar", async () => {
+    const { id } = await saveService(db, tenantId, base);
+    await archiveService(db, tenantId, id);
+    await expect(saveService(db, tenantId, { ...base, id, name: "Novo nome" })).rejects.toMatchObject({
+      code: "not_found",
+      message: "Serviço arquivado. Restaure para editar.",
+    });
+    const [row] = await db.select().from(services).where(eq(services.id, id));
+    expect(row.name).toBe("Corte");
+  });
+
+  it("não entra na disponibilidade nem pode ser agendado", async () => {
+    await updateBusinessHours(db, tenantId, { ...emptyWeek(), 1: [{ start: "09:00", end: "18:00" }] });
+    const bia = await seedProfessional(db, tenantId, "Bia");
+    await saveProfessional(db, tenantId, {
+      id: bia.id,
+      name: "Bia",
+      color: "#B4237A",
+      active: true,
+      serviceIds: [],
+      hours: { ...emptyWeek(), 1: [{ start: "09:00", end: "18:00" }] },
+    });
+    const { id } = await saveService(db, tenantId, { ...base, professionalIds: [bia.id] });
+    await archiveService(db, tenantId, id);
+
+    await expect(
+      loadAvailabilityContext(db, tenantId, { date: "2030-01-07", serviceIds: [id] }),
+    ).rejects.toThrow("Nenhum serviço encontrado");
+
+    const error = await createBooking(
+      db,
+      tenantId,
+      {
+        serviceIds: [id],
+        professionalId: bia.id,
+        startsAt: new Date("2030-01-07T13:00:00.000Z"),
+        customer: { name: "Maria", phone: "11999990000" },
+        source: "panel",
+      },
+      new Date("2030-01-01T00:00:00.000Z"),
+    ).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(BookingError);
+    expect((error as BookingError).code).toBe("invalid_selection");
   });
 });
