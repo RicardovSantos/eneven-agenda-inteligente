@@ -134,7 +134,7 @@ export async function createBooking(
       const { professionalIds, endsAt, blockedUntil } = candidatesFor(
         ctx,
         input.startsAt,
-        input.allowOutsideHours === true,
+        input.source === "panel" && input.allowOutsideHours === true,
       );
       if (professionalIds.length === 0) throw new BookingError("slot_taken");
 
@@ -151,7 +151,7 @@ export async function createBooking(
             )
           : professionalIds[0];
 
-      const customer = await upsertCustomer(tx, tenantId, input.customer);
+      const customer = await upsertCustomer(tx, tenantId, input.customer, input.source);
       const { token, hash } = newManageToken();
 
       const [booking] = await tx
@@ -207,7 +207,9 @@ async function getBookingOrThrow(tx: Db, tenantId: string, bookingId: string) {
     .select()
     .from(bookings)
     .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)))
-    .limit(1);
+    .limit(1)
+    // Trava a linha: quem chega depois relê o estado já gravado.
+    .for("update");
   if (!booking) throw new BookingError("not_found");
   return booking;
 }
@@ -340,16 +342,22 @@ export async function setBookingStatus(
   bookingId: string,
   status: Exclude<BookingStatus, "canceled">,
 ): Promise<void> {
-  await withTenant(db, tenantId, async (tx) => {
-    const booking = await getBookingOrThrow(tx, tenantId, bookingId);
-    if (!TRANSITIONS[booking.status].includes(status)) {
-      throw new BookingError("invalid_transition");
-    }
-    await tx
-      .update(bookings)
-      .set({ status, updatedAt: new Date() })
-      .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)));
-  });
+  try {
+    await withTenant(db, tenantId, async (tx) => {
+      const booking = await getBookingOrThrow(tx, tenantId, bookingId);
+      if (!TRANSITIONS[booking.status].includes(status)) {
+        throw new BookingError("invalid_transition");
+      }
+      await tx
+        .update(bookings)
+        .set({ status, updatedAt: new Date() })
+        .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)));
+    });
+  } catch (error) {
+    // Desfazer concluído/falta reativa o horário, que pode ter sido ocupado.
+    if (isExclusionViolation(error)) throw new BookingError("slot_taken");
+    throw error;
+  }
 }
 
 /**

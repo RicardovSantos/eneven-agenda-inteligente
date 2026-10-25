@@ -166,6 +166,11 @@ describe("createBooking", () => {
     expect((blocked as BookingError).code).toBe("slot_taken");
   });
 
+  it("allowOutsideHours é ignorado em reservas públicas", async () => {
+    const err = await rejection(book({ startsAt: local("07:00"), allowOutsideHours: true }));
+    expect((err as BookingError).code).toBe("slot_taken");
+  });
+
   it("serviço de outro tenant -> invalid_selection", async () => {
     const other = await seedTenant(db, "loja-b");
     const foreign = await addService(other.id);
@@ -221,6 +226,26 @@ describe("upsertCustomer", () => {
     await withTenant(db, tenantId, (tx) => upsertCustomer(tx, tenantId, { name: "Ana Maria", phone: "11987654321" }));
     const [after] = await db.select().from(customers).where(eq(customers.id, a.id));
     expect(after).toMatchObject({ name: "Ana Maria", email: "ana@x.com" });
+  });
+
+  it("origem pública não sobrescreve dados preenchidos; painel sobrescreve", async () => {
+    const up = (source: "public" | "panel", name: string, email?: string) =>
+      withTenant(db, tenantId, (tx) =>
+        upsertCustomer(tx, tenantId, { name, phone: "11987654321", email }, source),
+      );
+    const { id } = await up("panel", "Ana Curada", "curada@x.com");
+    await up("public", "Outro Nome", "outro@x.com");
+    let [row] = await db.select().from(customers).where(eq(customers.id, id));
+    expect(row).toMatchObject({ name: "Ana Curada", email: "curada@x.com" });
+
+    await db.update(customers).set({ email: null }).where(eq(customers.id, id));
+    await up("public", "Outro Nome", "novo@x.com");
+    [row] = await db.select().from(customers).where(eq(customers.id, id));
+    expect(row).toMatchObject({ name: "Ana Curada", email: "novo@x.com" });
+
+    await up("panel", "Ana Nova");
+    [row] = await db.select().from(customers).where(eq(customers.id, id));
+    expect(row.name).toBe("Ana Nova");
   });
 
   it("telefone inválido -> erro", async () => {
@@ -281,6 +306,24 @@ describe("cancelBooking / setBookingStatus", () => {
     const err = await rejection(setBookingStatus(db, tenantId, bookingId, "confirmed"));
     expect(err).toBeInstanceOf(BookingError);
     expect((err as BookingError).code).toBe("invalid_transition");
+  });
+
+  it("cancelar e confirmar ao mesmo tempo terminam em estado consistente", async () => {
+    const { bookingId } = await book();
+    const results = await Promise.allSettled([
+      cancelBooking(db, tenantId, bookingId, "customer", new Date("2030-01-07T10:00:00.000Z")),
+      setBookingStatus(db, tenantId, bookingId, "confirmed"),
+    ]);
+    const row = await bookingRow(bookingId);
+    const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    for (const f of failures) expect((f.reason as BookingError).code).toBe("invalid_transition");
+    // Nunca "confirmed" com canceledAt preenchido.
+    if (row.status === "canceled") expect(row.canceledAt).not.toBeNull();
+    else {
+      expect(row.status).toBe("confirmed");
+      expect(row.canceledAt).toBeNull();
+    }
+    expect(failures.length + results.filter((r) => r.status === "fulfilled").length).toBe(2);
   });
 
   it("agendamento inexistente ou de outro tenant -> not_found", async () => {
