@@ -4,7 +4,10 @@ import { runMigrations } from "./migrate";
 import * as schema from "./schema";
 import type { Db } from "./types";
 
-/** Pasta do PGlite usado em desenvolvimento quando não há DATABASE_URL. */
+/**
+ * Pasta do PGlite usado em desenvolvimento quando não há DATABASE_URL.
+ * `PGLITE_DATA_DIR` troca a pasta (o `pnpm test:e2e` usa um banco só dele).
+ */
 export const PGLITE_DATA_DIR = "./.data/pglite";
 
 const globalForDb = globalThis as unknown as {
@@ -35,7 +38,11 @@ async function createDb(): Promise<Db> {
     // Necessária para a trava de dupla reserva (EXCLUDE USING gist).
     import("@electric-sql/pglite/contrib/btree_gist"),
   ]);
-  const dataDir = path.resolve(process.cwd(), PGLITE_DATA_DIR);
+  // Só desenvolvimento/testes (produção exige DATABASE_URL): não é para rastrear o projeto inteiro no build.
+  const dataDir = path.resolve(
+    /*turbopackIgnore: true*/ process.cwd(),
+    process.env.PGLITE_DATA_DIR || PGLITE_DATA_DIR,
+  );
   mkdirSync(dataDir, { recursive: true });
   const db = drizzle(new PGlite(dataDir, { extensions: { btree_gist } }), {
     schema,

@@ -66,6 +66,15 @@ pnpm typecheck   # TypeScript
 pnpm build       # build de produção
 ```
 
+### Testes de ponta a ponta (Playwright)
+
+```bash
+pnpm exec playwright install chromium   # uma vez
+pnpm test:e2e                            # página pública de agendamento e gerenciar agendamento
+```
+
+O comando sobe o `pnpm dev` na porta 3100 com um PGlite só dele (`.data/pglite-e2e`, apagado a cada execução) e a rota de apoio `/api/e2e/seed`, que cria estabelecimentos e agendamentos de teste. Essa rota só responde quando `E2E_SEED` está definido, o processo não é de produção e o cabeçalho `x-e2e-seed` traz o mesmo segredo; fora disso devolve 404. **Pare o `pnpm dev` antes de rodar** (o Next aceita um servidor de desenvolvimento por pasta). Os testes ficam em `tests/e2e/`, fora do `pnpm test` e do CI por enquanto; a primeira execução é lenta porque o modo de desenvolvimento compila cada rota na primeira visita.
+
 O CI (`.github/workflows/ci.yml`) roda lint, typecheck e testes a cada push na `main` e em todo pull request (uma nova execução na mesma branch cancela a anterior).
 
 ## Como trocar a logo
