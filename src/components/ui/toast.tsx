@@ -1,0 +1,90 @@
+"use client";
+
+import { CircleAlert, CircleCheck } from "lucide-react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+
+type ToastTone = "success" | "error";
+type ToastItem = { id: number; message: string; tone: ToastTone };
+
+type ToastApi = {
+  /** Confirmação discreta no rodapé (4 s). Use o mesmo verbo do botão. */
+  show: (message: string, tone?: ToastTone) => void;
+};
+
+const TOAST_MS = 4000;
+const ToastContext = createContext<ToastApi | null>(null);
+
+export function useToast(): ToastApi {
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error("useToast precisa estar dentro de <ToastProvider>");
+  return ctx;
+}
+
+/**
+ * Dispara um toast quando `at` muda (resultado novo de uma ação do servidor).
+ * `message`/`error` vazios não fazem nada.
+ */
+export function useToastOnResult(state: {
+  at?: number;
+  message?: string;
+  error?: string;
+}) {
+  const { show } = useToast();
+  const lastAt = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (state.at === undefined || state.at === lastAt.current) return;
+    lastAt.current = state.at;
+    if (state.error) show(state.error, "error");
+    else if (state.message) show(state.message, "success");
+  }, [state, show]);
+}
+
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [items, setItems] = useState<ToastItem[]>([]);
+  const nextId = useRef(1);
+
+  const show = useCallback((message: string, tone: ToastTone = "success") => {
+    const id = nextId.current++;
+    setItems((current) => [...current.slice(-2), { id, message, tone }]);
+    setTimeout(() => {
+      setItems((current) => current.filter((item) => item.id !== id));
+    }, TOAST_MS);
+  }, []);
+
+  const api = useMemo(() => ({ show }), [show]);
+
+  return (
+    <ToastContext.Provider value={api}>
+      {children}
+      {/* Acima da navegação inferior no celular; no rodapé em telas largas. */}
+      <div
+        aria-live="polite"
+        className="pointer-events-none fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-center gap-2 px-4 lg:bottom-6 lg:pl-[calc(232px+1rem)]"
+      >
+        {items.map((item) => (
+          <div
+            key={item.id}
+            role={item.tone === "error" ? "alert" : "status"}
+            className="pointer-events-auto flex max-w-md items-center gap-2.5 rounded-field bg-ink px-4 py-3 text-sm font-medium leading-snug text-canvas shadow-float animate-in fade-in slide-in-from-bottom-2"
+          >
+            {item.tone === "error" ? (
+              <CircleAlert className="size-5 shrink-0 text-[#fb923c]" aria-hidden="true" />
+            ) : (
+              <CircleCheck className="size-5 shrink-0 text-[#3dd68c]" aria-hidden="true" />
+            )}
+            {item.message}
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}

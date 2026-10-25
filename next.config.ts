@@ -27,6 +27,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // PGlite carrega arquivos .wasm/.data relativos ao próprio pacote.
   serverExternalPackages: ["@electric-sql/pglite"],
+  // Envio do logo (até 1 MB) por ação do servidor: o padrão de 1 MB não cobre o corpo multipart.
+  experimental: { serverActions: { bodySizeLimit: "2mb" } },
   turbopack: {
     rules: {
       "*.css": {

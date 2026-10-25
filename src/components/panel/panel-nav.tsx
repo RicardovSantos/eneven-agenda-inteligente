@@ -27,14 +27,15 @@ const SIDEBAR_ITEMS: NavItem[] = [
   { label: "Serviços", icon: Scissors },
   { label: "Equipe", icon: UserRound },
   { label: "Painel", icon: ChartNoAxesColumn },
-  { label: "Configurações", icon: Settings },
+  { label: "Configurações", icon: Settings, href: "/painel/configuracoes" },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [
   { label: "Agenda", icon: CalendarDays, href: "/painel" },
   { label: "Clientes", icon: Users },
   { label: "Painel", icon: ChartNoAxesColumn },
-  { label: "Mais", icon: Ellipsis },
+  // Até existir o menu "Mais", leva às Configurações (único destino extra).
+  { label: "Mais", icon: Ellipsis, href: "/painel/configuracoes" },
 ];
 
 function isActive(pathname: string, href: string) {
