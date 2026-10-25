@@ -117,6 +117,10 @@ export function BrandForm({ initial }: { initial: BrandInitial }) {
       return;
     }
     uploadFormRef.current?.requestSubmit();
+    // O arquivo já entrou no FormData: limpar permite escolher o mesmo de novo.
+    setTimeout(() => {
+      if (fileRef.current) fileRef.current.value = "";
+    }, 0);
   };
 
   const onHexChange = (value: string) => {

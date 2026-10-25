@@ -144,6 +144,19 @@ describe("logo", () => {
     await expectValidation(uploadLogo(db, tenantId, { mime: "image/png", bytes: Buffer.alloc(0) }), "logo");
   });
 
+  it("recusa imagem com pixels demais (bomba de descompressão) com mensagem amigável", async () => {
+    const huge = await sharp({
+      create: { width: 6000, height: 6000, channels: 3, background: "#fff" },
+    })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    expect(huge.byteLength).toBeLessThan(1024 * 1024);
+    await expect(uploadLogo(db, tenantId, { mime: "image/png", bytes: huge })).rejects.toMatchObject({
+      code: "validation",
+      fieldErrors: { logo: "Imagem grande demais. Use uma imagem menor." },
+    });
+  });
+
   it("recusa svg mesmo declarado como png", async () => {
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>');
     await expectValidation(uploadLogo(db, tenantId, { mime: "image/png", bytes: svg }), "logo");
@@ -283,6 +296,13 @@ describe("updateSlug / checkSlugAvailability", () => {
   it("recusa vazio; manter o mesmo slug não é erro", async () => {
     await expectValidation(updateSlug(db, tenantId, "  "), "slug");
     expect((await updateSlug(db, tenantId, "salao-a")).slug).toBe("salao-a");
+  });
+
+  it("slug sem letras nem números (!!!) é recusado", async () => {
+    await expect(updateSlug(db, tenantId, "!!!")).rejects.toMatchObject({
+      fieldErrors: { slug: "Use letras, números e hífen." },
+    });
+    expect(await checkSlugAvailability(db, tenantId, "!!!")).toEqual({ status: "invalid" });
   });
 
   it("atualiza o logoUrl versionado junto com o slug", async () => {

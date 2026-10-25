@@ -27,7 +27,10 @@ export function SlugForm({ currentSlug }: { currentSlug: string }) {
   // Resultado da última verificação feita no servidor (vale só para esse slug).
   const [remote, setRemote] = useState<{ slug: string; status: Status } | null>(null);
 
-  const normalized = raw.trim() === "" ? "" : slugify(raw);
+  // Sem letra nem número, `slugify` devolveria um texto padrão: tratamos como vazio.
+  const normalized = /[a-z0-9]/i.test(raw.normalize("NFD").replace(/[̀-ͯ]/g, ""))
+    ? slugify(raw)
+    : "";
   const changed = normalized !== "" && normalized !== currentSlug;
 
   // Verifica a disponibilidade 400 ms depois da última tecla.

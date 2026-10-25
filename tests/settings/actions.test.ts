@@ -93,6 +93,20 @@ describe("ações de configurações: papel", () => {
     expect(result.fieldErrors).toHaveProperty("whatsapp");
   });
 
+  it.each([
+    "null",
+    "[]",
+    '"texto"',
+    "{}",
+    '{"0":[],"1":[],"2":[],"3":[],"4":[],"5":[]}',
+    '{"0":[],"1":[],"2":[],"3":[],"4":[],"5":[],"6":"x"}',
+  ])("horário malformado (%s) dá erro de validação, não o genérico", async (hours) => {
+    asRole("owner");
+    const result = await saveHoursAction({}, form({ hours }));
+    expect(result.error).toBeUndefined();
+    expect(result.fieldErrors?.hours).toBeTruthy();
+  });
+
   it("slug em uso volta como erro do campo", async () => {
     asRole("owner");
     await seedTenant(db, "ocupado");

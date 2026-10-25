@@ -19,7 +19,7 @@ export const WEEKDAY_LABELS: Record<number, string> = {
   5: "Sexta",
   6: "Sábado",
 };
-export const MAX_RANGES_PER_DAY = 6;
+export const MAX_RANGES_PER_DAY = 4;
 
 const HM = /^([01]\d|2[0-3]):([0-5]\d)$/;
 

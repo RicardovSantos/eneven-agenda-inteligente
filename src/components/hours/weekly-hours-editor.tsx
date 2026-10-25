@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
+  MAX_RANGES_PER_DAY,
   WEEKDAY_LABELS,
   WEEKDAY_ORDER,
   validateWeeklyHours,
@@ -13,7 +14,6 @@ import {
 } from "@/lib/weekly-hours";
 
 const DEFAULT_RANGE: TimeRange = { start: "09:00", end: "18:00" };
-const MAX_RANGES = 4;
 
 const toMinutes = (hm: string) => {
   const [h, m] = hm.split(":").map(Number);
@@ -98,7 +98,7 @@ export function WeeklyHoursEditor({
                   checked={open}
                   disabled={disabled}
                   onCheckedChange={(on) => setDay(day, on ? [{ ...DEFAULT_RANGE }] : [])}
-                  label={`${WEEKDAY_LABELS[day]}: ${toggleLabel}`}
+                  label={WEEKDAY_LABELS[day]}
                 />
                 <div className="min-w-0 leading-tight">
                   <p className="text-sm font-semibold">{WEEKDAY_LABELS[day]}</p>
@@ -151,7 +151,7 @@ export function WeeklyHoursEditor({
                       </button>
                     </div>
                   ))}
-                  {ranges.length < MAX_RANGES ? (
+                  {ranges.length < MAX_RANGES_PER_DAY ? (
                     <button
                       type="button"
                       disabled={disabled}

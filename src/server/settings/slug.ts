@@ -9,6 +9,12 @@ export const SLUG_TAKEN_MESSAGE = "Esse link já está em uso.";
 export const SLUG_RESERVED_MESSAGE = "Esse link não está disponível. Escolha outro.";
 export const SLUG_EMPTY_MESSAGE = "Informe o link da sua agenda.";
 
+export const SLUG_CHARS_MESSAGE = "Use letras, números e hífen.";
+
+/** `slugify` cai num texto padrão quando não sobra nada: "!!!" não vale como link. */
+const hasAlphanumeric = (raw: string) =>
+  /[a-z0-9]/i.test(raw.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+
 export type SlugAvailability =
   | { status: "invalid" }
   | { status: "current" | "available" | "taken" | "reserved"; slug: string };
@@ -18,7 +24,7 @@ export async function checkSlugAvailability(
   tenantId: string,
   raw: string,
 ): Promise<SlugAvailability> {
-  if (raw.trim() === "") return { status: "invalid" };
+  if (!hasAlphanumeric(raw)) return { status: "invalid" };
   const slug = slugify(raw);
   if (RESERVED_SLUGS.includes(slug)) return { status: "reserved", slug };
   const [row] = await db
@@ -40,7 +46,11 @@ export async function updateSlug(
   raw: string,
 ): Promise<{ slug: string }> {
   const check = await checkSlugAvailability(db, tenantId, raw);
-  if (check.status === "invalid") throw validationError({ slug: SLUG_EMPTY_MESSAGE });
+  if (check.status === "invalid") {
+    throw validationError({
+      slug: raw.trim() === "" ? SLUG_EMPTY_MESSAGE : SLUG_CHARS_MESSAGE,
+    });
+  }
   if (check.status === "reserved") throw validationError({ slug: SLUG_RESERVED_MESSAGE });
   if (check.status === "taken") throw validationError({ slug: SLUG_TAKEN_MESSAGE });
   if (check.status === "current") return { slug: check.slug };

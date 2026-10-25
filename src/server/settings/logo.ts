@@ -3,10 +3,13 @@ import sharp from "sharp";
 import { tenantLogos, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { withTenant } from "@/server/tenant-db";
-import { validationError } from "./errors";
+import { SettingsError, validationError } from "./errors";
 
 export const LOGO_MAX_BYTES = 1024 * 1024;
 export const LOGO_SIZE = 256;
+/** Limite de pixels da imagem enviada (proteção contra bomba de descompressão). */
+export const LOGO_MAX_INPUT_PIXELS = 25_000_000;
+const TOO_BIG = "Imagem grande demais. Use uma imagem menor.";
 const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp"];
 const ALLOWED_FORMATS = ["png", "jpeg", "webp"];
 
@@ -37,16 +40,22 @@ export async function uploadLogo(
   try {
     const input = Buffer.from(file.bytes);
     // Confere o formato pelo conteúdo, não pelo tipo declarado.
-    const meta = await sharp(input).metadata();
+    const limit = { limitInputPixels: LOGO_MAX_INPUT_PIXELS };
+    const meta = await sharp(input, limit).metadata();
     if (!meta.format || !ALLOWED_FORMATS.includes(meta.format)) {
       throw new Error("formato");
     }
-    png = await sharp(input)
+    if ((meta.width ?? 0) * (meta.height ?? 0) > LOGO_MAX_INPUT_PIXELS) {
+      throw bad(TOO_BIG);
+    }
+    png = await sharp(input, limit)
       .rotate()
       .resize(LOGO_SIZE, LOGO_SIZE, { fit: "cover" })
       .png()
       .toBuffer();
-  } catch {
+  } catch (error) {
+    if (error instanceof SettingsError) throw error;
+    if (error instanceof Error && /pixel limit/i.test(error.message)) throw bad(TOO_BIG);
     throw bad("Não conseguimos ler essa imagem. Tente outro arquivo.");
   }
 
@@ -74,10 +83,12 @@ export async function uploadLogo(
 }
 
 export async function removeLogo(db: Db, tenantId: string): Promise<void> {
+  // Limpa o `logoUrl` antes de apagar: se o apagar falhar, o pior caso é um
+  // logo sem referência (a rota pública ainda o serve), nunca um link quebrado.
+  await db.update(tenants).set({ logoUrl: null }).where(eq(tenants.id, tenantId));
   await withTenant(db, tenantId, (tx) =>
     tx.delete(tenantLogos).where(eq(tenantLogos.tenantId, tenantId)),
   );
-  await db.update(tenants).set({ logoUrl: null }).where(eq(tenants.id, tenantId));
 }
 
 export async function getLogo(

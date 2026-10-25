@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db/client";
 import type { Db } from "@/db/types";
+import { z } from "zod";
 import type { WeeklyHours } from "@/lib/weekly-hours";
 import { requireOwner } from "@/server/settings/access";
 import {
@@ -17,6 +19,19 @@ import {
   uploadLogo,
   type SlugAvailability,
 } from "@/server/settings";
+
+const dayRanges = z.array(z.object({ start: z.string(), end: z.string() }).strict());
+const weeklyHoursSchema = z
+  .object({
+    0: dayRanges,
+    1: dayRanges,
+    2: dayRanges,
+    3: dayRanges,
+    4: dayRanges,
+    5: dayRanges,
+    6: dayRanges,
+  })
+  .strict();
 
 export type SettingsFormState = {
   /** Confirmação para o toast ("Alterações salvas"). */
@@ -59,7 +74,7 @@ async function run(
         : { fieldErrors: error.fieldErrors, error: undefined, at: Date.now() };
     }
     // Redirecionamentos do Next (sessão ausente) precisam seguir adiante.
-    if (error instanceof Error && error.message.startsWith("NEXT_")) throw error;
+    unstable_rethrow(error);
     console.error("Falha ao salvar configurações", error);
     return { error: GENERIC_ERROR, at: Date.now() };
   }
@@ -125,13 +140,18 @@ export async function saveHoursAction(
   formData: FormData,
 ): Promise<SettingsFormState> {
   return run(async ({ db, tenantId }) => {
-    let hours: WeeklyHours;
+    const invalid = () =>
+      new SettingsError("validation", "Horário inválido.", { hours: "Horário inválido." });
+    let json: unknown;
     try {
-      hours = JSON.parse(text(formData, "hours")) as WeeklyHours;
+      json = JSON.parse(text(formData, "hours"));
     } catch {
-      throw new SettingsError("validation", "Horário inválido.", { hours: "Horário inválido." });
+      throw invalid();
     }
-    await updateBusinessHours(db, tenantId, hours);
+    // Forma exata: objeto com os dias 0 a 6, cada um uma lista de { start, end }.
+    const parsed = weeklyHoursSchema.safeParse(json);
+    if (!parsed.success) throw invalid();
+    await updateBusinessHours(db, tenantId, parsed.data as WeeklyHours);
     return {};
   });
 }
@@ -167,7 +187,7 @@ export async function checkSlugAction(raw: string): Promise<SlugAvailability> {
     const session = await requireOwner();
     return await checkSlugAvailability(await getDb(), session.tenantId, String(raw));
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("NEXT_")) throw error;
+    unstable_rethrow(error);
     return { status: "invalid" };
   }
 }
