@@ -109,7 +109,7 @@ export function WeeklyHoursEditor({
               </div>
 
               {open ? (
-                <div className="flex min-w-0 flex-1 flex-col gap-2 pl-1 sm:pl-0">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
                   {ranges.map((range, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <Input
@@ -120,7 +120,7 @@ export function WeeklyHoursEditor({
                         value={range.start}
                         disabled={disabled}
                         onChange={(e) => setRange(day, index, { start: e.target.value })}
-                        className="h-11 min-w-0 flex-1 tabular-nums sm:w-[7.25rem] sm:flex-none"
+                        className="h-11 min-w-[6.5rem] flex-1 px-2.5 tabular-nums sm:w-[7.25rem] sm:flex-none sm:px-3"
                       />
                       <span className="text-sm text-ink-muted" aria-hidden="true">
                         às
@@ -133,7 +133,7 @@ export function WeeklyHoursEditor({
                         value={range.end}
                         disabled={disabled}
                         onChange={(e) => setRange(day, index, { end: e.target.value })}
-                        className="h-11 min-w-0 flex-1 tabular-nums sm:w-[7.25rem] sm:flex-none"
+                        className="h-11 min-w-[6.5rem] flex-1 px-2.5 tabular-nums sm:w-[7.25rem] sm:flex-none sm:px-3"
                       />
                       <button
                         type="button"

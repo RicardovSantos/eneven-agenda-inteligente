@@ -34,11 +34,16 @@ const BOTTOM_ITEMS: NavItem[] = [
   { label: "Agenda", icon: CalendarDays, href: "/painel" },
   { label: "Clientes", icon: Users },
   { label: "Painel", icon: ChartNoAxesColumn },
-  // Até existir o menu "Mais", leva às Configurações (único destino extra).
-  { label: "Mais", icon: Ellipsis, href: "/painel/configuracoes" },
+  { label: "Mais", icon: Ellipsis, href: "/painel/mais" },
 ];
 
 function isActive(pathname: string, href: string) {
+  // "Mais" também fica ativo nas telas que ele abre (Configurações, Serviços, Equipe).
+  if (href === "/painel/mais") {
+    return ["/painel/mais", "/painel/configuracoes", "/painel/servicos", "/painel/equipe"].some(
+      (p) => pathname === p || pathname.startsWith(`${p}/`),
+    );
+  }
   return pathname === href;
 }
 

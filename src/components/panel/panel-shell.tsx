@@ -26,9 +26,9 @@ export function PanelShell({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-dvh bg-canvas">
-      {/* Barra lateral (>= 1024px) */}
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[232px] flex-col border-r border-line bg-surface lg:flex">
+    <div className="min-h-dvh bg-canvas lg:flex">
+      {/* Barra lateral (>= 1024px): fica no topo da janela; rola por dentro se precisar */}
+      <aside className="sticky top-0 z-20 hidden h-dvh w-[232px] shrink-0 flex-col self-start border-r border-line bg-surface lg:flex">
         <div className="px-4 pb-6 pt-6">
           <BrandLogo width={132} />
         </div>
@@ -52,6 +52,7 @@ export function PanelShell({
         </div>
       </aside>
 
+      <div className="min-w-0 flex-1">
       {/* Topo (celular) */}
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-line bg-surface pl-4 pr-1 lg:hidden">
         <p className="truncate font-display text-lg font-semibold">{tenantName}</p>
@@ -67,8 +68,7 @@ export function PanelShell({
         </LogoutForm>
       </header>
 
-      <div className="lg:pl-[232px]">
-        <main className="px-4 pb-28 pt-6 lg:px-8 lg:pb-10 lg:pt-8">{children}</main>
+      <main className="px-4 pb-28 pt-6 lg:px-8 lg:pb-10 lg:pt-8">{children}</main>
       </div>
 
       <BottomNav />
