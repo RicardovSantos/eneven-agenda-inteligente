@@ -20,7 +20,7 @@ const LOGO_MAX_BYTES = 1024 * 1024;
 const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 /** Sugestões do sistema visual (todas com contraste AA com texto branco). */
-const SUGGESTIONS: Array<{ hex: string; name: string }> = [
+export const BRAND_SUGGESTIONS: Array<{ hex: string; name: string }> = [
   { hex: "#3E07D2", name: "Violeta" },
   { hex: "#0E7C86", name: "Turquesa" },
   { hex: "#B4237A", name: "Magenta" },
@@ -31,7 +31,7 @@ const SUGGESTIONS: Array<{ hex: string; name: string }> = [
   { hex: "#5B4BC4", name: "Índigo" },
 ];
 
-function Avatar({
+export function BrandAvatar({
   color,
   name,
   logoUrl,
@@ -140,7 +140,7 @@ export function BrandForm({ initial }: { initial: BrandInitial }) {
         <div className="flex flex-col gap-3">
           <p className="text-sm font-medium leading-snug">Logo</p>
           <div className="flex flex-wrap items-center gap-4">
-            <Avatar
+            <BrandAvatar
               color={usedColor}
               name={initial.name}
               logoUrl={logoUrl}
@@ -208,7 +208,7 @@ export function BrandForm({ initial }: { initial: BrandInitial }) {
               Cor da marca
             </p>
             <div role="radiogroup" aria-labelledby="brand-color-label" className="flex flex-wrap gap-2.5">
-              {SUGGESTIONS.map((s) => {
+              {BRAND_SUGGESTIONS.map((s) => {
                 const selected = valid && normalizeHex(hex) === s.hex;
                 return (
                   <button
@@ -258,7 +258,7 @@ export function BrandForm({ initial }: { initial: BrandInitial }) {
               Prévia da sua página
             </p>
             <div className="flex items-center gap-3 rounded-field border border-line bg-surface px-3 py-2.5">
-              <Avatar color={usedColor} name={initial.name} logoUrl={logoUrl} size={40} />
+              <BrandAvatar color={usedColor} name={initial.name} logoUrl={logoUrl} size={40} />
               <div className="min-w-0 leading-tight">
                 <p className="truncate font-display font-semibold">{initial.name}</p>
                 <p className="text-[0.8125rem] text-ink-muted">Agende seu horário</p>

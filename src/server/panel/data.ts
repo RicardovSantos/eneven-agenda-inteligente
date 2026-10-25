@@ -22,6 +22,7 @@ export const getPanelData = cache(async () => {
       tenantStatus: tenants.status,
       trialEndsAt: tenants.trialEndsAt,
       timezone: tenants.timezone,
+      onboardingCompletedAt: tenants.onboardingCompletedAt,
     })
     .from(memberships)
     .innerJoin(users, eq(users.id, memberships.userId))

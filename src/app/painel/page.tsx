@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { ResendVerification } from "@/components/panel/resend-verification";
 import { formatDayMonth, trialDaysLeft } from "@/lib/trial";
-import { getPanelData } from "@/server/panel/data";
+import { requireOnboarded } from "@/server/panel/onboarding-gate";
 
 export const metadata: Metadata = { title: "Agenda" };
 
 export default async function PainelPage() {
-  const data = await getPanelData();
+  const data = await requireOnboarded();
   const firstName = data.userName.trim().split(/\s+/)[0] ?? data.userName;
 
   const isTrial = data.tenantStatus === "trial";

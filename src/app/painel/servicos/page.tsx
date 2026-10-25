@@ -5,13 +5,13 @@ import {
   type ProfessionalOption,
   type ServiceItem,
 } from "@/components/catalog/services-screen";
-import { requireTenantSession } from "@/server/auth/guard";
+import { requireOnboarded } from "@/server/panel/onboarding-gate";
 import { listProfessionals, listServices } from "@/server/catalog";
 
 export const metadata: Metadata = { title: "Serviços" };
 
 export default async function ServicosPage() {
-  const session = await requireTenantSession();
+  const { session } = await requireOnboarded();
   const db = await getDb();
   const [services, professionals] = await Promise.all([
     listServices(db, session.tenantId, { includeArchived: true }),

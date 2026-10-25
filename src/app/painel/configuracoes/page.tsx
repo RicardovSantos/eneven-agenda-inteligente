@@ -8,13 +8,13 @@ import { BusinessInfoForm } from "@/components/settings/business-info-form";
 import { HoursForm } from "@/components/settings/hours-form";
 import { RulesForm } from "@/components/settings/rules-form";
 import { SlugForm } from "@/components/settings/slug-form";
-import { requireTenantSession } from "@/server/auth/guard";
+import { requireOnboarded } from "@/server/panel/onboarding-gate";
 import { getBusinessHours } from "@/server/settings";
 
 export const metadata: Metadata = { title: "Configurações" };
 
 export default async function ConfiguracoesPage() {
-  const session = await requireTenantSession();
+  const { session } = await requireOnboarded();
 
   // Só o proprietário altera as configurações: os demais papéis veem o aviso.
   if (session.role !== "owner") {

@@ -32,6 +32,20 @@ export function emptyWeek(): WeeklyHours {
   return { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
 }
 
+/** Horário que todo estabelecimento novo recebe: seg a sex 09:00–18:00 e sábado 09:00–13:00. */
+export function defaultBusinessHours(): WeeklyHours {
+  const weekday = () => [{ start: "09:00", end: "18:00" }];
+  return {
+    ...emptyWeek(),
+    1: weekday(),
+    2: weekday(),
+    3: weekday(),
+    4: weekday(),
+    5: weekday(),
+    6: [{ start: "09:00", end: "13:00" }],
+  };
+}
+
 /**
  * Devolve a primeira mensagem de erro de cada dia (chave = dia da semana), ou
  * `{}` quando válido: formato HH:MM, início antes do fim e sem sobreposição

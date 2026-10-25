@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { getDb } from "@/db/client";
 import { ProfessionalsScreen } from "@/components/catalog/professionals-screen";
-import { requireTenantSession } from "@/server/auth/guard";
+import { requireOnboarded } from "@/server/panel/onboarding-gate";
 import { listProfessionals, listServices } from "@/server/catalog";
 import { getBusinessHours } from "@/server/settings";
 
 export const metadata: Metadata = { title: "Equipe" };
 
 export default async function EquipePage() {
-  const session = await requireTenantSession();
+  const { session } = await requireOnboarded();
   const db = await getDb();
   const [professionals, services, businessHours] = await Promise.all([
     listProfessionals(db, session.tenantId),

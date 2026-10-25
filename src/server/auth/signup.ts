@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { memberships, tenants, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { isUniqueViolation } from "@/server/db-errors";
+import { seedTenantDefaults } from "@/server/tenants/defaults";
 import { generateUniqueSlug } from "@/server/tenants/slug";
 import { AuthError } from "./errors";
 import { hashPassword } from "./password";
@@ -82,7 +83,8 @@ export type NewTenantOwner = {
 
 /**
  * Cria o estabelecimento (em teste por 14 dias), o usuário e o vínculo
- * `owner` numa única transação. É a regra única de cadastro, usada pelo
+ * `owner` numa única transação, já com o horário padrão e o dono como
+ * primeiro profissional. É a regra única de cadastro, usada pelo
  * cadastro com senha e pelo cadastro com o Google.
  *
  * `inTransaction` roda dentro da mesma transação, depois das linhas criadas
@@ -127,6 +129,11 @@ export async function createTenantWithOwner(
         await tx
           .insert(memberships)
           .values({ userId: user.id, tenantId: tenant.id, role: "owner" });
+        await seedTenantDefaults(tx, {
+          tenantId: tenant.id,
+          ownerUserId: user.id,
+          ownerName: input.ownerName,
+        });
         const created = { userId: user.id, tenantId: tenant.id };
         await inTransaction?.(tx, created);
         return { ...created, slug };
