@@ -23,6 +23,11 @@ export type LoadOptions = {
   excludeBookingId?: string;
   /** Duração/buffer já conhecidos (remarcação); dispensa `serviceIds`. */
   override?: { durationMin: number; bufferAfterMin: number };
+  /**
+   * Quantos dias a partir de `date` o contexto precisa cobrir (padrão 1: só o
+   * próprio dia). Usado para listar as datas livres de uma vez só.
+   */
+  spanDays?: number;
 };
 
 function emptyWeek(): WeeklyHours {
@@ -114,10 +119,14 @@ export async function loadAvailabilityContext(
     for (const h of hours) addRange(proWeeks.get(h.professionalId)!, h.weekday, h.startsAt, h.endsAt);
   }
 
-  // Janela do dia com folga de um dia para cada lado (atendimentos e buffers
-  // que atravessam a meia-noite).
+  // Janela do período com folga de um dia para cada lado (atendimentos e
+  // buffers que atravessam a meia-noite).
   const from = zonedInstant(addDaysToDate(opts.date, -1), 0, tenant.timezone);
-  const to = zonedInstant(addDaysToDate(opts.date, 2), 0, tenant.timezone);
+  const to = zonedInstant(
+    addDaysToDate(opts.date, 1 + Math.max(1, opts.spanDays ?? 1)),
+    0,
+    tenant.timezone,
+  );
 
   const busyRows =
     proIds.length === 0

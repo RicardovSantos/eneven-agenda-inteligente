@@ -18,6 +18,17 @@ export const signupLimiter = createRateLimiter({ limit: 5, windowMs: HOUR_MS });
 export const forgotPasswordByIpLimiter = createRateLimiter({ limit: 5, windowMs: HOUR_MS });
 export const forgotPasswordByEmailLimiter = createRateLimiter({ limit: 5, windowMs: HOUR_MS });
 
+/**
+ * Página pública de agendamento: reservar = 10 / 10 min por IP e 5 / h por
+ * telefone (barra quem enche a agenda de um salão); consultar horários = 120 /
+ * min por IP (cada consulta lê o banco); remarcar/cancelar pelo link = 20 / 10
+ * min por IP.
+ */
+export const bookingByIpLimiter = createRateLimiter({ limit: 10, windowMs: 10 * MINUTE_MS });
+export const bookingByPhoneLimiter = createRateLimiter({ limit: 5, windowMs: HOUR_MS });
+export const publicReadByIpLimiter = createRateLimiter({ limit: 120, windowMs: MINUTE_MS });
+export const manageByIpLimiter = createRateLimiter({ limit: 20, windowMs: 10 * MINUTE_MS });
+
 /** Junta os resultados: recusa se qualquer um recusar, com o maior tempo de espera. */
 function combine(results: RateLimitResult[]): RateLimitResult {
   const blocked = results.filter(
@@ -53,6 +64,21 @@ export function limitForgotPassword(ip: string, email: string, now?: number): Ra
   return combine([byIp, forgotPasswordByEmailLimiter.hit(email, now)]);
 }
 
+/** `phone` já normalizado (55 + DDD + número). IP primeiro; IP bloqueado não cria chave por telefone. */
+export function limitBooking(ip: string, phone: string, now?: number): RateLimitResult {
+  const byIp = bookingByIpLimiter.hit(ip, now);
+  if (!byIp.ok) return byIp;
+  return bookingByPhoneLimiter.hit(phone, now);
+}
+
+export function limitPublicRead(ip: string, now?: number): RateLimitResult {
+  return publicReadByIpLimiter.hit(ip, now);
+}
+
+export function limitManage(ip: string, now?: number): RateLimitResult {
+  return manageByIpLimiter.hit(ip, now);
+}
+
 /** Zera todos os limitadores (só para testes). */
 export function resetRateLimitsForTests(): void {
   for (const limiter of [
@@ -62,6 +88,10 @@ export function resetRateLimitsForTests(): void {
     signupLimiter,
     forgotPasswordByIpLimiter,
     forgotPasswordByEmailLimiter,
+    bookingByIpLimiter,
+    bookingByPhoneLimiter,
+    publicReadByIpLimiter,
+    manageByIpLimiter,
   ]) {
     limiter.reset();
   }
