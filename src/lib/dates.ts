@@ -80,3 +80,18 @@ export function periodOf(hhmm: string): DayPeriod {
   if (hour < 18) return "Tarde";
   return "Noite";
 }
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/**
+ * Rótulo do mês (ou dos meses) de uma faixa de datas, acima da faixa de dias:
+ * "Outubro 2026" ou, quando atravessa meses, "Outubro – Novembro" (com o ano
+ * só na ponta quando o ano muda: "Dezembro 2026 – Janeiro 2027").
+ */
+export function formatMonthRange(first: string, last: string): string {
+  const a = parts(first);
+  const b = parts(last);
+  if (a.y === b.y && a.m === b.m) return `${capitalize(MONTHS[a.m - 1])} ${a.y}`;
+  if (a.y === b.y) return `${capitalize(MONTHS[a.m - 1])} – ${capitalize(MONTHS[b.m - 1])}`;
+  return `${capitalize(MONTHS[a.m - 1])} ${a.y} – ${capitalize(MONTHS[b.m - 1])} ${b.y}`;
+}

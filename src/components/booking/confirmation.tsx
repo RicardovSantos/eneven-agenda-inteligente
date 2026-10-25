@@ -24,12 +24,14 @@ export function Confirmation({
   tenant,
   booking,
   token,
+  firstName,
 }: {
   tenant: BookingTenant;
   booking: BookingView;
   token: string;
+  /** Primeiro nome digitado no formulário (nunca o guardado pelo salão). */
+  firstName: string;
 }) {
-  const firstName = booking.customerName.trim().split(/\s+/)[0];
   return (
     <div className="flex min-h-dvh flex-col gap-6 px-5 pt-7 pb-5">
       <CompactBrand tenant={tenant} />

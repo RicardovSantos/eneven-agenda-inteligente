@@ -1,7 +1,7 @@
 import type { Db } from "@/db/types";
-import { BookingError, type BookingErrorCode } from "@/server/agenda/errors";
+import { BookingError, SLOT_TAKEN_MESSAGE, type BookingErrorCode } from "@/server/agenda/errors";
 import { createBooking } from "@/server/agenda/bookings";
-import { limitBooking } from "@/server/security/limits";
+import { limitBookingIp, limitBookingPhone } from "@/server/security/limits";
 import { rateLimitMessage } from "@/server/security/rate-limit";
 import { bookInputSchema, fieldErrorsOf, MESSAGES } from "./schemas";
 import { getPublicTenant } from "./tenant";
@@ -48,15 +48,25 @@ export async function bookPublic(
   }
   const input = parsed.data;
 
-  const limit = limitBooking(context.ip, input.phone);
-  if (!limit.ok) {
-    return { ok: false, code: "rate_limited", error: rateLimitMessage(limit.retryAfterSec) };
+  // O IP conta antes de tudo; o telefone só depois de entrada e estabelecimento
+  // válidos, para tentativas inválidas não gastarem a cota de quem tem aquele número.
+  const ipLimit = limitBookingIp(context.ip);
+  if (!ipLimit.ok) {
+    return { ok: false, code: "rate_limited", error: rateLimitMessage(ipLimit.retryAfterSec) };
   }
 
   const now = context.now ?? new Date();
   const resolved = await getPublicTenant(slug, { db, now });
   if (!resolved || !resolved.canBook) {
     return { ok: false, code: "unavailable", error: MESSAGES.unavailable };
+  }
+  if (new Date(input.startsAt).getTime() <= now.getTime()) {
+    return { ok: false, code: "slot_taken", error: SLOT_TAKEN_MESSAGE };
+  }
+
+  const phoneLimit = limitBookingPhone(input.phone);
+  if (!phoneLimit.ok) {
+    return { ok: false, code: "rate_limited", error: rateLimitMessage(phoneLimit.retryAfterSec) };
   }
 
   try {

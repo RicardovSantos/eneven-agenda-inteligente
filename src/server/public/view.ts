@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import { bookingServices, bookings, customers, professionals } from "@/db/schema";
+import { bookingServices, bookings, professionals } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { formatTime } from "@/lib/dates";
 import type { BookingStatus } from "@/server/agenda/bookings";
@@ -7,7 +7,10 @@ import { BookingError } from "@/server/agenda/errors";
 import { localDateOf } from "@/server/agenda/time";
 import { withTenant } from "@/server/tenant-db";
 
-/** Agendamento como a cliente o vê (confirmação e página de gestão). */
+/**
+ * Agendamento como a cliente o vê (confirmação e página de gestão). Não leva o
+ * nome do cliente: o telefone digitado poderia revelar o nome guardado pelo salão.
+ */
 export type BookingView = {
   bookingId: string;
   status: BookingStatus;
@@ -22,7 +25,6 @@ export type BookingView = {
   services: Array<{ name: string; durationMin: number; priceCents: number }>;
   professionalId: string;
   professionalName: string;
-  customerName: string;
 };
 
 export async function getBookingView(
@@ -41,11 +43,9 @@ export async function getBookingView(
         totalCents: bookings.totalCents,
         professionalId: bookings.professionalId,
         professionalName: professionals.name,
-        customerName: customers.name,
       })
       .from(bookings)
       .innerJoin(professionals, eq(professionals.id, bookings.professionalId))
-      .innerJoin(customers, eq(customers.id, bookings.customerId))
       .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)))
       .limit(1);
     if (!row) throw new BookingError("not_found");
@@ -72,7 +72,6 @@ export async function getBookingView(
       services: lines,
       professionalId: row.professionalId,
       professionalName: row.professionalName,
-      customerName: row.customerName,
     };
   });
 }

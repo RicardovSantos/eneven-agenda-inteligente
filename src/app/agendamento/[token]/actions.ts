@@ -11,7 +11,7 @@ import {
   listRescheduleSlots,
   rescheduleByToken,
 } from "@/server/public/manage";
-import { rescheduleInputSchema, MESSAGES } from "@/server/public/schemas";
+import { isRealDate, rescheduleInputSchema, MESSAGES } from "@/server/public/schemas";
 import type { PublicSlot } from "@/server/public/slots";
 import { currentClientIp } from "@/server/security/client-ip";
 import { limitManage, limitPublicRead } from "@/server/security/limits";
@@ -26,7 +26,6 @@ type Failure = { ok: false; error: string };
 type Done = { ok: true };
 
 const GENERIC = "Não foi possível concluir agora. Tente novamente em instantes.";
-const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Mensagem do prazo com o nome do salão ("Para remarcar ou cancelar, fale com …."). */
 async function messageFor(error: BookingError, token: string): Promise<string> {
@@ -43,7 +42,7 @@ export async function getRescheduleSlotsAction(
 ): Promise<{ ok: true; slots: PublicSlot[] } | Failure> {
   const limit = limitPublicRead(await currentClientIp());
   if (!limit.ok) return { ok: false, error: rateLimitMessage(limit.retryAfterSec) };
-  if (typeof date !== "string" || !YMD.test(date)) return { ok: false, error: GENERIC };
+  if (typeof date !== "string" || !isRealDate(date)) return { ok: false, error: GENERIC };
   try {
     return { ok: true, slots: await listRescheduleSlots(await getDb(), token, date) };
   } catch (error) {
@@ -59,7 +58,7 @@ export async function getRescheduleDatesAction(
 ): Promise<{ ok: true; dates: string[] } | Failure> {
   const limit = limitPublicRead(await currentClientIp());
   if (!limit.ok) return { ok: false, error: rateLimitMessage(limit.retryAfterSec) };
-  if (typeof from !== "string" || !YMD.test(from)) return { ok: false, error: GENERIC };
+  if (typeof from !== "string" || !isRealDate(from)) return { ok: false, error: GENERIC };
   try {
     return { ok: true, dates: await listRescheduleDates(await getDb(), token, from) };
   } catch (error) {

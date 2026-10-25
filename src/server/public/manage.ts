@@ -9,7 +9,7 @@ import { loadAvailabilityContext } from "@/server/agenda/load";
 import { diffDays, localDateOf } from "@/server/agenda/time";
 import { withTenant } from "@/server/tenant-db";
 import type { PublicSlot } from "./slots";
-import { toPublicTenant, type PublicTenant } from "./tenant";
+import { getPublicTenant, toPublicTenant, type PublicTenant } from "./tenant";
 import { getBookingView, type BookingView } from "./view";
 
 const MIN_MS = 60_000;
@@ -20,6 +20,8 @@ export type ManageView = {
   booking: BookingView;
   /** Ainda dá para remarcar ou cancelar sozinha (status e prazo do salão). */
   canChange: boolean;
+  /** `canChange` e o estabelecimento pode receber agendamentos (remarcar ocupa um horário novo). */
+  canReschedule: boolean;
 };
 
 /** Localiza o agendamento pelo token e o estabelecimento dono dele (o tenant vem do banco, nunca do cliente). */
@@ -29,6 +31,11 @@ async function resolveToken(db: Db, token: string) {
   if (!found) return null;
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, found.tenantId)).limit(1);
   return tenant ? { ...found, tenant } : null;
+}
+
+/** Remarcar exige que o estabelecimento possa agendar (e-mail, plano e serviços em dia); cancelar não. */
+async function tenantCanBook(db: Db, slug: string, now: Date): Promise<boolean> {
+  return (await getPublicTenant(slug, { db, now }))?.canBook ?? false;
 }
 
 function allowsChange(
@@ -50,10 +57,12 @@ export async function getManageView(
   const resolved = await resolveToken(db, token);
   if (!resolved) return null;
   const booking = await getBookingView(db, resolved.tenantId, resolved.bookingId, resolved.tenant.timezone);
+  const canChange = allowsChange(booking, resolved.tenant.cancelWindowMin, now);
   return {
     tenant: toPublicTenant(resolved.tenant),
     booking,
-    canChange: allowsChange(booking, resolved.tenant.cancelWindowMin, now),
+    canChange,
+    canReschedule: canChange && (await tenantCanBook(db, resolved.tenant.slug, now)),
   };
 }
 
@@ -73,6 +82,9 @@ export async function rescheduleByToken(
 ): Promise<void> {
   const resolved = await resolveToken(db, token);
   if (!resolved) throw new BookingError("not_found");
+  if (!(await tenantCanBook(db, resolved.tenant.slug, now))) {
+    throw new BookingError("reschedule_unavailable", `Para remarcar, fale com ${resolved.tenant.name}.`);
+  }
   await rescheduleBooking(
     db,
     resolved.tenantId,
@@ -98,6 +110,7 @@ async function rescheduleContext(
   const resolved = await resolveToken(db, token);
   if (!resolved) return null;
   const { tenantId, bookingId, tenant } = resolved;
+  if (!(await tenantCanBook(db, tenant.slug, now))) return null;
 
   return withTenant(db, tenantId, async (tx) => {
     const [booking] = await tx

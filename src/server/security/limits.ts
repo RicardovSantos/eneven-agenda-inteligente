@@ -64,6 +64,16 @@ export function limitForgotPassword(ip: string, email: string, now?: number): Ra
   return combine([byIp, forgotPasswordByEmailLimiter.hit(email, now)]);
 }
 
+/** Só o IP (a reserva confere o telefone depois de validar entrada e estabelecimento). */
+export function limitBookingIp(ip: string, now?: number): RateLimitResult {
+  return bookingByIpLimiter.hit(ip, now);
+}
+
+/** Só o telefone normalizado. */
+export function limitBookingPhone(phone: string, now?: number): RateLimitResult {
+  return bookingByPhoneLimiter.hit(phone, now);
+}
+
 /** `phone` já normalizado (55 + DDD + número). IP primeiro; IP bloqueado não cria chave por telefone. */
 export function limitBooking(ip: string, phone: string, now?: number): RateLimitResult {
   const byIp = bookingByIpLimiter.hit(ip, now);

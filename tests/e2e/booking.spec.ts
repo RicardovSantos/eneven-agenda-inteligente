@@ -55,6 +55,8 @@ test.describe("página pública de agendamento", () => {
     // Confirmação no mesmo lugar, sem recarregar.
     await expect(page.getByRole("heading", { name: "Agendamento confirmado" })).toBeVisible();
     await expect(page.getByText("Te esperamos, Paula.")).toBeVisible();
+    // A URL passa a ser a da gestão: recarregar não perde o link.
+    await expect(page).toHaveURL(/\/agendamento\/[\w-]+$/);
     await expect(page.getByText("Piercing hélix")).toBeVisible();
     await expect(page.getByText("R$ 90,00 · pago no local")).toBeVisible();
     await expect(page.getByText("Rua Augusta, 120")).toBeVisible();

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   dayOfMonth,
   formatLongDate,
+  formatMonthRange,
   formatShortDate,
   formatTime,
   monthShort,
@@ -41,6 +42,14 @@ describe("datas em pt-BR", () => {
     expect(periodOf("12:00")).toBe("Tarde");
     expect(periodOf("17:59")).toBe("Tarde");
     expect(periodOf("18:00")).toBe("Noite");
+  });
+});
+
+describe("formatMonthRange", () => {
+  it("um mês com ano; dois meses sem ano; virada de ano com os dois", () => {
+    expect(formatMonthRange("2026-10-26", "2026-10-31")).toBe("Outubro 2026");
+    expect(formatMonthRange("2026-10-26", "2026-11-20")).toBe("Outubro – Novembro");
+    expect(formatMonthRange("2026-12-20", "2027-01-10")).toBe("Dezembro 2026 – Janeiro 2027");
   });
 });
 

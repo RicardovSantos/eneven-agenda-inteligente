@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { bookings } from "@/db/schema";
+import { bookings, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { bookPublic } from "@/server/public/booking";
 import {
@@ -69,9 +69,9 @@ describe("getManageView", () => {
       status: "scheduled",
       date: "2030-01-07",
       time: "10:00",
-      customerName: "Paula",
     });
     expect(view!.canChange).toBe(true);
+    expect(view!.canReschedule).toBe(true);
   });
 
   it("dentro do prazo mínimo (cancelWindowMin = 120): canChange falso", async () => {
@@ -90,6 +90,24 @@ describe("getManageView", () => {
     const view = await getManageView(db, token, NOW);
     expect(view!.booking.status).toBe("canceled");
     expect(view!.canChange).toBe(false);
+  });
+});
+
+describe("salão que não pode agendar (e-mail não confirmado)", () => {
+  beforeEach(async () => {
+    await db.update(users).set({ emailVerifiedAt: null }).where(eq(users.id, seed.ownerId));
+  });
+
+  it("cancelar continua valendo; remarcar é recusado com orientação", async () => {
+    const view = await getManageView(db, token, NOW);
+    expect(view).toMatchObject({ canChange: true, canReschedule: false });
+    await expect(
+      rescheduleByToken(db, token, local("2030-01-08", "14:30").toISOString(), NOW),
+    ).rejects.toMatchObject({ code: "reschedule_unavailable", message: "Para remarcar, fale com Studio Defendi." });
+    expect(await listRescheduleSlots(db, token, "2030-01-08", NOW)).toEqual([]);
+    expect(await listRescheduleDates(db, token, "2030-01-01", NOW)).toEqual([]);
+    await cancelByToken(db, token, NOW);
+    expect((await getManageView(db, token, NOW))!.booking.status).toBe("canceled");
   });
 });
 

@@ -38,7 +38,17 @@ const nextConfig: NextConfig = {
     },
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders() }];
+    return [
+      { source: "/:path*", headers: securityHeaders() },
+      // O token de gestão está na URL: sem referrer e fora dos buscadores.
+      {
+        source: "/agendamento/:path*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+    ];
   },
   async rewrites() {
     // Navegadores pedem /favicon.ico direto: serve o ícone gerado a partir da logo.

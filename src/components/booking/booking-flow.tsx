@@ -64,7 +64,7 @@ export function BookingFlow({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [done, setDone] = useState<{ token: string; booking: BookingView } | null>(null);
+  const [done, setDone] = useState<{ token: string; booking: BookingView; firstName: string } | null>(null);
 
   const selected = useMemo(
     () =>
@@ -98,7 +98,11 @@ export function BookingFlow({
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // Cada passo novo abre no topo.
+  // Passo mostrado: o Avançar do navegador pode cair num passo sem os dados dele
+  // (recarregou, ou o horário foi limpo): volta ao passo que falta.
+  const view: Step = selected.length === 0 ? 0 : step === 3 && !slot ? 2 : step;
+
+  // Cada passo novo abre no topo e leva o foco ao título (leitores de tela e teclado).
   const first = useRef(true);
   useEffect(() => {
     if (first.current) {
@@ -106,7 +110,8 @@ export function BookingFlow({
       return;
     }
     window.scrollTo({ top: 0 });
-  }, [step, done]);
+    document.querySelector<HTMLElement>("[data-step-heading]")?.focus({ preventScroll: true });
+  }, [view, done]);
 
   function goTo(next: Step) {
     window.history.pushState({ bookingStep: next }, "");
@@ -164,7 +169,9 @@ export function BookingFlow({
         consent: form.consent,
       });
       if (result.ok) {
-        setDone({ token: result.token, booking: result.booking });
+        setDone({ token: result.token, booking: result.booking, firstName: name.split(/\s+/)[0] });
+        // Recarregar a página cai na gestão do agendamento, não numa agenda vazia.
+        window.history.replaceState(null, "", `/agendamento/${result.token}`);
         requestAnimationFrame(() => document.getElementById("confirmation-title")?.focus());
         return;
       }
@@ -185,13 +192,13 @@ export function BookingFlow({
     }
   }
 
-  if (done) return <Confirmation tenant={tenant} booking={done.booking} token={done.token} />;
+  if (done) return <Confirmation tenant={tenant} booking={done.booking} token={done.token} firstName={done.firstName} />;
 
   const summaryLabel = `${selected.length} ${selected.length === 1 ? "serviço" : "serviços"} · ${formatDuration(totalMin)}`;
 
   return (
     <>
-      {step === 0 ? (
+      {view === 0 ? (
         <header className="flex flex-col gap-[18px] border-b border-line px-5 pt-5 pb-4">
           <div className="flex items-center gap-3.5">
             <BrandMark name={tenant.name} logoUrl={tenant.logoUrl} size="lg" />
@@ -217,14 +224,14 @@ export function BookingFlow({
             </button>
             <CompactBrand tenant={tenant} />
           </div>
-          <ProgressThread steps={STEPS} current={step} label="Etapas do agendamento" />
+          <ProgressThread steps={STEPS} current={view} label="Etapas do agendamento" />
         </header>
       )}
 
-      {step === 0 ? (
+      {view === 0 ? (
         <>
           <main className="flex flex-1 flex-col gap-3 px-5 pt-5">
-            <h2 className="m-0 font-display text-[19px] font-semibold">Escolha o serviço</h2>
+            <h2 tabIndex={-1} data-step-heading className="m-0 font-display text-[19px] font-semibold outline-none">Escolha o serviço</h2>
             <ul className="m-0 flex list-none flex-col p-0">
               {services.map((service) => (
                 <li key={service.id} className="border-b border-line">
@@ -273,11 +280,11 @@ export function BookingFlow({
         </>
       ) : null}
 
-      {step === 1 ? (
+      {view === 1 ? (
         <>
           <main className="flex flex-1 flex-col gap-3 px-5 pt-[18px]">
             <div className="flex flex-col gap-1">
-              <h2 className="m-0 font-display text-[19px] font-semibold">Com quem você quer agendar?</h2>
+              <h2 tabIndex={-1} data-step-heading className="m-0 font-display text-[19px] font-semibold outline-none">Com quem você quer agendar?</h2>
               <span className="text-[13px] text-ink-muted">{serviceNames}</span>
             </div>
             <ul className="m-0 flex list-none flex-col p-0">
@@ -323,11 +330,11 @@ export function BookingFlow({
         </>
       ) : null}
 
-      {step === 2 ? (
+      {view === 2 ? (
         <>
           <main className="flex flex-1 flex-col gap-4 px-5 pt-[18px]">
             <div className="flex flex-col gap-1">
-              <h2 className="m-0 font-display text-[19px] font-semibold">Escolha o dia e o horário</h2>
+              <h2 tabIndex={-1} data-step-heading className="m-0 font-display text-[19px] font-semibold outline-none">Escolha o dia e o horário</h2>
               <span className="text-[13px] text-ink-muted">
                 {serviceNames} · {formatDuration(totalMin)} ·{" "}
                 {professional ? `com ${professional.name}` : "com qualquer profissional"}
@@ -394,10 +401,10 @@ export function BookingFlow({
         </>
       ) : null}
 
-      {step === 3 && slot ? (
+      {view === 3 && slot ? (
         <form onSubmit={submit} noValidate className="flex flex-1 flex-col">
           <main className="flex flex-1 flex-col gap-5 px-5 pt-[18px] pb-5">
-            <h2 className="m-0 font-display text-[19px] font-semibold">Seus dados</h2>
+            <h2 tabIndex={-1} data-step-heading className="m-0 font-display text-[19px] font-semibold outline-none">Seus dados</h2>
 
             <div className="flex items-start justify-between gap-3 rounded-panel bg-canvas p-4 text-sm leading-snug">
               <div className="flex min-w-0 flex-col gap-0.5">

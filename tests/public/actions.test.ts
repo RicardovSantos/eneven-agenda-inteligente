@@ -72,6 +72,15 @@ describe("getSlotsAction e getDatesAction", () => {
     expect((await getSlotsAction("studio", null)).ok).toBe(false);
   });
 
+  it("data que não existe é recusada", async () => {
+    for (const date of ["2026-13-45", "2026-02-30", "2026-00-10"]) {
+      expect((await getSlotsAction("studio", { ...selection(), date })).ok).toBe(false);
+      expect((await getDatesAction("studio", { ...selection(), from: date })).ok).toBe(false);
+    }
+    expect((await getRescheduleSlotsAction("token", "2026-13-45")).ok).toBe(false);
+    expect((await getRescheduleDatesAction("token", "2026-02-30")).ok).toBe(false);
+  });
+
   it("serviço de outro estabelecimento: erro de seleção", async () => {
     const other = await seedBookable(db, { slug: "outro" });
     const result = await getSlotsAction("studio", {

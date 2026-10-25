@@ -13,6 +13,7 @@ import {
 import { FormAlert, FormNotice } from "@/components/auth/form-alert";
 import { ConfirmDialog } from "@/components/catalog/parts";
 import { formatLongDate } from "@/lib/dates";
+import { SLOT_TAKEN_MESSAGE } from "@/server/agenda/errors";
 import type { BookingView } from "@/server/public/view";
 import { BookingDetails } from "./booking-details";
 import {
@@ -40,12 +41,15 @@ export function ManageBooking({
   tenant,
   booking,
   canChange,
+  canReschedule,
   today,
 }: {
   token: string;
   tenant: BookingTenant;
   booking: BookingView;
   canChange: boolean;
+  /** Pode remarcar: dentro do prazo e o salão aceita agendamentos. */
+  canReschedule: boolean;
   today: string;
 }) {
   const router = useRouter();
@@ -53,6 +57,7 @@ export function ManageBooking({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [slot, setSlot] = useState<PickedSlot | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [pending, setPending] = useState<"reschedule" | "cancel" | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
@@ -72,6 +77,11 @@ export function ManageBooking({
         router.refresh();
       } else {
         setError(result.error);
+        if (result.error === SLOT_TAKEN_MESSAGE) {
+          // Horário tomado: limpa a escolha e recarrega a lista.
+          setSlot(null);
+          setReloadKey((n) => n + 1);
+        }
       }
     } catch {
       setError("Não foi possível remarcar agora. Confira sua conexão e tente de novo.");
@@ -128,7 +138,7 @@ export function ManageBooking({
           {error ? <FormAlert>{error}</FormAlert> : null}
           <SlotPicker
             today={today}
-            loadKey={`reschedule|${booking.startsAt}`}
+            loadKey={`reschedule|${booking.startsAt}|${reloadKey}`}
             loadDates={async (from) => {
               const r = await getRescheduleDatesAction(token, from);
               return r.ok ? { ok: true, data: r.dates } : r;
@@ -209,6 +219,10 @@ export function ManageBooking({
         <p className="m-0 text-[15px] leading-snug text-ink-muted">
           Para remarcar ou cancelar, fale com {tenant.name}.
         </p>
+      ) : active && !canReschedule ? (
+        <p className="m-0 text-[15px] leading-snug text-ink-muted">
+          Para remarcar, fale com {tenant.name}.
+        </p>
       ) : null}
 
       <div className="mt-auto flex flex-col gap-2.5">
@@ -224,17 +238,19 @@ export function ManageBooking({
         )}
         {active && canChange ? (
           <>
-            <button
-              type="button"
-              onClick={() => {
-                setNotice(null);
-                setError(null);
-                setMode("reschedule");
-              }}
-              className={outlineButton}
-            >
-              Remarcar
-            </button>
+            {canReschedule ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setNotice(null);
+                  setError(null);
+                  setMode("reschedule");
+                }}
+                className={outlineButton}
+              >
+                Remarcar
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => {
@@ -247,7 +263,7 @@ export function ManageBooking({
             </button>
           </>
         ) : null}
-        {tenant.whatsapp && (!active || !canChange) ? (
+        {tenant.whatsapp && (!active || !canReschedule) ? (
           <a
             href={whatsappUrl(tenant.whatsapp)}
             target="_blank"

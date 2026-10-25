@@ -48,7 +48,6 @@ describe("bookPublic", () => {
       time: "10:00",
       totalCents: 9000,
       durationMin: 30,
-      customerName: "Paula Souza",
       services: [{ name: "Corte", durationMin: 30, priceCents: 9000 }],
     });
     // "Qualquer": um dos profissionais ativos.
@@ -88,6 +87,7 @@ describe("bookPublic", () => {
   it("valida nome, WhatsApp e e-mail", async () => {
     expect(await book({ name: "A" })).toMatchObject({ ok: false, fieldErrors: { name: expect.any(String) } });
     expect(await book({ name: "x".repeat(81) })).toMatchObject({ ok: false, fieldErrors: { name: expect.any(String) } });
+    expect(await book({ phone: "1".repeat(40) })).toMatchObject({ ok: false, fieldErrors: { phone: expect.any(String) } });
     expect(await book({ phone: "123" })).toMatchObject({
       ok: false,
       fieldErrors: { phone: "Informe um WhatsApp com DDD." },
@@ -200,6 +200,27 @@ describe("bookPublic", () => {
       const blocked = await book({}, "7.7.7.9");
       expect(blocked).toMatchObject({ ok: false, code: "rate_limited" });
     });
+  });
+
+  it("não devolve o nome guardado do cliente (nem de quem usa um telefone já cadastrado)", async () => {
+    await book({ name: "Paula Souza" });
+    await db.update(customers).set({ name: "Nome Secreto Cadastrado" }).where(eq(customers.tenantId, seed.tenantId));
+    const second = await book({ name: "Intruso", startsAt: new Date("2030-01-07T11:00:00.000-03:00").toISOString() }, "3.3.3.3");
+    expect(second.ok).toBe(true);
+    expect(JSON.stringify(second)).not.toContain("Secreto");
+    expect(JSON.stringify(second)).not.toContain("Cadastrado");
+  });
+
+  it("tentativa com horário passado ou salão indisponível não gasta a cota do telefone", async () => {
+    const past = new Date("2029-12-31T10:00:00.000-03:00").toISOString();
+    for (let i = 0; i < 10; i++) {
+      expect(await book({ startsAt: past }, `5.5.5.${i}`)).toMatchObject({ ok: false, code: "slot_taken" });
+    }
+    for (let i = 0; i < 10; i++) {
+      expect(await book({}, `6.6.6.${i}`, "nao-existe")).toMatchObject({ code: "unavailable" });
+    }
+    // A dona do telefone ainda consegue agendar (5 tentativas por hora seguem intactas).
+    expect((await book({}, "4.4.4.4")).ok).toBe(true);
   });
 
   it("nunca escreve o token de gestão em log", async () => {

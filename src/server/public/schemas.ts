@@ -11,7 +11,16 @@ export const MESSAGES = {
   generic: "Não foi possível agendar agora. Tente novamente em instantes.",
 } as const;
 
-const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+/** "yyyy-MM-dd" de um dia que existe (rejeita 2026-13-45 e 2026-02-30). */
+export function isRealDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
+const date = z.string().refine(isRealDate, "Data inválida.");
 
 const selection = {
   serviceIds: z.array(z.uuid()).min(1).max(20),
@@ -27,7 +36,7 @@ export const bookInputSchema = z.object({
   ...selection,
   startsAt: z.iso.datetime({ offset: true }),
   name: z.string().trim().min(2, MESSAGES.name).max(80, MESSAGES.name),
-  phone: z.string().transform((value, ctx) => {
+  phone: z.string().max(32, MESSAGES.phone).transform((value, ctx) => {
     const normalized = normalizeBrazilPhone(value);
     if (!normalized) {
       ctx.addIssue({ code: "custom", message: MESSAGES.phone });

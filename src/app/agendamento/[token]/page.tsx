@@ -20,7 +20,7 @@ export default async function ManageBookingPage({ params }: PageProps<"/agendame
   const view = await getManageView(db, token);
   if (!view) notFound();
 
-  const { tenant, booking, canChange } = view;
+  const { tenant, booking, canChange, canReschedule } = view;
   const { today } = await loadPublicHeader(db, tenant);
 
   return (
@@ -39,6 +39,7 @@ export default async function ManageBookingPage({ params }: PageProps<"/agendame
         }}
         booking={booking}
         canChange={canChange}
+        canReschedule={canReschedule}
         today={today}
       />
     </PublicShell>

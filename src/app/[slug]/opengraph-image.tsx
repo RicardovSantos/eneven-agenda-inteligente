@@ -32,8 +32,9 @@ async function loadOutfitBold(): Promise<ArrayBuffer | null> {
 
 /** Tamanho do nome conforme o comprimento, para caber em até duas linhas. */
 function nameSize(name: string): number {
-  if (name.length <= 16) return 88;
-  if (name.length <= 28) return 68;
+  const length = Array.from(name).length;
+  if (length <= 16) return 88;
+  if (length <= 28) return 68;
   return 54;
 }
 
@@ -57,7 +58,8 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     }
   }
   const outfit = await loadOutfitBold();
-  const shownName = name.length > MAX_NAME ? `${name.slice(0, MAX_NAME - 1)}…` : name;
+  const chars = Array.from(name);
+  const shownName = chars.length > MAX_NAME ? `${chars.slice(0, MAX_NAME - 1).join("")}…` : name;
 
   return new ImageResponse(
     (
@@ -87,7 +89,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
               style={{
                 width: 220,
                 height: 220,
-                borderRadius: 110,
+                borderRadius: 48,
                 background: color,
                 color: "#FFFFFF",
                 display: "flex",
