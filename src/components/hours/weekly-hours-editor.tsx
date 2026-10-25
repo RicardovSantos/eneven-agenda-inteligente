@@ -81,7 +81,7 @@ export function WeeklyHoursEditor({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="@container flex flex-col gap-3">
       <ul className="flex flex-col divide-y divide-line rounded-field border border-line">
         {WEEKDAY_ORDER.map((day) => {
           const ranges = value[day];
@@ -91,9 +91,9 @@ export function WeeklyHoursEditor({
           return (
             <li
               key={day}
-              className="flex flex-col gap-1 px-3 py-2.5 sm:flex-row sm:items-start sm:gap-4"
+              className="flex flex-col gap-1 px-3 py-2.5 @min-[34rem]:flex-row @min-[34rem]:items-start @min-[34rem]:gap-4"
             >
-              <div className="flex items-center gap-1 sm:w-44 sm:shrink-0 sm:pt-0">
+              <div className="flex items-center gap-1 @min-[34rem]:w-44 @min-[34rem]:shrink-0">
                 <Switch
                   checked={open}
                   disabled={disabled}
@@ -120,7 +120,7 @@ export function WeeklyHoursEditor({
                         value={range.start}
                         disabled={disabled}
                         onChange={(e) => setRange(day, index, { start: e.target.value })}
-                        className="h-11 min-w-[6.5rem] flex-1 px-2.5 tabular-nums sm:w-[7.25rem] sm:flex-none sm:px-3"
+                        className="h-11 min-w-[6.5rem] flex-1 px-2.5 tabular-nums @min-[34rem]:w-[7.25rem] @min-[34rem]:flex-none @min-[34rem]:px-3"
                       />
                       <span className="text-sm text-ink-muted" aria-hidden="true">
                         às
@@ -133,7 +133,7 @@ export function WeeklyHoursEditor({
                         value={range.end}
                         disabled={disabled}
                         onChange={(e) => setRange(day, index, { end: e.target.value })}
-                        className="h-11 min-w-[6.5rem] flex-1 px-2.5 tabular-nums sm:w-[7.25rem] sm:flex-none sm:px-3"
+                        className="h-11 min-w-[6.5rem] flex-1 px-2.5 tabular-nums @min-[34rem]:w-[7.25rem] @min-[34rem]:flex-none @min-[34rem]:px-3"
                       />
                       <button
                         type="button"
@@ -169,7 +169,7 @@ export function WeeklyHoursEditor({
                   ) : null}
                 </div>
               ) : (
-                <p className="hidden text-sm text-ink-muted sm:block sm:pt-3">
+                <p className="hidden text-sm text-ink-muted @min-[34rem]:block @min-[34rem]:pt-3">
                   {dayErrors?.[day] ? (
                     <span role="alert" className="text-danger">
                       {dayErrors[day]}

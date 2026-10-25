@@ -24,8 +24,8 @@ type NavItem = {
 const SIDEBAR_ITEMS: NavItem[] = [
   { label: "Agenda", icon: CalendarDays, href: "/painel" },
   { label: "Clientes", icon: Users },
-  { label: "Serviços", icon: Scissors },
-  { label: "Equipe", icon: UserRound },
+  { label: "Serviços", icon: Scissors, href: "/painel/servicos" },
+  { label: "Equipe", icon: UserRound, href: "/painel/equipe" },
   { label: "Painel", icon: ChartNoAxesColumn },
   { label: "Configurações", icon: Settings, href: "/painel/configuracoes" },
 ];

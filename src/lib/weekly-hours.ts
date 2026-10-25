@@ -84,3 +84,34 @@ export function validateWeeklyHours(
 export function formatRange(range: TimeRange): string {
   return `${range.start}–${range.end}`;
 }
+
+/**
+ * Dias em que o expediente sai do horário de funcionamento: cada intervalo do
+ * profissional precisa caber inteiro em algum intervalo do estabelecimento no
+ * mesmo dia da semana. Devolve a mensagem por dia (`{}` quando está tudo certo).
+ * Horários inválidos são ignorados aqui (`validateWeeklyHours` cuida deles).
+ */
+export const OUTSIDE_BUSINESS_HOURS_MESSAGE =
+  "O horário do profissional precisa estar dentro do horário de funcionamento.";
+
+export function outsideBusinessHours(
+  hours: WeeklyHours,
+  business: WeeklyHours,
+): Partial<Record<number, string>> {
+  const errors: Partial<Record<number, string>> = {};
+  for (const day of WEEKDAYS) {
+    const allowed = (business[day] ?? [])
+      .map((r) => [minutes(r.start), minutes(r.end)] as const)
+      .filter((r): r is readonly [number, number] => r[0] !== null && r[1] !== null);
+    for (const range of hours[day] ?? []) {
+      const start = minutes(range?.start ?? "");
+      const end = minutes(range?.end ?? "");
+      if (start === null || end === null) continue;
+      if (!allowed.some(([s, e]) => start >= s && end <= e)) {
+        errors[day] = OUTSIDE_BUSINESS_HOURS_MESSAGE;
+        break;
+      }
+    }
+  }
+  return errors;
+}
