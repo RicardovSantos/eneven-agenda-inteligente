@@ -13,14 +13,17 @@ import {
 } from "react";
 
 type ToastTone = "success" | "error";
-type ToastItem = { id: number; message: string; tone: ToastTone };
+type ToastAction = { label: string; href: string };
+type ToastItem = { id: number; message: string; tone: ToastTone; action?: ToastAction };
 
 type ToastApi = {
   /** Confirmação discreta no rodapé (4 s). Use o mesmo verbo do botão. */
-  show: (message: string, tone?: ToastTone) => void;
+  show: (message: string, tone?: ToastTone, action?: ToastAction) => void;
 };
 
 const TOAST_MS = 4000;
+/** Com botão de ação (ex.: "Avisar pelo WhatsApp") fica mais tempo, para dar tempo de tocar. */
+const TOAST_ACTION_MS = 10000;
 const ToastContext = createContext<ToastApi | null>(null);
 
 export function useToast(): ToastApi {
@@ -52,12 +55,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
   const nextId = useRef(1);
 
-  const show = useCallback((message: string, tone: ToastTone = "success") => {
+  const show = useCallback((message: string, tone: ToastTone = "success", action?: ToastAction) => {
     const id = nextId.current++;
-    setItems((current) => [...current.slice(-2), { id, message, tone }]);
+    setItems((current) => [...current.slice(-2), { id, message, tone, action }]);
     setTimeout(() => {
       setItems((current) => current.filter((item) => item.id !== id));
-    }, TOAST_MS);
+    }, action ? TOAST_ACTION_MS : TOAST_MS);
   }, []);
 
   const api = useMemo(() => ({ show }), [show]);
@@ -81,7 +84,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             ) : (
               <CircleCheck className="size-5 shrink-0 text-[#3dd68c]" aria-hidden="true" />
             )}
-            {item.message}
+            <span>{item.message}</span>
+            {item.action ? (
+              <a
+                href={item.action.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 shrink-0 rounded-md bg-canvas/15 px-3 py-1.5 font-semibold text-canvas underline-offset-2 hover:underline"
+              >
+                {item.action.label}
+              </a>
+            ) : null}
           </div>
         ))}
       </div>

@@ -2,8 +2,11 @@ import { getDb } from "@/db/client";
 import {
   e2eSeedAllowed,
   listE2eBookings,
+  seedE2eBlock,
   seedE2eBooking,
+  seedE2eSession,
   seedE2eTenant,
+  type SeedBlockOptions,
   type SeedBookingOptions,
   type SeedTenantOptions,
 } from "@/server/e2e/seed";
@@ -28,6 +31,10 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json(await seedE2eTenant(db, body as SeedTenantOptions));
     case "booking":
       return Response.json(await seedE2eBooking(db, body as unknown as SeedBookingOptions));
+    case "block":
+      return Response.json(await seedE2eBlock(db, body as unknown as SeedBlockOptions));
+    case "session":
+      return Response.json(await seedE2eSession(db, String(body.slug)));
     case "bookings":
       return Response.json(await listE2eBookings(db, String(body.slug)));
     default:

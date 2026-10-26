@@ -29,6 +29,26 @@ export const seedBooking = (request: APIRequestContext, slug: string, options: R
     ...options,
   });
 
+export const seedBlock = (request: APIRequestContext, slug: string, options: Record<string, unknown>) =>
+  seed<{ blockId: string }>(request, { action: "block", slug, ...options });
+
+/** Entra no painel como proprietário do estabelecimento (cookie de sessão criado direto no banco). */
+export async function loginAs(page: Page, request: APIRequestContext, slug: string) {
+  const { token, cookieName } = await seed<{ token: string; cookieName: string }>(request, {
+    action: "session",
+    slug,
+  });
+  await page.context().addCookies([
+    { name: cookieName, value: token, url: new URL(page.url() === "about:blank" ? baseUrl() : page.url()).origin },
+  ]);
+}
+
+const baseUrl = () => `http://localhost:${process.env.E2E_PORT ?? 3100}`;
+
+/** Dia local do salão ("yyyy-MM-dd") de um instante. */
+export const saoPauloDate = (iso: string) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(iso));
+
 export type DbBooking = {
   id: string;
   status: string;

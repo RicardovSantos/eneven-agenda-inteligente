@@ -118,7 +118,7 @@ export function SlotPicker({
               className={cn(
                 "flex h-16 w-14 flex-none cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[14px] font-[inherit]",
                 selected
-                  ? "border-0 bg-(--brand) text-white"
+                  ? "border-0 bg-(--brand) text-(--brand-fg,white)"
                   : "border border-line bg-surface text-foreground hover:bg-primary-soft",
               )}
             >
@@ -161,7 +161,7 @@ export function SlotPicker({
                       className={cn(
                         "min-h-11 cursor-pointer rounded-full text-[15px] font-semibold tabular-nums",
                         selected
-                          ? "border-0 bg-(--brand) text-white"
+                          ? "border-0 bg-(--brand) text-(--brand-fg,white)"
                           : "border border-line bg-surface text-foreground hover:bg-primary-soft",
                       )}
                     >

@@ -5,14 +5,18 @@ import {
   bookingServices,
   bookings,
   customers,
+  memberships,
   professionals,
   services,
   tenants,
+  timeBlocks,
 } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { defaultBusinessHours } from "@/lib/weekly-hours";
-import { cancelBooking, createBooking } from "@/server/agenda/bookings";
+import { cancelBooking, createBooking, setBookingStatus } from "@/server/agenda/bookings";
 import { addDaysToDate, localDateOf, weekdayOf, zonedInstant } from "@/server/agenda/time";
+import { SESSION_COOKIE } from "@/server/auth/cookie-names";
+import { createSession } from "@/server/auth/session";
 import { createTenantWithOwner } from "@/server/auth/signup";
 import { listProfessionals, saveProfessional, saveService } from "@/server/catalog";
 import { uploadLogo } from "@/server/settings";
@@ -61,7 +65,7 @@ const COLORS = ["#0E7C86", "#B4237A", "#2F6FDB", "#8A5A00"];
 
 export async function seedE2eTenant(db: Db, options: SeedTenantOptions = {}) {
   const suffix = Math.random().toString(36).slice(2, 7);
-  const { tenantId, slug } = await createTenantWithOwner(db, {
+  const { tenantId, slug, userId } = await createTenantWithOwner(db, {
     businessName: options.name ?? "Studio Defendi",
     ownerName: "Bia",
     email: `e2e-${suffix}-${Date.now()}@exemplo.com`,
@@ -77,6 +81,8 @@ export async function seedE2eTenant(db: Db, options: SeedTenantOptions = {}) {
       address: options.address ?? "Rua Augusta, 120",
       about: options.about ?? null,
       status: options.status ?? "trial",
+      // Sem o assistente de primeiros passos: o painel abre direto na agenda.
+      onboardingCompletedAt: new Date(),
       ...(options.trialEndsAt ? { trialEndsAt: new Date(options.trialEndsAt) } : {}),
       ...(options.cancelWindowMin !== undefined ? { cancelWindowMin: options.cancelWindowMin } : {}),
       slotIntervalMin: 30,
@@ -124,7 +130,7 @@ export async function seedE2eTenant(db: Db, options: SeedTenantOptions = {}) {
     });
     professionalIds.push(id);
   }
-  return { tenantId, slug, serviceIds, professionalIds };
+  return { tenantId, slug, userId, serviceIds, professionalIds };
 }
 
 export type SeedBookingOptions = {
@@ -133,7 +139,9 @@ export type SeedBookingOptions = {
   startsInMinutes?: number;
   startsAt?: string;
   serviceIndex?: number;
-  status?: "scheduled" | "canceled";
+  status?: "scheduled" | "confirmed" | "completed" | "no_show" | "canceled";
+  /** Índice do profissional (ordem de criação); sem isso, qualquer disponível. */
+  professionalIndex?: number;
   customerName?: string;
   phone?: string;
 };
@@ -169,9 +177,16 @@ export async function seedE2eBooking(db: Db, options: SeedBookingOptions) {
       ? new Date(Math.ceil((Date.now() + options.startsInMinutes * 60_000) / 300_000) * 300_000)
       : defaultStart();
 
+  const pros = await withTenant(db, tenantId, (tx) =>
+    tx
+      .select({ id: professionals.id })
+      .from(professionals)
+      .where(eq(professionals.tenantId, tenantId))
+      .orderBy(asc(professionals.sortOrder), asc(professionals.createdAt), asc(professionals.id)),
+  );
   const { bookingId, manageToken } = await createBooking(db, tenantId, {
     serviceIds: [serviceId],
-    professionalId: "any",
+    professionalId: options.professionalIndex === undefined ? "any" : pros[options.professionalIndex].id,
     startsAt,
     customer: { name: options.customerName ?? "Paula Souza", phone: options.phone ?? "(11) 98765-4321" },
     source: "panel",
@@ -179,6 +194,8 @@ export async function seedE2eBooking(db: Db, options: SeedBookingOptions) {
   });
   if (options.status === "canceled") {
     await cancelBooking(db, tenantId, bookingId, "staff");
+  } else if (options.status && options.status !== "scheduled") {
+    await setBookingStatus(db, tenantId, bookingId, options.status);
   }
   return { bookingId, token: manageToken, startsAt: startsAt.toISOString() };
 }
@@ -213,4 +230,53 @@ export async function listE2eBookings(db: Db, slug: string) {
       services: lines.filter((l) => l.bookingId === row.id).map((l) => l.name),
     }));
   });
+}
+
+export type SeedBlockOptions = {
+  slug: string;
+  startsAt: string;
+  endsAt: string;
+  reason?: string;
+  /** Índice do profissional; sem isso, o estabelecimento todo. */
+  professionalIndex?: number;
+};
+
+/** Bloqueio de agenda (folga, almoço) para as capturas de tela. */
+export async function seedE2eBlock(db: Db, options: SeedBlockOptions) {
+  const tenantId = await tenantIdOf(db, options.slug);
+  return withTenant(db, tenantId, async (tx) => {
+    let professionalId: string | null = null;
+    if (options.professionalIndex !== undefined) {
+      const pros = await tx
+        .select({ id: professionals.id })
+        .from(professionals)
+        .where(eq(professionals.tenantId, tenantId))
+        .orderBy(asc(professionals.sortOrder), asc(professionals.createdAt), asc(professionals.id));
+      professionalId = pros[options.professionalIndex].id;
+    }
+    const [row] = await tx
+      .insert(timeBlocks)
+      .values({
+        tenantId,
+        professionalId,
+        startsAt: new Date(options.startsAt),
+        endsAt: new Date(options.endsAt),
+        reason: options.reason ?? null,
+      })
+      .returning({ id: timeBlocks.id });
+    return { blockId: row.id };
+  });
+}
+
+/** Sessão do proprietário, para o Playwright entrar no painel sem passar pela tela de login. */
+export async function seedE2eSession(db: Db, slug: string) {
+  const tenantId = await tenantIdOf(db, slug);
+  const [owner] = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(eq(memberships.tenantId, tenantId))
+    .limit(1);
+  if (!owner) throw new Error(`Proprietário não encontrado: ${slug}`);
+  const token = await createSession(db, owner.userId, tenantId);
+  return { token, cookieName: SESSION_COOKIE };
 }
