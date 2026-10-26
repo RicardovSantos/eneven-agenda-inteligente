@@ -53,8 +53,12 @@ export function BookingDetail({
   const [pending, setPending] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
+  // Foco só ao abrir (o detalhe re-renderiza a cada minuto e a cada ação).
   useEffect(() => {
     sectionRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
     };

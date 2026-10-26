@@ -140,11 +140,14 @@ export function ConfirmDialog({
   title,
   confirmLabel,
   pending,
+  titleId = "confirm-title",
   onConfirm,
   onCancel,
   children,
 }: {
   open: boolean;
+  /** Diferente quando há mais de um diálogo de confirmação na mesma página. */
+  titleId?: string;
   title: string;
   confirmLabel: string;
   pending?: boolean;
@@ -163,7 +166,7 @@ export function ConfirmDialog({
   return (
     <dialog
       ref={ref}
-      aria-labelledby="confirm-title"
+      aria-labelledby={titleId}
       onCancel={(e) => {
         e.preventDefault();
         onCancel();
@@ -171,7 +174,7 @@ export function ConfirmDialog({
       className="m-auto w-[min(calc(100vw-2rem),26rem)] rounded-panel border border-line bg-surface p-6 text-foreground shadow-float backdrop:bg-ink/40"
     >
       <div className="flex flex-col gap-3">
-        <h2 id="confirm-title" className="font-display text-xl font-semibold">
+        <h2 id={titleId} className="font-display text-xl font-semibold">
           {title}
         </h2>
         <div className="text-[0.9375rem] leading-snug text-ink-muted">{children}</div>

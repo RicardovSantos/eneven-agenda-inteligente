@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, CircleCheck } from "lucide-react";
+import { CircleAlert, CircleCheck, X } from "lucide-react";
 import {
   createContext,
   useCallback,
@@ -22,8 +22,7 @@ type ToastApi = {
 };
 
 const TOAST_MS = 4000;
-/** Com botão de ação (ex.: "Avisar pelo WhatsApp") fica mais tempo, para dar tempo de tocar. */
-const TOAST_ACTION_MS = 10000;
+/** Toast com ação (ex.: "Avisar pelo WhatsApp") não some sozinho: fica até ser dispensado. */
 const ToastContext = createContext<ToastApi | null>(null);
 
 export function useToast(): ToastApi {
@@ -58,9 +57,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const show = useCallback((message: string, tone: ToastTone = "success", action?: ToastAction) => {
     const id = nextId.current++;
     setItems((current) => [...current.slice(-2), { id, message, tone, action }]);
-    setTimeout(() => {
-      setItems((current) => current.filter((item) => item.id !== id));
-    }, action ? TOAST_ACTION_MS : TOAST_MS);
+    if (!action) {
+      setTimeout(() => {
+        setItems((current) => current.filter((item) => item.id !== id));
+      }, TOAST_MS);
+    }
+  }, []);
+
+  const dismiss = useCallback((id: number) => {
+    setItems((current) => current.filter((item) => item.id !== id));
   }, []);
 
   const api = useMemo(() => ({ show }), [show]);
@@ -90,10 +95,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 href={item.action.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-1 shrink-0 rounded-md bg-canvas/15 px-3 py-1.5 font-semibold text-canvas underline-offset-2 hover:underline"
+                className="ml-1 flex min-h-11 shrink-0 items-center rounded-md bg-canvas/15 px-3 font-semibold text-canvas underline-offset-2 hover:underline"
               >
                 {item.action.label}
               </a>
+            ) : null}
+            {item.action ? (
+              <button
+                type="button"
+                onClick={() => dismiss(item.id)}
+                aria-label="Dispensar aviso"
+                className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-canvas/80 hover:bg-canvas/15"
+              >
+                <X className="size-5" aria-hidden="true" />
+              </button>
             ) : null}
           </div>
         ))}

@@ -129,6 +129,7 @@ test.describe("agenda do painel", () => {
       await expect(page.getByRole("status").filter({ hasText: "Horário bloqueado" })).toBeVisible();
       await expect(page.getByText("Bloqueado · Almoço")).toBeVisible();
       await page.getByRole("button", { name: "Remover bloqueio Almoço" }).click();
+      await page.getByRole("dialog", { name: "Remover bloqueio?" }).getByRole("button", { name: "Remover" }).click();
       await expect(page.getByText("Bloqueado · Almoço")).toBeHidden();
     });
   });

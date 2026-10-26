@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { z } from "zod";
 import {
   bookingServices,
   bookings,
@@ -22,6 +23,7 @@ import { appUrl } from "@/server/email/templates";
 import { withTenant } from "@/server/tenant-db";
 import { getAvailableDates, getAvailableSlots } from "./availability";
 import {
+  PANEL_RULES,
   cancelBooking,
   createBooking,
   rescheduleBooking,
@@ -29,6 +31,7 @@ import {
 } from "./bookings";
 import { BookingError } from "./errors";
 import { loadAvailabilityContext } from "./load";
+import { findStaffProfessional } from "./panel-queries";
 import { localDateOf } from "./time";
 
 /**
@@ -51,18 +54,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const notFound = () => new BookingError("not_found");
 const blockNotFound = () => new BookingError("not_found", "Bloqueio não encontrado.");
 
-/** `null` = sem restrição; string = o único profissional que o usuário pode ver. */
+/** `null` = sem restrição; string = o único profissional que o usuário pode ver (resolvedor compartilhado com a página). */
 async function staffProfessionalId(db: Db, actor: PanelActor): Promise<string | null> {
   if (actor.role !== "staff") return null;
-  const [row] = await withTenant(db, actor.tenantId, (tx) =>
-    tx
-      .select({ id: professionals.id })
-      .from(professionals)
-      .where(and(eq(professionals.tenantId, actor.tenantId), eq(professionals.userId, actor.userId)))
-      .limit(1),
-  );
-  // Profissional sem vínculo com a equipe não enxerga nada.
-  return row?.id ?? "00000000-0000-0000-0000-000000000000";
+  const own = await findStaffProfessional(db, actor.tenantId, actor.userId);
+  // Profissional sem vínculo (ou inativo) não enxerga nada.
+  return own?.id ?? "00000000-0000-0000-0000-000000000000";
 }
 
 /** Profissional a usar nas consultas: o do filtro, ou o do próprio `staff`. */
@@ -197,6 +194,10 @@ export async function createPanelBooking(
   now: Date = new Date(),
 ): Promise<{ bookingId: string }> {
   const own = await staffProfessionalId(db, actor);
+  const email = input.email?.trim() || null;
+  if (email && !z.email().safeParse(email).success) {
+    throw new BookingError("invalid_selection", "Informe um e-mail válido ou deixe em branco.");
+  }
   const { bookingId } = await createBooking(
     db,
     actor.tenantId,
@@ -204,11 +205,13 @@ export async function createPanelBooking(
       serviceIds: input.serviceIds,
       professionalId: own ?? input.professionalId,
       startsAt: parseInstant(input.startsAt),
-      customer: { name: input.name, phone: input.phone, email: input.email },
+      customer: { name: input.name, phone: input.phone, email },
       source: "panel",
       notes: input.notes?.trim() || undefined,
       createdByUserId: actor.userId,
       allowOutsideHours: input.allowOutsideHours === true,
+      // Profissional não altera dados de cliente existente; recepção e proprietário sim.
+      preserveCustomerData: actor.role === "staff",
     },
     now,
   );
@@ -397,7 +400,7 @@ async function panelContext(
       override,
     }),
   );
-  return { ...ctx, rules: { ...ctx.rules, minNoticeMin: 0, maxDaysAhead: 3650 } };
+  return { ...ctx, rules: { ...ctx.rules, ...PANEL_RULES } };
 }
 
 export async function listPanelSlots(

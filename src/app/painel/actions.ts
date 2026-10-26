@@ -126,7 +126,7 @@ const createBookingSchema = z.object({
     .string()
     .max(32)
     .refine((v) => normalizeBrazilPhone(v) !== null, "Informe um WhatsApp com DDD."),
-  email: z.string().trim().max(160).optional(),
+  email: z.union([z.literal(""), z.email("Informe um e-mail válido ou deixe em branco.")]).optional(),
   notes: z.string().trim().max(300, "Use até 300 caracteres na observação.").optional(),
   allowOutsideHours: z.boolean().optional(),
 });

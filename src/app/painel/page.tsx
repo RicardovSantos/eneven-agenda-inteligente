@@ -4,7 +4,7 @@ import { AgendaScreen } from "@/components/agenda/agenda-screen";
 import { ResendVerification } from "@/components/panel/resend-verification";
 import { PUBLIC_HOST } from "@/lib/brand";
 import { formatDayMonth, trialDaysLeft } from "@/lib/trial";
-import { getDayAgenda, getMonthOverview, listPanelProfessionals } from "@/server/agenda/panel-queries";
+import { findStaffProfessional, getDayAgenda, getMonthOverview, listPanelProfessionals } from "@/server/agenda/panel-queries";
 import { addDaysToDate, localDateOf, weekdayOf } from "@/server/agenda/time";
 import { requireOnboarded } from "@/server/panel/onboarding-gate";
 import { isRealDate } from "@/server/public/schemas";
@@ -32,7 +32,8 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
 
   // Profissional (`staff`) só enxerga a própria agenda; os demais podem filtrar.
   const allPros = await listPanelProfessionals(db, session.tenantId);
-  const own = session.role === "staff" ? (allPros.find((p) => p.userId === session.userId) ?? null) : null;
+  const own =
+    session.role === "staff" ? await findStaffProfessional(db, session.tenantId, session.userId) : null;
   const banners = <Banners data={data} />;
 
   if (session.role === "staff" && !own) {

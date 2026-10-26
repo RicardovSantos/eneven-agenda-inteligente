@@ -235,6 +235,18 @@ export async function listPanelProfessionals(db: Db, tenantId: string): Promise<
 }
 
 /**
+ * Profissional do usuário `staff` (ativo, ligado por `user_id`; ordem por
+ * `sortOrder`). Único resolvedor, usado pela página e pelas ações.
+ */
+export async function findStaffProfessional(
+  db: Db,
+  tenantId: string,
+  userId: string,
+): Promise<PanelProfessional | null> {
+  return (await listPanelProfessionals(db, tenantId)).find((p) => p.userId === userId) ?? null;
+}
+
+/**
  * Agendamentos e bloqueios do dia, em ordem de horário. Cancelados aparecem na
  * lista (riscados) mas não entram em `count` nem em `totalCents`. Com
  * `professionalId`, só os dele e os bloqueios gerais ou dele.

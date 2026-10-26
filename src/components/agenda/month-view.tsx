@@ -88,15 +88,24 @@ export function MonthView({
               >
                 {dayNumber}
               </span>
-              {day && !day.closed && count > 0 ? (
+              {day && count > 0 ? (
                 <span className="flex w-full min-w-0 flex-col gap-1.5">
-                  <span className="text-[11px] leading-tight tabular-nums text-ink-muted min-[1440px]:text-xs">{countLabel(count)}</span>
-                  <span className="block h-1 overflow-hidden rounded-full bg-line">
-                    <span
-                      className={cn("block h-full rounded-full", past ? "bg-[#B9A6F4] dark:bg-[#5d4b94]" : "bg-primary")}
-                      style={{ width: `${Math.max(4, Math.round(day.occupancy * 100))}%` }}
-                    />
+                  <span
+                    role="img"
+                    aria-label={countLabel(count)}
+                    title={countLabel(count)}
+                    className="font-display text-sm font-semibold tabular-nums text-foreground"
+                  >
+                    {count}
                   </span>
+                  {day.closed ? null : (
+                    <span className="block h-1 overflow-hidden rounded-full bg-line">
+                      <span
+                        className={cn("block h-full rounded-full", past ? "bg-[#B9A6F4] dark:bg-[#5d4b94]" : "bg-primary")}
+                        style={{ width: `${Math.max(4, Math.round(day.occupancy * 100))}%` }}
+                      />
+                    </span>
+                  )}
                 </span>
               ) : null}
               {day?.closed ? <span className="text-xs text-ink-muted/80">Fechado</span> : null}

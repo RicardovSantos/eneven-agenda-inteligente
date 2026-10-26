@@ -3,8 +3,9 @@
 import { ChevronLeft, ChevronRight, Copy, Lock, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { deleteBlockAction } from "@/app/painel/actions";
+import { ConfirmDialog } from "@/components/catalog/parts";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { formatLongDate, formatMonthRange } from "@/lib/dates";
@@ -72,6 +73,9 @@ export function AgendaScreen({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [blockOpen, setBlockOpen] = useState(false);
+  const [blockToRemove, setBlockToRemove] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const closeDetail = useCallback(() => setSelectedId(null), []);
 
   const month = date.slice(0, 7);
   const monthFirst = `${month}-01`;
@@ -94,11 +98,24 @@ export function AgendaScreen({
       ? "Nenhum agendamento"
       : `${day.count} ${day.count === 1 ? "agendamento" : "agendamentos"} · ${formatBRL(day.totalCents)} previstos`;
 
-  async function removeBlock(id: string) {
-    const result = await deleteBlockAction(id);
-    if (result.ok) toast.show(result.message);
-    else toast.show(result.error, "error");
+  async function removeBlock() {
+    if (!blockToRemove || removing) return;
+    setRemoving(true);
+    try {
+      const result = await deleteBlockAction(blockToRemove);
+      if (result.ok) toast.show(result.message);
+      else toast.show(result.error, "error");
+    } catch {
+      toast.show("Não foi possível remover agora. Tente novamente em instantes.", "error");
+    } finally {
+      setRemoving(false);
+      setBlockToRemove(null);
+    }
   }
+
+  // Profissional só remove bloqueio do próprio profissional (nunca o do estabelecimento todo).
+  const canDeleteBlock = (professionalId: string | null) =>
+    !lockedProfessionalId || professionalId === lockedProfessionalId;
 
   async function copyLink() {
     if (!publicUrl) return;
@@ -270,7 +287,8 @@ export function AgendaScreen({
               isToday={isToday}
               nowMs={now}
               onOpen={setSelectedId}
-              onDeleteBlock={removeBlock}
+              canDeleteBlock={canDeleteBlock}
+              onDeleteBlock={setBlockToRemove}
             />
           )}
         </div>
@@ -281,7 +299,7 @@ export function AgendaScreen({
             booking={detail}
             today={today}
             timezone={day.timezone}
-            onClose={() => setSelectedId(null)}
+            onClose={closeDetail}
           />
         ) : null}
       </aside>
@@ -307,6 +325,17 @@ export function AgendaScreen({
         lockedProfessionalId={lockedProfessionalId}
         onCreated={(booked) => router.push(agendaHref({ data: booked, pro, view }))}
       />
+      <ConfirmDialog
+        open={blockToRemove !== null}
+        title="Remover bloqueio?"
+        titleId="block-confirm-title"
+        confirmLabel="Remover"
+        pending={removing}
+        onCancel={() => setBlockToRemove(null)}
+        onConfirm={removeBlock}
+      >
+        O horário volta a ficar livre.
+      </ConfirmDialog>
       <BlockDialog
         open={blockOpen}
         onClose={() => setBlockOpen(false)}

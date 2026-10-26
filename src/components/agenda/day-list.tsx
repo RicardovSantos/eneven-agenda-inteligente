@@ -17,12 +17,14 @@ export function DayList({
   isToday,
   nowMs,
   onOpen,
+  canDeleteBlock,
   onDeleteBlock,
 }: {
   day: DayAgenda;
   isToday: boolean;
   nowMs: number;
   onOpen: (id: string) => void;
+  canDeleteBlock: (professionalId: string | null) => boolean;
   onDeleteBlock: (id: string) => void;
 }) {
   // A linha entra antes do primeiro item que começa depois de agora (ou no fim).
@@ -38,7 +40,7 @@ export function DayList({
             {item.kind === "booking" ? (
               <BookingRow booking={item} onOpen={onOpen} />
             ) : (
-              <BlockRow block={item} onDelete={onDeleteBlock} />
+              <BlockRow block={item} onDelete={canDeleteBlock(item.professionalId) ? onDeleteBlock : null} />
             )}
           </li>
         </Fragment>
@@ -85,7 +87,7 @@ function BookingRow({ booking, onOpen }: { booking: DayBooking; onOpen: (id: str
   );
 }
 
-function BlockRow({ block, onDelete }: { block: DayBlock; onDelete: (id: string) => void }) {
+function BlockRow({ block, onDelete }: { block: DayBlock; onDelete: ((id: string) => void) | null }) {
   const who = block.professionalName ?? "Todo o estabelecimento";
   return (
     <div
@@ -103,6 +105,7 @@ function BlockRow({ block, onDelete }: { block: DayBlock; onDelete: (id: string)
           {block.time} às {block.endTime} · {who}
         </span>
       </span>
+      {onDelete ? (
       <button
         type="button"
         onClick={() => onDelete(block.id)}
@@ -111,6 +114,7 @@ function BlockRow({ block, onDelete }: { block: DayBlock; onDelete: (id: string)
       >
         <Trash2 className="size-5" aria-hidden="true" />
       </button>
+      ) : null}
     </div>
   );
 }

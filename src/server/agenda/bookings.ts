@@ -35,7 +35,12 @@ export type CreateBookingInput = {
   createdByUserId?: string;
   /** Só painel: ignora expediente, antecedência e prazo máximo (mantém conflitos e bloqueios). */
   allowOutsideHours?: boolean;
+  /** Só painel: não sobrescreve nome/e-mail de cliente existente (só preenche o que está vazio). */
+  preserveCustomerData?: boolean;
 };
+
+/** Regras do painel: a equipe ignora antecedência mínima e prazo máximo (expediente, conflitos e bloqueios valem). */
+export const PANEL_RULES = { minNoticeMin: 0, maxDaysAhead: 3650 } as const;
 
 const TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   scheduled: ["confirmed", "completed", "no_show", "canceled"],
@@ -131,8 +136,10 @@ export async function createBooking(
       // Nenhum profissional ativo que faça todos os serviços (ou o escolhido não faz).
       if (ctx.professionals.length === 0) throw new BookingError("invalid_selection");
 
+      const effective: AvailabilityInput =
+        input.source === "panel" ? { ...ctx, rules: { ...ctx.rules, ...PANEL_RULES } } : ctx;
       const { professionalIds, endsAt, blockedUntil } = candidatesFor(
-        ctx,
+        effective,
         input.startsAt,
         input.source === "panel" && input.allowOutsideHours === true,
       );
@@ -151,7 +158,12 @@ export async function createBooking(
             )
           : professionalIds[0];
 
-      const customer = await upsertCustomer(tx, tenantId, input.customer, input.source);
+      const customer = await upsertCustomer(
+        tx,
+        tenantId,
+        input.customer,
+        input.source === "panel" && !input.preserveCustomerData ? "panel" : "public",
+      );
       const { token, hash } = newManageToken();
 
       const [booking] = await tx

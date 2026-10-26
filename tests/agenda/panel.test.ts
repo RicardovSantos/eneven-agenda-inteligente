@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { memberships, professionals, timeBlocks, users } from "@/db/schema";
+import { customers, memberships, professionals, timeBlocks, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { BookingError, createBooking, findBookingByManageToken } from "@/server/agenda/bookings";
 import {
@@ -17,7 +17,7 @@ import {
   undoBookingStatus,
   type PanelActor,
 } from "@/server/agenda/panel-ops";
-import { getDayAgenda, getMonthOverview } from "@/server/agenda/panel-queries";
+import { findStaffProfessional, getDayAgenda, getMonthOverview } from "@/server/agenda/panel-queries";
 import { withTenant } from "@/server/tenant-db";
 import { createTestDb } from "../helpers/test-db";
 import { seedBookable, type PublicSeed } from "../helpers/public-fixtures";
@@ -372,5 +372,86 @@ describe("ações do painel", () => {
     const token = link.split("/agendamento/")[1];
     expect(await findBookingByManageToken(db, manageToken)).toBeNull();
     expect(await findBookingByManageToken(db, token)).toEqual({ tenantId: a.tenantId, bookingId });
+  });
+
+  describe("regras do painel x página pública", () => {
+    const input = (startsAt: Date) => ({
+      serviceIds: [a.serviceIds[0]],
+      professionalId: a.proIds[0],
+      startsAt,
+      customer: { name: "Ana", phone: "(11) 98765-4321" },
+    });
+
+    it("painel agenda 30 min à frente (antecedência 60) e além do prazo máximo; público continua barrando", async () => {
+      const now = local("2030-01-07", "10:00");
+      const soon = local("2030-01-07", "10:30");
+      await expect(createBooking(db, a.tenantId, { ...input(soon), source: "public" }, now)).rejects.toMatchObject({
+        code: "slot_taken",
+      });
+      await expect(createBooking(db, a.tenantId, { ...input(soon), source: "panel" }, now)).resolves.toBeTruthy();
+
+      const far = local("2030-03-04", "10:00"); // segunda, muito além de 30 dias
+      await expect(createBooking(db, a.tenantId, { ...input(far), source: "public" }, now)).rejects.toMatchObject({
+        code: "slot_taken",
+      });
+      await expect(createBooking(db, a.tenantId, { ...input(far), source: "panel" }, now)).resolves.toBeTruthy();
+      // Conflito continua valendo no painel.
+      await expect(createBooking(db, a.tenantId, { ...input(far), source: "panel" }, now)).rejects.toMatchObject({
+        code: "slot_taken",
+      });
+    });
+  });
+
+  it("staff não sobrescreve nome/e-mail de cliente existente; recepção e proprietário sim", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "leo2@exemplo.com", name: "Léo", emailVerifiedAt: new Date() })
+      .returning();
+    await db.insert(memberships).values({ userId: user.id, tenantId: a.tenantId, role: "staff" });
+    await db.update(professionals).set({ userId: user.id }).where(eq(professionals.id, a.proIds[1]));
+    const staff = actorOf(a, "staff", user.id);
+    const base = {
+      serviceIds: [a.serviceIds[0]],
+      professionalId: "any" as const,
+      phone: "(11) 98765-4321",
+    };
+    await createPanelBooking(db, owner, { ...base, startsAt: local("2030-01-08", "10:00").toISOString(), name: "Ana Souza", email: "ana@exemplo.com" }, NOW);
+    await createPanelBooking(db, staff, { ...base, startsAt: local("2030-01-08", "11:00").toISOString(), name: "Outro Nome", email: "outro@exemplo.com" }, NOW);
+    expect((await searchCustomers(db, owner, "98765"))[0].name).toBe("Ana Souza");
+    const [kept] = await withTenant(db, a.tenantId, (tx) => tx.select().from(customers));
+    expect(kept.email).toBe("ana@exemplo.com");
+
+    await createPanelBooking(db, actorOf(a, "reception"), { ...base, startsAt: local("2030-01-08", "12:00").toISOString(), name: "Ana Souza Lima" }, NOW);
+    expect((await searchCustomers(db, owner, "98765"))[0].name).toBe("Ana Souza Lima");
+  });
+
+  it("e-mail inválido no agendamento do painel", async () => {
+    await expect(
+      createPanelBooking(
+        db,
+        owner,
+        {
+          serviceIds: [a.serviceIds[0]],
+          professionalId: a.proIds[0],
+          startsAt: local("2030-01-08", "10:00").toISOString(),
+          name: "Ana",
+          phone: "(11) 98765-4321",
+          email: "isso-nao-e-email",
+        },
+        NOW,
+      ),
+    ).rejects.toMatchObject({ code: "invalid_selection" });
+  });
+
+  it("profissional inativo ligado ao usuário não vê nada (mesmo resolvedor da página)", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "inativo@exemplo.com", name: "Inativo", emailVerifiedAt: new Date() })
+      .returning();
+    await db.insert(memberships).values({ userId: user.id, tenantId: a.tenantId, role: "staff" });
+    const id = await book(a, "2030-01-07", "10:00", { pro: 1 });
+    await db.update(professionals).set({ userId: user.id, active: false }).where(eq(professionals.id, a.proIds[1]));
+    await expect(confirmBooking(db, actorOf(a, "staff", user.id), id)).rejects.toMatchObject({ code: "not_found" });
+    expect(await findStaffProfessional(db, a.tenantId, user.id)).toBeNull();
   });
 });

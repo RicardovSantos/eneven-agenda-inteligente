@@ -18,7 +18,7 @@ export type ColumnPro = { id: string; name: string; color: string | null };
  */
 export function DayColumns({
   day,
-  professionals,
+  professionals: activeProfessionals,
   isToday,
   nowMs,
   onOpen,
@@ -29,6 +29,13 @@ export function DayColumns({
   nowMs: number;
   onOpen: (id: string) => void;
 }) {
+  // Profissional inativo só ganha coluna quando tem agendamento no dia.
+  const professionals = [...activeProfessionals];
+  for (const item of day.items) {
+    if (item.kind === "booking" && item.status !== "canceled" && !professionals.some((p) => p.id === item.professional.id)) {
+      professionals.push({ id: item.professional.id, name: `${item.professional.name} (inativo)`, color: item.professional.color });
+    }
+  }
   const bookings = day.items.filter((i) => i.kind === "booking" && i.status !== "canceled");
   const blocks = day.items.filter((i) => i.kind === "block");
 
@@ -118,15 +125,17 @@ export function DayColumns({
                     onClick={() => onOpen(b.id)}
                     aria-label={`${b.time}, ${b.customer.name}, ${b.services.map((s) => s.name).join(" e ")}, ${STATUS_LABEL[b.status]}`}
                     className={cn(
-                      "absolute inset-x-1 flex cursor-pointer flex-col items-start gap-0.5 overflow-hidden rounded-lg px-2 py-1 text-left text-xs text-foreground",
+                      "absolute inset-x-1 flex cursor-pointer flex-col items-start justify-center gap-0.5 overflow-hidden rounded-lg px-2 py-1 text-left text-xs text-foreground",
                       STATUS_CARD[b.status],
                     )}
                     style={{ top, height: h }}
                   >
-                    <span className="font-display font-semibold tabular-nums">
+                    <span className="max-w-full truncate font-display font-semibold tabular-nums">
                       {b.time} · {b.customer.name}
                     </span>
-                    <span className="truncate text-ink-muted">{b.services.map((s) => s.name).join(" + ")}</span>
+                    {h >= 40 ? (
+                      <span className="max-w-full truncate text-ink-muted">{b.services.map((s) => s.name).join(" + ")}</span>
+                    ) : null}
                   </button>
                 );
               })}
