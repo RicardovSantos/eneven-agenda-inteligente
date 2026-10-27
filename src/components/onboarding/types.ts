@@ -10,5 +10,5 @@ export type WizardProfessional = {
   name: string;
   color: string | null;
   /** Ligado ao usuário proprietário (por `userId`, não pela posição). */
-  isOwner?: boolean;
+  isOwner: boolean;
 };

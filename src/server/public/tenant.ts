@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
@@ -44,6 +45,8 @@ export type PublicTenantResult = {
   tenant: PublicTenant;
   canBook: boolean;
   reason?: PublicReason;
+  /** Catálogo já carregado para decidir `canBook` (só quando `canBook`). */
+  catalog?: PublicCatalog;
 } | null;
 
 type TenantRow = typeof tenants.$inferSelect;
@@ -164,7 +167,7 @@ export async function getPublicCatalog(db: Db, tenantId: string): Promise<Public
  * `trial` dentro do prazo e ao menos um serviço visível com profissional ativo.
  * Slug inválido, reservado ou inexistente devolve `null`.
  */
-export async function getPublicTenant(
+async function resolvePublicTenant(
   slug: string,
   options: { db?: Db; now?: Date } = {},
 ): Promise<PublicTenantResult> {
@@ -199,5 +202,21 @@ export async function getPublicTenant(
   const catalog = await getPublicCatalog(db, row.id);
   if (catalog.services.length === 0) return { tenant, canBook: false, reason: "no_services" };
 
-  return { tenant, canBook: true };
+  return { tenant, canBook: true, catalog };
+}
+
+const resolvePublicTenantOnce = cache((slug: string) => resolvePublicTenant(slug));
+
+/**
+ * Resolve o estabelecimento pelo slug. Sem `options`, o resultado é
+ * compartilhado dentro da mesma requisição (página, metadados e imagem de
+ * prévia não repetem as consultas); com `db`/`now` (testes, ações) consulta
+ * sempre.
+ */
+export function getPublicTenant(
+  slug: string,
+  options: { db?: Db; now?: Date } = {},
+): Promise<PublicTenantResult> {
+  if (options.db || options.now) return resolvePublicTenant(slug, options);
+  return resolvePublicTenantOnce(slug);
 }

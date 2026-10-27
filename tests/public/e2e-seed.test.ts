@@ -75,5 +75,8 @@ describe("rota de apoio do e2e", () => {
     const unverified = await call({ action: "tenant", verified: false }, "segredo");
     const { slug } = (await unverified.json()) as { slug: string };
     expect(await getPublicTenant(slug, { db })).toMatchObject({ canBook: false, reason: "email_unverified" });
+
+    expect((await call({ action: "verify-email", slug }, "segredo")).status).toBe(200);
+    expect(await getPublicTenant(slug, { db })).toMatchObject({ canBook: true });
   });
 });

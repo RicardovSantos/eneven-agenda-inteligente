@@ -6,6 +6,7 @@ import {
   seedE2eBooking,
   seedE2eSession,
   seedE2eTenant,
+  verifyE2eOwnerEmail,
   type SeedBlockOptions,
   type SeedBookingOptions,
   type SeedTenantOptions,
@@ -35,6 +36,8 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json(await seedE2eBlock(db, body as unknown as SeedBlockOptions));
     case "session":
       return Response.json(await seedE2eSession(db, String(body.slug)));
+    case "verify-email":
+      return Response.json(await verifyE2eOwnerEmail(db, String(body.slug)));
     case "bookings":
       return Response.json(await listE2eBookings(db, String(body.slug)));
     default:

@@ -74,13 +74,6 @@ export function limitBookingPhone(phone: string, now?: number): RateLimitResult 
   return bookingByPhoneLimiter.hit(phone, now);
 }
 
-/** `phone` já normalizado (55 + DDD + número). IP primeiro; IP bloqueado não cria chave por telefone. */
-export function limitBooking(ip: string, phone: string, now?: number): RateLimitResult {
-  const byIp = bookingByIpLimiter.hit(ip, now);
-  if (!byIp.ok) return byIp;
-  return bookingByPhoneLimiter.hit(phone, now);
-}
-
 export function limitPublicRead(ip: string, now?: number): RateLimitResult {
   return publicReadByIpLimiter.hit(ip, now);
 }

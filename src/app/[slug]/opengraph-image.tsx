@@ -23,6 +23,7 @@ const MAX_NAME = 60;
  */
 async function loadOutfitBold(): Promise<ArrayBuffer | null> {
   try {
+    // `outputFileTracingIncludes` (next.config.ts) leva o arquivo para o build standalone/Docker.
     const file = await readFile(join(process.cwd(), "src/assets/fonts/Outfit-Bold.woff"));
     return file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer;
   } catch {

@@ -29,6 +29,11 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@electric-sql/pglite"],
   // Envio do logo (até 1 MB) por ação do servidor: o padrão de 1 MB não cobre o corpo multipart.
   experimental: { serverActions: { bodySizeLimit: "2mb" } },
+  // A fonte da imagem de prévia (opengraph-image) é lida do disco: sem isto o build standalone não a copia.
+  outputFileTracingIncludes: {
+    "/[[]slug]/opengraph-image": ["./src/assets/fonts/Outfit-Bold.woff"],
+    "/*": ["./src/assets/fonts/Outfit-Bold.woff"],
+  },
   turbopack: {
     rules: {
       "*.css": {

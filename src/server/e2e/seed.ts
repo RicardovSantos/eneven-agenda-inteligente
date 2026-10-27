@@ -10,6 +10,7 @@ import {
   services,
   tenants,
   timeBlocks,
+  users,
 } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { defaultBusinessHours } from "@/lib/weekly-hours";
@@ -279,4 +280,17 @@ export async function seedE2eSession(db: Db, slug: string) {
   if (!owner) throw new Error(`Proprietário não encontrado: ${slug}`);
   const token = await createSession(db, owner.userId, tenantId);
   return { token, cookieName: SESSION_COOKIE };
+}
+
+/** Marca o e-mail do proprietário como confirmado (no lugar de abrir o link enviado por e-mail). */
+export async function verifyE2eOwnerEmail(db: Db, slug: string) {
+  const tenantId = await tenantIdOf(db, slug);
+  const [owner] = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(eq(memberships.tenantId, tenantId))
+    .limit(1);
+  if (!owner) throw new Error(`Proprietário não encontrado: ${slug}`);
+  await db.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, owner.userId));
+  return { ok: true };
 }

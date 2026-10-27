@@ -56,7 +56,7 @@ export function StepTeam({
       setError(other ?? null);
       return false;
     }
-    onProfessionalsChange([...professionals, { id: result.id, name: name.trim(), color }]);
+    onProfessionalsChange([...professionals, { id: result.id, name: name.trim(), color, isOwner: false }]);
     setName("");
     return true;
   };
