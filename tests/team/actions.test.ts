@@ -37,7 +37,7 @@ let ownerId: string;
 let proId: string;
 
 const asRole = (role: "owner" | "reception" | "staff") => {
-  state.session = { userId: ownerId, tenantId, role, isSuperAdmin: false, emailVerified: true };
+  state.session = { userId: ownerId, tenantId, role, isSuperAdmin: false, emailVerified: true, support: false };
 };
 
 beforeEach(async () => {

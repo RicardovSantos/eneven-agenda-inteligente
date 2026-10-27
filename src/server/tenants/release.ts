@@ -22,3 +22,22 @@ export function isTenantReleased(
 ): boolean {
   return tenant.emailVerified && isTenantActive(tenant, now);
 }
+
+export type TenantSituation =
+  | "trial"
+  | "trial_expired"
+  | "active"
+  | "past_due"
+  | "read_only"
+  | "canceled";
+
+/** Situação exibida ao dono da plataforma: separa teste em andamento de teste vencido. Pura. */
+export function tenantSituation(
+  tenant: TenantTiming,
+  now: Date = new Date(),
+): TenantSituation {
+  if (tenant.status === "trial") {
+    return tenant.trialEndsAt.getTime() > now.getTime() ? "trial" : "trial_expired";
+  }
+  return tenant.status;
+}

@@ -29,7 +29,7 @@ const seedCustomer = async (_db: Db, tenant: string, v: { name: string; phone: s
   (await db.insert(customers).values({ tenantId: tenant, ...v }).returning())[0];
 
 const asRole = (role: "owner" | "reception" | "staff") => {
-  state.session = { userId: "u1", tenantId, role, isSuperAdmin: false, emailVerified: true };
+  state.session = { userId: "u1", tenantId, role, isSuperAdmin: false, emailVerified: true, support: false };
 };
 
 beforeEach(async () => {

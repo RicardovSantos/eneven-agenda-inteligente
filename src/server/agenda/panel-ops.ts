@@ -21,6 +21,7 @@ import {
 import { hashToken } from "@/server/auth/session";
 import { appUrl } from "@/server/email/templates";
 import { withTenant } from "@/server/tenant-db";
+import { isTenantActive } from "@/server/tenants/release";
 import { getAvailableDates, getAvailableSlots } from "./availability";
 import {
   PANEL_RULES,
@@ -71,6 +72,22 @@ export async function scopedProfessionalId(
 ): Promise<string | undefined> {
   const own = await staffProfessionalId(db, actor);
   return own ?? requested;
+}
+
+/**
+ * Estabelecimento inativo (teste vencido, bloqueado, cancelado, pagamento
+ * atrasado) fica em modo somente leitura: não cria nem move agenda. Cancelar e
+ * marcar o resultado de um atendimento continuam permitidos.
+ */
+async function assertWritable(db: Db, tenantId: string, now: Date): Promise<void> {
+  const [row] = await withTenant(db, tenantId, (tx) =>
+    tx
+      .select({ status: tenants.status, trialEndsAt: tenants.trialEndsAt })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1),
+  );
+  if (!row || !isTenantActive(row, now)) throw new BookingError("read_only");
 }
 
 async function loadOwned(db: Db, actor: PanelActor, bookingId: string) {
@@ -163,6 +180,7 @@ export async function rescheduleBookingAsStaff(
   professionalId?: string,
   now: Date = new Date(),
 ): Promise<{ whatsappUrl: string }> {
+  await assertWritable(db, actor.tenantId, now);
   await loadOwned(db, actor, bookingId);
   const startsAt = parseInstant(startsAtIso);
   const targetPro = (await scopedProfessionalId(db, actor, professionalId)) ?? undefined;
@@ -194,6 +212,7 @@ export async function createPanelBooking(
   input: PanelBookingInput,
   now: Date = new Date(),
 ): Promise<{ bookingId: string }> {
+  await assertWritable(db, actor.tenantId, now);
   const own = await staffProfessionalId(db, actor);
   const email = input.email?.trim() || null;
   if (email && !z.email().safeParse(email).success) {
@@ -258,7 +277,13 @@ export type BlockInput = {
   reason: string | null;
 };
 
-export async function createBlock(db: Db, actor: PanelActor, input: BlockInput): Promise<{ id: string }> {
+export async function createBlock(
+  db: Db,
+  actor: PanelActor,
+  input: BlockInput,
+  now: Date = new Date(),
+): Promise<{ id: string }> {
+  await assertWritable(db, actor.tenantId, now);
   const startsAt = parseInstant(input.startsAt);
   const endsAt = parseInstant(input.endsAt);
   if (endsAt.getTime() <= startsAt.getTime()) {

@@ -8,6 +8,7 @@ const sessao: SessionInfo = {
   role: "owner",
   isSuperAdmin: false,
   emailVerified: true,
+  support: false,
 };
 
 describe("canAccessTenantPanel", () => {

@@ -34,7 +34,7 @@ let tenantId: string;
 let otherTenantId: string;
 
 const asRole = (role: "owner" | "reception" | "staff") => {
-  state.session = { userId: "u1", tenantId, role, isSuperAdmin: false, emailVerified: true };
+  state.session = { userId: "u1", tenantId, role, isSuperAdmin: false, emailVerified: true, support: false };
 };
 
 const serviceInput = {

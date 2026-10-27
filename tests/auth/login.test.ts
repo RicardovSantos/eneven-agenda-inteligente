@@ -100,6 +100,7 @@ describe("login e sessão", () => {
       role: "owner",
       isSuperAdmin: false,
       emailVerified: false,
+      support: false,
     });
   });
 

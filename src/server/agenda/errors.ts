@@ -4,7 +4,8 @@ export type BookingErrorCode =
   | "invalid_selection"
   | "invalid_transition"
   | "not_found"
-  | "reschedule_unavailable";
+  | "reschedule_unavailable"
+  | "read_only";
 
 export const SLOT_TAKEN_MESSAGE = "Esse horário acabou de ser reservado. Escolha outro.";
 
@@ -15,6 +16,7 @@ const MESSAGES: Record<BookingErrorCode, string> = {
   invalid_transition: "Não é possível mudar o status deste agendamento.",
   not_found: "Agendamento não encontrado.",
   reschedule_unavailable: "Não é possível remarcar agora. Fale com o estabelecimento.",
+  read_only: "Sua agenda está em modo somente leitura.",
 };
 
 export class BookingError extends Error {
