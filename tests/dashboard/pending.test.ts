@@ -64,4 +64,26 @@ describe("listPendingOutcomes", () => {
     const list = await listPendingOutcomes(db, tenantId, NOW);
     expect(list.map((p) => p.bookingId)).toEqual([b.id, a.id]);
   });
+
+  it("não lista o que já começou mas ainda não terminou", async () => {
+    await book(new Date(NOW.getTime() - 10 * 60_000), "scheduled");
+    expect(await listPendingOutcomes(db, tenantId, NOW)).toEqual([]);
+  });
+
+  it("limita a 50, dos mais antigos", async () => {
+    const rows = Array.from({ length: 55 }, (_, i) => {
+      const startsAt = new Date(NOW.getTime() - (60 - i) * HOUR);
+      const endsAt = new Date(startsAt.getTime() + 30 * 60_000);
+      return bookingValues(tenantId, professionalId, customerId, {
+        startsAt,
+        endsAt,
+        blockedUntil: endsAt,
+        status: "scheduled",
+      });
+    });
+    await db.insert(bookings).values(rows);
+    const list = await listPendingOutcomes(db, tenantId, NOW);
+    expect(list).toHaveLength(50);
+    expect(list[0].startsAt.getTime()).toBe(NOW.getTime() - 60 * HOUR);
+  });
 });

@@ -2,6 +2,8 @@ import { TZDate } from "@date-fns/tz";
 
 /** Utilitários de data/hora no fuso do tenant. Sem dependência do fuso do processo. */
 
+export const DAY_MS = 86_400_000;
+
 const HM = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const YMD = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -49,5 +51,5 @@ export function addDaysToDate(date: string, days: number): string {
 export function diffDays(a: string, b: string): number {
   const [ya, ma, da] = parseYmd(a);
   const [yb, mb, db] = parseYmd(b);
-  return Math.round((Date.UTC(yb, mb - 1, db) - Date.UTC(ya, ma - 1, da)) / 86_400_000);
+  return Math.round((Date.UTC(yb, mb - 1, db) - Date.UTC(ya, ma - 1, da)) / DAY_MS);
 }

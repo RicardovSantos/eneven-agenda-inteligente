@@ -1,5 +1,6 @@
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { bookingServices, bookings } from "@/db/schema";
+import { bookingServices, bookings, professionals } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { getDashboard } from "@/server/dashboard/overview";
 import { bookingValues, seedCustomer, seedProfessional, seedTenant } from "../helpers/agenda-fixtures";
@@ -93,12 +94,20 @@ describe("getDashboard", () => {
   });
 
   it("calcula faltas (3 de 87)", async () => {
-    // 84 concluídos e 3 faltas em dias distintos do mês
-    for (let i = 0; i < 87; i++) {
+    const rows = Array.from({ length: 87 }, (_, i) => {
       const day = String((i % 28) + 1).padStart(2, "0");
       const hour = String(8 + Math.floor(i / 28) * 2).padStart(2, "0");
-      await book(`2026-10-${day}T${hour}:00:00`, i < 3 ? "no_show" : "completed", 1000);
-    }
+      const startsAt = new Date(`2026-10-${day}T${hour}:00:00-03:00`);
+      const endsAt = new Date(startsAt.getTime() + 30 * 60_000);
+      return bookingValues(tenantId, professionalId, customerId, {
+        startsAt,
+        endsAt,
+        blockedUntil: endsAt,
+        status: i < 3 ? "no_show" : "completed",
+        totalCents: 1000,
+      });
+    });
+    await db.insert(bookings).values(rows);
     const d = await dash();
     expect(d.noShow.count).toBe(3);
     expect(d.noShow.base).toBe(87);
@@ -139,16 +148,39 @@ describe("getDashboard", () => {
     ]);
   });
 
+  it("topServices desempata por nome e limita a 5", async () => {
+    // inseridos em ordem alfabética reversa, todos com a mesma contagem
+    for (const [i, name] of ["Zeta", "Eta", "Beta", "Alfa"].entries()) {
+      await book(`2026-10-0${i + 2}T10:00:00`, "completed", 1000, [{ name, priceCents: 1000 }]);
+    }
+    expect((await dash()).topServices.map((s) => s.name)).toEqual(["Alfa", "Beta", "Eta", "Zeta"]);
+
+    // seis serviços: o de menor contagem fica de fora
+    await book("2026-10-10T10:00:00", "completed", 1000, [{ name: "Zeta", priceCents: 1000 }]);
+    await book("2026-10-11T10:00:00", "completed", 1000, [{ name: "Eta", priceCents: 1000 }]);
+    await book("2026-10-12T10:00:00", "completed", 1000, [{ name: "Beta", priceCents: 1000 }]);
+    await book("2026-10-13T10:00:00", "completed", 1000, [{ name: "Alfa", priceCents: 1000 }]);
+    await book("2026-10-14T10:00:00", "completed", 1000, [{ name: "Gama", priceCents: 1000 }]);
+    await book("2026-10-15T10:00:00", "completed", 1000, [{ name: "Delta", priceCents: 1000 }]);
+    const top = (await dash()).topServices;
+    expect(top).toHaveLength(5);
+    expect(top.map((s) => s.name)).toEqual(["Alfa", "Beta", "Eta", "Zeta", "Delta"]);
+  });
+
   it("perProfessional lista quem atendeu, inclusive inativos, por cents desc", async () => {
     const other = await seedProfessional(db, tenantId, "Ana");
     const idle = await seedProfessional(db, tenantId, "Sem agenda");
     await book("2026-10-02T10:00:00", "completed", 1000);
     await book("2026-10-03T10:00:00", "no_show", 1000);
     await book("2026-10-02T10:00:00", "completed", 7000, [], other.id);
+    const inactive = await seedProfessional(db, tenantId, "Carla");
+    await db.update(professionals).set({ active: false }).where(eq(professionals.id, inactive.id));
+    await book("2026-10-04T10:00:00", "completed", 3000, [], inactive.id);
     const d = await dash();
-    expect(d.perProfessional.map((p) => p.name)).toEqual(["Ana", "Bia"]);
+    expect(d.perProfessional.map((p) => p.name)).toEqual(["Ana", "Carla", "Bia"]);
+    expect(d.perProfessional[1]).toMatchObject({ id: inactive.id, completed: 1, cents: 3000 });
     expect(d.perProfessional[0]).toMatchObject({ completed: 1, cents: 7000, noShows: 0 });
-    expect(d.perProfessional[1]).toMatchObject({ completed: 1, cents: 1000, noShows: 1 });
+    expect(d.perProfessional[2]).toMatchObject({ completed: 1, cents: 1000, noShows: 1 });
     expect(d.perProfessional.some((p) => p.id === idle.id)).toBe(false);
   });
 

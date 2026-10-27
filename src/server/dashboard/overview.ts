@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { bookingServices, bookings, professionals } from "@/db/schema";
 import type { Db } from "@/db/types";
-import { addDaysToDate, diffDays, localDateOf, zonedInstant } from "@/server/agenda/time";
+import { DAY_MS, addDaysToDate, diffDays, localDateOf, zonedInstant } from "@/server/agenda/time";
 import { withTenant } from "@/server/tenant-db";
 
 export type DashboardInput = {
@@ -37,7 +37,6 @@ export type Dashboard = {
 };
 
 const MONTH = /^(\d{4})-(\d{2})$/;
-const DAY_MS = 86_400_000;
 
 function parseMonth(month: string): { first: string; next: string; previous: string } {
   const m = MONTH.exec(month);

@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
 import { bookingServices, bookings, customers, professionals } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { DAY_MS } from "@/server/agenda/time";
 import { withTenant } from "@/server/tenant-db";
 
 export type PendingOutcome = {
@@ -11,7 +12,6 @@ export type PendingOutcome = {
   professionalName: string;
 };
 
-const DAY_MS = 86_400_000;
 const WINDOW_DAYS = 90;
 const LIMIT = 50;
 
@@ -39,7 +39,7 @@ export async function listPendingOutcomes(
           gte(bookings.startsAt, new Date(now.getTime() - WINDOW_DAYS * DAY_MS)),
         ),
       )
-      .orderBy(asc(bookings.startsAt))
+      .orderBy(asc(bookings.startsAt), asc(bookings.id))
       .limit(LIMIT);
     if (rows.length === 0) return [];
 
