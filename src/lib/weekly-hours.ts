@@ -129,3 +129,45 @@ export function outsideBusinessHours(
   }
   return errors;
 }
+
+/** Expediente reduzido à janela: interseção por dia, descartando o que sobra vazio. */
+export function clipWeekToBusiness(hours: WeeklyHours, business: WeeklyHours): WeeklyHours {
+  const week = emptyWeek();
+  for (const day of WEEKDAYS) {
+    const windows = (business[day] ?? [])
+      .map((r) => [minutes(r.start), minutes(r.end)] as const)
+      .filter((r): r is readonly [number, number] => r[0] !== null && r[1] !== null)
+      .sort((a, b) => a[0] - b[0]);
+    for (const range of hours[day] ?? []) {
+      const start = minutes(range.start);
+      const end = minutes(range.end);
+      if (start === null || end === null) continue;
+      const pieces: Array<[number, number]> = [];
+      for (const [ws, we] of windows) {
+        const s = Math.max(start, ws);
+        const e = Math.min(end, we);
+        if (s >= e) continue;
+        const last = pieces[pieces.length - 1];
+        if (last && last[1] === s) last[1] = e;
+        else pieces.push([s, e]);
+      }
+      for (const [s, e] of pieces) week[day].push({ start: toHm(s), end: toHm(e) });
+    }
+  }
+  return week;
+}
+
+const toHm = (total: number) =>
+  `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+
+/** Duas semanas têm exatamente os mesmos intervalos (ignora a ordem de gravação). */
+export function sameWeek(a: WeeklyHours, b: WeeklyHours): boolean {
+  const key = (w: WeeklyHours) =>
+    WEEKDAYS.map((d) =>
+      [...(w[d] ?? [])]
+        .map((r) => `${r.start}-${r.end}`)
+        .sort()
+        .join(","),
+    ).join("|");
+  return key(a) === key(b);
+}

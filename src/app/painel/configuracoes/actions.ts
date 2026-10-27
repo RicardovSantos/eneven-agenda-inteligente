@@ -45,6 +45,8 @@ export type SettingsFormState = {
   /** Cor guardada (já ajustada) e se foi ajustada. */
   color?: string;
   adjusted?: boolean;
+  /** Horário salvo sem aplicar à equipe e algum ativo ficou com expediente diferente. */
+  teamOutOfSync?: boolean;
   /** Novo link público guardado. */
   slug?: string;
 };
@@ -151,8 +153,10 @@ export async function saveHoursAction(
     // Forma exata: objeto com os dias 0 a 6, cada um uma lista de { start, end }.
     const parsed = weeklyHoursSchema.safeParse(json);
     if (!parsed.success) throw invalid();
-    await updateBusinessHours(db, tenantId, parsed.data as WeeklyHours);
-    return {};
+    const { teamOutOfSync } = await updateBusinessHours(db, tenantId, parsed.data as WeeklyHours, {
+      applyToTeam: text(formData, "applyToTeam") === "1",
+    });
+    return { teamOutOfSync };
   });
 }
 

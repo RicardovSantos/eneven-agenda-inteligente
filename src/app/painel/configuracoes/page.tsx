@@ -9,7 +9,7 @@ import { HoursForm } from "@/components/settings/hours-form";
 import { RulesForm } from "@/components/settings/rules-form";
 import { SlugForm } from "@/components/settings/slug-form";
 import { requireOnboarded } from "@/server/panel/onboarding-gate";
-import { getBusinessHours } from "@/server/settings";
+import { defaultApplyToTeam, getBusinessHours } from "@/server/settings";
 
 export const metadata: Metadata = { title: "Configurações" };
 
@@ -37,6 +37,7 @@ export default async function ConfiguracoesPage() {
     .limit(1);
   if (!tenant) redirect("/entrar");
   const hours = await getBusinessHours(db, session.tenantId);
+  const applyToTeamDefault = await defaultApplyToTeam(db, session.tenantId);
 
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
@@ -63,7 +64,7 @@ export default async function ConfiguracoesPage() {
           color: tenant.brandColor ?? "#3E07D2",
         }}
       />
-      <HoursForm initial={hours} />
+      <HoursForm initial={hours} applyToTeamDefault={applyToTeamDefault} />
       <RulesForm
         initial={{
           slotIntervalMin: tenant.slotIntervalMin,

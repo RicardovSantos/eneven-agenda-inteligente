@@ -1,7 +1,10 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { tenants } from "@/db/schema";
+import { professionalHours, professionals, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { listProfessionals } from "@/server/catalog/professionals";
+import { updateBusinessHours } from "@/server/settings";
+import { withTenant } from "@/server/tenant-db";
 import { createTestDb } from "../helpers/test-db";
 import { seedTenant } from "../helpers/agenda-fixtures";
 
@@ -105,6 +108,51 @@ describe("ações de configurações: papel", () => {
     const result = await saveHoursAction({}, form({ hours }));
     expect(result.error).toBeUndefined();
     expect(result.fieldErrors?.hours).toBeTruthy();
+  });
+
+  describe("horário e equipe", () => {
+    const day = (start: string, end: string) => ({
+      0: [], 1: [{ start, end }], 2: [], 3: [], 4: [], 5: [], 6: [],
+    });
+    const teamWeek = async () =>
+      (await listProfessionals(db, tenantId))[0].hours[1];
+
+    async function seedTeam() {
+      await updateBusinessHours(db, tenantId, day("09:00", "18:00"));
+      await withTenant(db, tenantId, async (tx) => {
+        const [a] = await tx.insert(professionals).values({ tenantId, name: "Ana" }).returning();
+        await tx
+          .insert(professionalHours)
+          .values({ tenantId, professionalId: a.id, weekday: 1, startsAt: "09:00", endsAt: "18:00" });
+        const [b] = await tx.insert(professionals).values({ tenantId, name: "Bia" }).returning();
+        await tx
+          .insert(professionalHours)
+          .values({ tenantId, professionalId: b.id, weekday: 1, startsAt: "09:00", endsAt: "18:00" });
+      });
+    }
+
+    it("applyToTeam=1 aplica o novo horário à equipe", async () => {
+      asRole("owner");
+      await seedTeam();
+      const result = await saveHoursAction(
+        {},
+        form({ hours: JSON.stringify(day("08:00", "20:00")), applyToTeam: "1" }),
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.teamOutOfSync).toBe(false);
+      expect(await teamWeek()).toEqual([{ start: "08:00", end: "20:00" }]);
+    });
+
+    it("sem applyToTeam recorta e avisa quando a equipe ficou diferente", async () => {
+      asRole("owner");
+      await seedTeam();
+      const widened = await saveHoursAction({}, form({ hours: JSON.stringify(day("08:00", "20:00")) }));
+      expect(widened.teamOutOfSync).toBe(true);
+      expect(await teamWeek()).toEqual([{ start: "09:00", end: "18:00" }]);
+      const narrowed = await saveHoursAction({}, form({ hours: JSON.stringify(day("10:00", "16:00")) }));
+      expect(narrowed.teamOutOfSync).toBe(false);
+      expect(await teamWeek()).toEqual([{ start: "10:00", end: "16:00" }]);
+    });
   });
 
   it("slug em uso volta como erro do campo", async () => {
