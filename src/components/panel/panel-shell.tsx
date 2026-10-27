@@ -24,6 +24,7 @@ export function PanelShell({
   publicLink,
   role,
   isSuperAdmin,
+  notice,
   children,
 }: {
   userName: string;
@@ -32,6 +33,8 @@ export function PanelShell({
   publicLink: { label: string; url: string } | null;
   role: PanelRole;
   isSuperAdmin: boolean;
+  /** Faixa de aviso (somente leitura) entre o topo e o conteúdo, de ponta a ponta. */
+  notice?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -77,6 +80,8 @@ export function PanelShell({
           </button>
         </LogoutForm>
       </header>
+
+      {notice}
 
       <main className="px-4 pb-28 pt-6 lg:px-8 lg:pb-10 lg:pt-8">{children}</main>
       </div>

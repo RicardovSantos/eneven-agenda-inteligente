@@ -84,12 +84,15 @@ export function EditPanel({
   titleId,
   onClose,
   widthClass = "lg:w-[420px]",
+  stickyClass = "lg:top-0 lg:h-dvh",
   children,
 }: {
   title: string;
   titleId: string;
   onClose: () => void;
   widthClass?: string;
+  /** Posição colada da coluna (padrão: toda a altura da janela; a plataforma desconta o topo fixo). */
+  stickyClass?: string;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLElement>(null);
@@ -102,7 +105,8 @@ export function EditPanel({
       ref={ref}
       aria-labelledby={titleId}
       className={cn(
-        "fixed inset-0 z-40 overflow-y-auto bg-surface lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:shrink-0 lg:border-l lg:border-line",
+        "fixed inset-0 z-40 overflow-y-auto bg-surface lg:sticky lg:z-auto lg:shrink-0 lg:border-l lg:border-line",
+        stickyClass,
         widthClass,
       )}
     >

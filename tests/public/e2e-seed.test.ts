@@ -120,4 +120,32 @@ describe("rota de apoio do e2e", () => {
     const view = await getInvitation(db, token);
     expect(view).toMatchObject({ status: "valid", email: "leo@exemplo.com", role: "staff", name: "Léo" });
   });
+  it("super-admin: cria o dono da plataforma com sessão, só com autorização", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("E2E_SEED", "segredo");
+
+    expect((await call({ action: "super-admin" })).status).toBe(404);
+    expect((await call({ action: "super-admin" }, "errado")).status).toBe(404);
+
+    const res = await call({ action: "super-admin" }, "segredo");
+    expect(res.status).toBe(200);
+    const { token, cookieName } = (await res.json()) as { token: string; cookieName: string };
+    expect(cookieName).toBe(SESSION_COOKIE);
+    expect(await getSession(db, token)).toMatchObject({ isSuperAdmin: true, tenantId: null, role: null, support: false });
+  });
+  it("tenant: aceita as situações da plataforma (bloqueado, teste vencido, cancelado)", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("E2E_SEED", "segredo");
+
+    const blocked = (await (await call({ action: "tenant", status: "read_only" }, "segredo")).json()) as { slug: string };
+    expect(await getPublicTenant(blocked.slug, { db })).toMatchObject({ canBook: false });
+
+    const expired = (await (
+      await call({ action: "tenant", status: "trial", trialEndsAt: "2020-01-01T00:00:00Z" }, "segredo")
+    ).json()) as { slug: string };
+    const [row] = await db.select().from(tenants).where(eq(tenants.slug, expired.slug));
+    expect(row.status).toBe("trial");
+    expect(row.trialEndsAt.toISOString()).toBe("2020-01-01T00:00:00.000Z");
+    expect(await getPublicTenant(expired.slug, { db })).toMatchObject({ canBook: false });
+  });
 });

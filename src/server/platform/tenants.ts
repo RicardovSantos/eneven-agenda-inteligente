@@ -27,6 +27,7 @@ export type PlatformTenantItem = {
   ownerEmail: string | null;
   situation: TenantSituation;
   trialEndsAt: Date;
+  activatedAt: Date | null;
   planName: string;
   bookings30d: number;
   ownerLastLoginAt: Date | null;
@@ -116,6 +117,7 @@ export async function listPlatformTenants(
       slug: tenants.slug,
       status: tenants.status,
       trialEndsAt: tenants.trialEndsAt,
+      activatedAt: tenants.activatedAt,
       planName: plans.name,
       createdAt: tenants.createdAt,
     })
@@ -173,6 +175,7 @@ export async function listPlatformTenants(
         ownerEmail: owner?.email ?? null,
         situation: tenantSituation(r, now),
         trialEndsAt: r.trialEndsAt,
+        activatedAt: r.activatedAt,
         planName: r.planName,
         bookings30d: usageOf.get(r.id) ?? 0,
         ownerLastLoginAt: owner?.lastLoginAt ?? null,

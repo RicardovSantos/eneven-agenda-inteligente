@@ -44,6 +44,8 @@ export type AgendaScreenProps = {
   /** Link público para o estado vazio (`null` = ainda não liberado). */
   publicUrl: string | null;
   nowMs: number;
+  /** Estabelecimento sem plano ativo: nada de novo agendamento, remarcação ou bloqueio (o servidor também recusa). */
+  readOnly?: boolean;
   banners?: ReactNode;
 };
 
@@ -65,6 +67,7 @@ export function AgendaScreen({
   lockedProfessionalId,
   publicUrl,
   nowMs,
+  readOnly = false,
   banners,
 }: AgendaScreenProps) {
   const router = useRouter();
@@ -251,6 +254,7 @@ export function AgendaScreen({
             <Button
               type="button"
               onClick={() => setNewOpen(true)}
+              disabled={readOnly}
               size="lg"
               className="hidden min-h-11 min-w-[10.5rem] flex-1 gap-1.5 rounded-field text-sm lg:flex"
             >
@@ -261,6 +265,7 @@ export function AgendaScreen({
               type="button"
               variant="outline"
               onClick={() => setBlockOpen(true)}
+              disabled={readOnly}
               className="min-h-11 min-w-[9.5rem] flex-1 gap-1.5 rounded-field text-sm"
             >
               <Lock className="size-4" aria-hidden="true" />
@@ -299,6 +304,7 @@ export function AgendaScreen({
             booking={detail}
             today={today}
             timezone={day.timezone}
+            readOnly={readOnly}
             onClose={closeDetail}
           />
         ) : null}
@@ -308,8 +314,9 @@ export function AgendaScreen({
       <button
         type="button"
         onClick={() => setNewOpen(true)}
+        disabled={readOnly}
         aria-label="Novo agendamento"
-        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[18px] z-30 flex size-14 cursor-pointer items-center justify-center rounded-[18px] bg-primary text-primary-foreground shadow-[0_12px_32px_-12px_rgb(62_7_210/0.6)] lg:hidden"
+        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[18px] z-30 flex size-14 cursor-pointer items-center justify-center rounded-[18px] bg-primary text-primary-foreground shadow-[0_12px_32px_-12px_rgb(62_7_210/0.6)] lg:hidden disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Plus className="size-6" strokeWidth={2.4} aria-hidden="true" />
       </button>

@@ -103,6 +103,7 @@ A aplicação roda em um container (`Dockerfile`, Node 24 Alpine) no Easypanel, 
 | `SESSION_SECRET` | aleatório (`openssl rand -hex 32`) |
 | `ZEPTOMAIL_TOKEN` e `EMAIL_FROM` | envio de e-mails |
 | `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` | opcionais |
+| `SUPPORT_WHATSAPP` | opcional (`5511999999999`): botão "Falar com a Eneven" na faixa de somente leitura |
 | `LEGAL_*` | opcionais |
 
 O `APP_URL` também é um argumento da imagem (`ARG APP_URL`, padrão `https://agenda.eneven.com.br`) nos estágios de build e final: no build grava o endereço nas páginas estáticas e, na imagem final, vira a variável de ambiente padrão (a variável do Easypanel, se existir, prevalece). Em produção a aplicação nunca cai em `localhost`: sem `APP_URL` ela falha em vez de mandar links errados. Localmente, `pnpm build` funciona sem `APP_URL` (a checagem é ignorada só durante o `next build`), porque páginas estáticas como a inicial gravam nele o endereço da imagem de compartilhamento. Se o domínio mudar, passe `--build-arg APP_URL=...` (ou crie o argumento no Easypanel) e refaça o build.
@@ -122,6 +123,14 @@ node dist/migrate.mjs
 ```bash
 SUPER_ADMIN_PASSWORD='uma-senha-longa' node dist/create-super-admin.mjs email@exemplo.com "Nome"
 ```
+
+**Promover um usuário que já existe a super-admin** (por exemplo, a sua conta de dono de estabelecimento; não pede senha nem mexe nela):
+
+```bash
+node dist/create-super-admin.mjs --promote email@exemplo.com
+```
+
+Depois de entrar, o menu do painel ganha "Plataforma" (`/admin`): lista de estabelecimentos, planos, "Entrar como o estabelecimento" (modo suporte, com faixa e registro no histórico) e "Meu estabelecimento" de volta ao seu painel.
 
 **Gerar `dist/` localmente** (para testar fora do Docker): `pnpm build:migrate` e `pnpm build:admin`.
 

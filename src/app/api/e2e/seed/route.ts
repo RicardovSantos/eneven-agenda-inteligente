@@ -7,6 +7,7 @@ import {
   seedE2eInvite,
   seedE2eMember,
   seedE2eSession,
+  seedE2eSuperAdmin,
   seedE2eTenant,
   verifyE2eOwnerEmail,
   type SeedBlockOptions,
@@ -39,6 +40,8 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json(await seedE2eBlock(db, body as unknown as SeedBlockOptions));
     case "session":
       return Response.json(await seedE2eSession(db, String(body.slug)));
+    case "super-admin":
+      return Response.json(await seedE2eSuperAdmin(db));
     case "member": {
       if (body.role !== "owner" && body.role !== "reception" && body.role !== "staff") {
         return Response.json({ error: "papel inválido" }, { status: 400 });

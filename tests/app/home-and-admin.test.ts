@@ -93,7 +93,8 @@ describe("/ e /admin", () => {
   });
 
   describe("página /admin", () => {
-    const page = async () => (await import("@/app/admin/page")).default();
+    const page = async (search: Record<string, string> = {}) =>
+      (await import("@/app/admin/page")).default({ searchParams: Promise.resolve(search) } as never);
 
     it("exige super-admin", async () => {
       expect(await redirectOf(page())).toBe("NEXT_REDIRECT:/entrar");
@@ -101,15 +102,24 @@ describe("/ e /admin", () => {
       expect(await redirectOf(page())).toBe("NEXT_REDIRECT:/entrar");
     });
 
-    it("mostra o título, o texto de construção e o botão Sair (POST /sair)", async () => {
+    it("mostra a lista: números, filtros, busca e o estabelecimento cadastrado", async () => {
       state.token = await createSession(db, rootId, null);
       const html = renderToStaticMarkup(await page());
-      expect(html).toContain("Painel da plataforma");
-      expect(html).toContain(
-        "Em construção. Aqui você vai gerenciar os estabelecimentos, planos e assinaturas.",
-      );
-      expect(html).toMatch(/<form[^>]*action="\/sair"[^>]*method="post"|<form[^>]*method="post"[^>]*action="\/sair"/);
-      expect(html).toContain("Sair");
+      expect(html).toContain("Estabelecimentos");
+      expect(html).toContain("Novo estabelecimento");
+      expect(html).toContain("Receita mensal (MRR)");
+      expect(html).toContain("Defendi Studio");
+      expect(html).toContain("ana@defendi.com");
+      expect(html).toContain("Em teste");
+      expect(html).toContain('aria-label="Filtrar por situação"');
+    });
+
+    it("filtro desconhecido vale como todos e busca sem resultado mostra o estado vazio", async () => {
+      state.token = await createSession(db, rootId, null);
+      expect(renderToStaticMarkup(await page({ situacao: "qualquer-coisa" }))).toContain("Defendi Studio");
+      const empty = renderToStaticMarkup(await page({ q: "zzzz-nao-existe" }));
+      expect(empty).toContain("Nenhum estabelecimento encontrado");
+      expect(empty).not.toContain("Defendi Studio");
     });
   });
 });

@@ -357,3 +357,23 @@ export async function seedE2eInvite(db: Db, options: SeedInviteOptions) {
   );
   return { token, invitationId };
 }
+
+/**
+ * Dono da plataforma (super-admin, sem estabelecimento) com sessão pronta: o
+ * Playwright entra em `/admin` sem passar pelo login nem por `create-super-admin`.
+ */
+export async function seedE2eSuperAdmin(db: Db) {
+  const suffix = Math.random().toString(36).slice(2, 7);
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: `e2e-admin-${suffix}-${Date.now()}@exemplo.com`,
+      passwordHash: null,
+      name: "Ricardo",
+      emailVerifiedAt: new Date(),
+      isSuperAdmin: true,
+    })
+    .returning({ id: users.id });
+  const token = await createSession(db, user.id, null);
+  return { token, cookieName: SESSION_COOKIE, userId: user.id };
+}

@@ -134,3 +134,11 @@ export async function loginAsMember(
   });
   await page.context().addCookies([{ name: cookieName, value: token, url: baseUrl() }]);
 }
+
+/** Entra como dono da plataforma (super-admin sem estabelecimento), com sessão criada direto no banco. */
+export async function loginAsSuperAdmin(page: Page, request: APIRequestContext) {
+  const { token, cookieName } = await seed<{ token: string; cookieName: string }>(request, {
+    action: "super-admin",
+  });
+  await page.context().addCookies([{ name: cookieName, value: token, url: baseUrl() }]);
+}
