@@ -2,6 +2,13 @@
 
 SaaS de agendamento multiempresa para negócios que trabalham com hora marcada (salões de beleza, estúdios de piercing, estética). Cada estabelecimento ganha um link público próprio, onde o cliente final agenda sozinho, um painel com agenda, clientes, faturamento e indicadores, e lembretes automáticos no WhatsApp que reduzem faltas. É vendido por assinatura barata e configurado pelo próprio estabelecimento, sem código novo por cliente.
 
+## O que já funciona
+
+- Cadastro (senha ou Google), confirmação de e-mail e assistente de primeiros passos (estabelecimento, horário, serviços e equipe).
+- Página pública de agendamento em `/{slug}` (serviço, profissional, dia e horário, confirmação, calendário `.ics`, remarcar e cancelar por link) com prévia de compartilhamento.
+- Painel: agenda (mês e dia, detalhe do agendamento, novo agendamento, bloqueios, confirmar, remarcar, atendido, faltou e cancelar), serviços, equipe e configurações (dados, marca, horário, regras e link).
+- Menu com o link de agendamento para copiar, liberado quando o e-mail está confirmado e a conta está ativa ou em teste. Clientes e Painel de indicadores ficam como "Em breve".
+
 ## Stack
 
 - Next.js (App Router) + TypeScript, aplicação única (página pública, painéis e API)
@@ -70,12 +77,12 @@ pnpm build       # build de produção
 
 ```bash
 pnpm exec playwright install chromium   # uma vez
-pnpm test:e2e                            # página pública de agendamento e gerenciar agendamento
+pnpm test:e2e                            # página pública, agenda do painel e o fluxo completo
 ```
 
-O comando sobe o `pnpm dev` na porta 3100 com um PGlite só dele (`.data/pglite-e2e`, apagado a cada execução) e a rota de apoio `/api/e2e/seed`, que cria estabelecimentos e agendamentos de teste. Essa rota só responde quando `E2E_SEED` está definido, o processo não é de produção e o cabeçalho `x-e2e-seed` traz o mesmo segredo; fora disso devolve 404. **Pare o `pnpm dev` antes de rodar** (o Next aceita um servidor de desenvolvimento por pasta). Os testes ficam em `tests/e2e/`, fora do `pnpm test` e do CI por enquanto; a primeira execução é lenta porque o modo de desenvolvimento compila cada rota na primeira visita.
+O comando sobe o `pnpm dev` na porta 3100 com um PGlite só dele (`.data/pglite-e2e`, apagado a cada execução) e a rota de apoio `/api/e2e/seed`, que cria estabelecimentos e agendamentos de teste. Essa rota só responde quando `E2E_SEED` está definido, o processo não é de produção e o cabeçalho `x-e2e-seed` traz o mesmo segredo; fora disso devolve 404. **Pare o `pnpm dev` antes de rodar** (o Next aceita um servidor de desenvolvimento por pasta). `tests/e2e/full-flow.spec.ts` percorre tudo: cadastro, primeiros passos, página pública, agenda, confirmar, remarcar e cancelar (a confirmação do e-mail é simulada pela rota de apoio). Para rodar só um arquivo: `pnpm test:e2e tests/e2e/full-flow.spec.ts`. Os testes ficam em `tests/e2e/`, fora do `pnpm test` e do CI por enquanto; a primeira execução é lenta porque o modo de desenvolvimento compila cada rota na primeira visita.
 
-O CI (`.github/workflows/ci.yml`) roda lint, typecheck e testes a cada push na `main` e em todo pull request (uma nova execução na mesma branch cancela a anterior).
+O CI (`.github/workflows/ci.yml`) roda lint, typecheck e testes a cada push na `main` e em todo pull request (uma nova execução na mesma branch cancela a anterior). O job `test-pg` sobe um PostgreSQL 17 e roda `pnpm test:pg` (RLS com `withTenant` e a trava de dupla reserva sob concorrência), o que o PGlite local não prova; localmente `pnpm test:pg` só roda com `TEST_DATABASE_URL` apontando para um Postgres (sem ela avisa e sai).
 
 ## Como trocar a logo
 

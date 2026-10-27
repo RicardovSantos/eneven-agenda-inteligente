@@ -95,7 +95,7 @@ test.describe("agenda do painel", () => {
 
       // Detalhe abre na coluna da direita.
       await page.getByRole("button", { name: /Marina Costa/ }).click();
-      const detail = page.getByRole("dialog", { name: "Marina Costa" });
+      const detail = page.getByRole("region", { name: "Marina Costa" });
       await expect(detail.getByText("(11) 91111-2222 · 1ª visita")).toBeVisible();
       await expect(detail.getByRole("link", { name: "Conversar com Marina no WhatsApp" })).toHaveAttribute(
         "href",

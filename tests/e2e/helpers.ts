@@ -115,3 +115,7 @@ export function uniquePhone(): string {
   const digits = String(Math.floor(Math.random() * 1e8)).padStart(8, "0");
   return `119${digits}`;
 }
+
+/** Marca o e-mail do proprietário como confirmado (no lugar de abrir o link enviado por e-mail). */
+export const verifyOwnerEmail = (request: APIRequestContext, slug: string) =>
+  seed<{ ok: true }>(request, { action: "verify-email", slug });
