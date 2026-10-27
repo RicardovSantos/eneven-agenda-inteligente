@@ -1,6 +1,7 @@
 import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/brand/logo";
+import { SidebarLink } from "./copy-link-button";
 import { BottomNav, SidebarNav } from "./panel-nav";
 
 /** `<form>` de logout: o `/sair` só aceita POST. */
@@ -19,10 +20,13 @@ function LogoutForm({ children, className }: { children: ReactNode; className?: 
 export function PanelShell({
   userName,
   tenantName,
+  publicLink,
   children,
 }: {
   userName: string;
   tenantName: string;
+  /** Link público do salão quando liberado (e-mail confirmado e conta ativa/em teste); senão `null`. */
+  publicLink: { label: string; url: string } | null;
   children: ReactNode;
 }) {
   return (
@@ -36,7 +40,8 @@ export function PanelShell({
           <SidebarNav />
         </div>
         <div className="flex flex-col gap-3 border-t border-line p-4">
-          <div className="min-w-0">
+          <SidebarLink label={publicLink?.label ?? ""} url={publicLink?.url ?? null} />
+          <div className="min-w-0 pt-1">
             <p className="truncate font-semibold leading-snug">{userName}</p>
             <p className="truncate text-sm leading-snug text-ink-muted">{tenantName}</p>
           </div>

@@ -33,8 +33,9 @@ function NavRow({
       {content}
     </Link>
   ) : (
-    <span aria-disabled="true" title="Só o proprietário" className={`${ROW} cursor-not-allowed opacity-50`}>
-      {content}
+    <span aria-disabled="true" className={`${ROW} cursor-not-allowed`}>
+      <span className="flex flex-1 items-center gap-3 opacity-50">{content}</span>
+      <span className="sr-only">(só o proprietário)</span>
     </span>
   );
 }

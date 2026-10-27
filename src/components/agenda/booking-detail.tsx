@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, Check, Clock, Loader2, MessageCircle, RotateCcw, UserRound } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import {
   cancelBookingAction,
   completeBookingAction,
@@ -24,6 +24,25 @@ import type { DayBooking } from "@/server/agenda/panel-queries";
 import { localDateOf } from "@/server/agenda/time";
 import { SlotField, type SlotSelection } from "./slot-field";
 import { Dot, StatusPill } from "./shared";
+
+const DESKTOP_QUERY = "(min-width: 1024px)";
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function subscribeDesktop(onChange: () => void) {
+  const media = window.matchMedia(DESKTOP_QUERY);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+/** No computador o detalhe é um painel ao lado da agenda; no celular, uma folha modal. */
+function useIsDesktop() {
+  return useSyncExternalStore(
+    subscribeDesktop,
+    () => window.matchMedia(DESKTOP_QUERY).matches,
+    () => false,
+  );
+}
 
 const GENERIC = "Não foi possível concluir agora. Tente novamente em instantes.";
 
@@ -53,10 +72,41 @@ export function BookingDetail({
   const [pending, setPending] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
-  // Foco só ao abrir (o detalhe re-renderiza a cada minuto e a cada ação).
+  const isDesktop = useIsDesktop();
+
+  // Foco só ao abrir (o detalhe re-renderiza a cada minuto e a cada ação) e,
+  // ao fechar, volta para o item da lista que abriu o detalhe.
   useEffect(() => {
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     sectionRef.current?.focus();
+    return () => {
+      if (trigger?.isConnected) trigger.focus();
+    };
   }, []);
+
+  // Folha modal (celular): Tab e Shift+Tab não saem dela.
+  function trapFocus(event: ReactKeyboardEvent<HTMLElement>) {
+    if (isDesktop || event.key !== "Tab") return;
+    const section = sectionRef.current;
+    if (!section) return;
+    const items = Array.from(section.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+      (el) => el.offsetParent !== null,
+    );
+    if (items.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const first = items[0];
+    const last = items[items.length - 1];
+    const current = document.activeElement;
+    if (event.shiftKey && (current === first || current === section)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && current === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -108,9 +158,10 @@ export function BookingDetail({
       <section
         ref={sectionRef}
         tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
+        role={isDesktop ? "region" : "dialog"}
+        aria-modal={isDesktop ? undefined : true}
         aria-labelledby="titulo-detalhe"
+        onKeyDown={trapFocus}
         data-testid="booking-detail"
         className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col gap-[18px] overflow-y-auto rounded-t-[22px] bg-surface px-5 pb-6 pt-2.5 text-foreground shadow-[0_-12px_32px_-12px_rgb(41_48_60/0.35)] outline-none lg:static lg:z-auto lg:max-h-none lg:overflow-visible lg:rounded-none lg:bg-transparent lg:p-0 lg:shadow-none"
       >

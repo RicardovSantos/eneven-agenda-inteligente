@@ -95,3 +95,13 @@ export function formatMonthRange(first: string, last: string): string {
   if (a.y === b.y) return `${capitalize(MONTHS[a.m - 1])} – ${capitalize(MONTHS[b.m - 1])}`;
   return `${capitalize(MONTHS[a.m - 1])} ${a.y} – ${capitalize(MONTHS[b.m - 1])} ${b.y}`;
 }
+
+/**
+ * Mês de um dia só, para o rótulo da faixa de dias: "Outubro". O ano aparece
+ * apenas quando difere do ano de referência ("Janeiro 2027").
+ */
+export function formatMonthLabel(date: string, referenceDate?: string): string {
+  const { y, m } = parts(date);
+  const name = capitalize(MONTHS[m - 1]);
+  return referenceDate && parts(referenceDate).y !== y ? `${name} ${y}` : name;
+}

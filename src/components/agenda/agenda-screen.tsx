@@ -190,10 +190,10 @@ export function AgendaScreen({
                 role="tab"
                 aria-selected="false"
                 aria-disabled="true"
-                title="Em breve"
                 className="flex h-9 cursor-not-allowed items-center rounded-[9px] px-4 text-sm font-medium text-ink-muted/60"
               >
                 Semana
+                <span className="sr-only"> (em breve)</span>
               </span>
               <ViewTab href={agendaHref({ data: date, pro, view: "dia" })} active={view === "dia"}>
                 Dia

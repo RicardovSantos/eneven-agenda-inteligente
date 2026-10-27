@@ -75,11 +75,13 @@ export function SidebarNav() {
               ) : (
                 <span
                   aria-disabled="true"
-                  title="Em breve"
-                  className={cn(base, "cursor-not-allowed font-medium text-ink opacity-50")}
+                  className={cn(base, "cursor-not-allowed font-medium text-ink")}
                 >
-                  <Icon className="size-5" aria-hidden="true" />
-                  {label}
+                  <Icon className="size-5 opacity-50" aria-hidden="true" />
+                  <span className="flex-1 opacity-50">{label}</span>
+                  <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-medium text-ink-muted">
+                    Em breve
+                  </span>
                 </span>
               )}
             </li>
@@ -117,13 +119,10 @@ export function BottomNav() {
                   {label}
                 </Link>
               ) : (
-                <span
-                  aria-disabled="true"
-                  title="Em breve"
-                  className={cn(base, "font-medium text-ink opacity-50")}
-                >
-                  <Icon className="size-6" aria-hidden="true" />
-                  {label}
+                <span aria-disabled="true" className={cn(base, "font-medium text-ink")}>
+                  <Icon className="size-6 opacity-50" aria-hidden="true" />
+                  <span className="opacity-50">{label}</span>
+                  <span className="sr-only">(em breve)</span>
                 </span>
               )}
             </li>

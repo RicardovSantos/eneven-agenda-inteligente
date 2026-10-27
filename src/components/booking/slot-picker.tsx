@@ -2,7 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { dayOfMonth, formatLongDate, formatMonthRange, periodOf, weekdayShort, type DayPeriod } from "@/lib/dates";
+import { dayOfMonth, formatLongDate, formatMonthLabel, periodOf, weekdayShort, type DayPeriod } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 export type PickedSlot = { date: string; startsAt: string; time: string };
@@ -94,8 +94,8 @@ export function SlotPicker({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="m-0 -mb-2 text-sm font-semibold text-ink-muted">
-        {formatMonthRange(dateList[0], dateList[dateList.length - 1])}
+      <p aria-live="polite" className="m-0 -mb-2 text-sm font-semibold text-ink-muted">
+        {formatMonthLabel(activeDate, today)}
       </p>
       <div
         role="group"

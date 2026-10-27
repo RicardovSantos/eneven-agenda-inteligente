@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   dayOfMonth,
   formatLongDate,
+  formatMonthLabel,
   formatMonthRange,
   formatShortDate,
   formatTime,
@@ -60,5 +61,13 @@ describe("initialsOf", () => {
     expect(initialsOf("Bia")).toBe("B");
     expect(initialsOf("  ")).toBe("?");
     expect(initialsOf("✂ Estúdio X")).toBe("EX");
+  });
+});
+
+describe("formatMonthLabel", () => {
+  it("mostra só o mês do dia, e o ano quando difere do de referência", () => {
+    expect(formatMonthLabel("2026-10-28")).toBe("Outubro");
+    expect(formatMonthLabel("2026-12-20", "2026-10-25")).toBe("Dezembro");
+    expect(formatMonthLabel("2027-01-05", "2026-10-25")).toBe("Janeiro 2027");
   });
 });
