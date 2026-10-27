@@ -150,3 +150,13 @@ describe("createTenantByAdmin", () => {
     expect(e2.fieldErrors?.planId).toBeTruthy();
   });
 });
+
+describe("sem mudança, sem auditoria", () => {
+  it("mesmo plano e mesmo estado não gravam linha", async () => {
+    const { tenant } = await seedPlatformTenant(db);
+    await changePlan(db, actor, tenant.id, tenant.planId);
+    await blockTenant(db, actor, tenant.id);
+    await blockTenant(db, actor, tenant.id);
+    expect(await db.select().from(auditLog)).toHaveLength(1);
+  });
+});

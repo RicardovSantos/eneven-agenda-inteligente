@@ -48,6 +48,7 @@ export async function changePlan(
     if (!plan.active) {
       throw new PlatformError("invalid_state", "Este plano está inativo e não pode ser atribuído.");
     }
+    if (tenant.planId === planId) return;
     const [from] = await tx
       .select({ code: plans.code })
       .from(plans)
@@ -105,6 +106,7 @@ async function setStatus(
 ) {
   await db.transaction(async (tx) => {
     const tenant = await loadTenant(tx, tenantId);
+    if (tenant.status === status) return;
     await tx
       .update(tenants)
       .set({

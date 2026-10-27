@@ -38,6 +38,24 @@ export async function startSupport(
       .limit(1);
     if (!tenant) throw tenantNotFound();
 
+    // Já em suporte (outro estabelecimento): encerra o anterior na auditoria
+    // antes de começar o novo, para os minutos não se perderem.
+    const [current] = await tx
+      .select({ tenantId: sessions.tenantId, supportStartedAt: sessions.supportStartedAt })
+      .from(sessions)
+      .where(and(eq(sessions.id, hashToken(sessionToken)), eq(sessions.userId, actor.userId)))
+      .limit(1);
+    if (current?.supportStartedAt) {
+      await tx.insert(auditLog).values({
+        actorUserId: actor.userId,
+        tenantId: current.tenantId,
+        action: "support.ended",
+        details: {
+          minutes: Math.round((now.getTime() - current.supportStartedAt.getTime()) / MIN_MS),
+        },
+      });
+    }
+
     const updated = await tx
       .update(sessions)
       .set({ tenantId, supportStartedAt: now })

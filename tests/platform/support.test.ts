@@ -110,3 +110,24 @@ describe("modo suporte", () => {
     expect(await sessionRow(token)).toBeUndefined();
   });
 });
+
+describe("suporte encadeado", () => {
+  it("trocar de A para B encerra A (com minutos) e inicia B", async () => {
+    const { admin, mine, target, token, actor } = await setup();
+    const other = (await seedPlatformTenant(db, { name: "Outro" })).tenant;
+    await startSupport(db, token, actor, target.id, NOW);
+    await startSupport(db, token, actor, other.id, new Date(NOW.getTime() + 5 * 60_000));
+    const rows = (await db.select().from(auditLog).orderBy(auditLog.id)).map((r) => [r.action, r.tenantId]);
+    expect(rows).toEqual([
+      ["support.started", target.id],
+      ["support.ended", target.id],
+      ["support.started", other.id],
+    ]);
+    const ended = (await db.select().from(auditLog).where(eq(auditLog.action, "support.ended")))[0];
+    expect(ended.details).toEqual({ minutes: 5 });
+    expect(ended.actorUserId).toBe(admin.id);
+    expect(await getSession(db, token)).toMatchObject({ tenantId: other.id, support: true });
+    await endSupport(db, token, actor, new Date(NOW.getTime() + 8 * 60_000));
+    expect((await sessionRow(token)).tenantId).toBe(mine.id);
+  });
+});

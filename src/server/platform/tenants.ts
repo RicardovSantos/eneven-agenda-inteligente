@@ -51,6 +51,15 @@ function situationCondition(situation: TenantSituation, now: Date): SQL {
   }
 }
 
+const SITUATIONS: readonly TenantSituation[] = [
+  "trial",
+  "trial_expired",
+  "active",
+  "past_due",
+  "read_only",
+  "canceled",
+];
+
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 /**
@@ -62,6 +71,9 @@ export async function listPlatformTenants(
   input: { situation?: TenantSituation; query?: string; page: number; now?: Date },
 ): Promise<PlatformTenantList> {
   const now = input.now ?? new Date();
+  // Valor desconhecido (ex.: vindo da URL) vale como "todas", sem chegar ao enum do banco.
+  const situation =
+    input.situation && SITUATIONS.includes(input.situation) ? input.situation : undefined;
   const page = Math.max(1, Math.floor(input.page) || 1);
 
   const q = input.query?.trim().slice(0, 100);
@@ -79,7 +91,7 @@ export async function listPlatformTenants(
       )
     : undefined;
 
-  const where = and(search, input.situation ? situationCondition(input.situation, now) : undefined);
+  const where = and(search, situation ? situationCondition(situation, now) : undefined);
 
   const [countRow] = await db
     .select({
@@ -95,7 +107,7 @@ export async function listPlatformTenants(
     .where(search);
   const counts = { ...countRow };
 
-  const total = input.situation ? await countWhere(db, where) : counts.all;
+  const total = situation ? await countWhere(db, where) : counts.all;
 
   const rows = await db
     .select({
@@ -241,6 +253,8 @@ export async function getPlatformTenant(
   if (!row) return null;
   const { tenant, plan } = row;
 
+  // Dono e auditoria ficam fora de withTenant de propósito: `agenda_app` não
+  // tem grant em memberships/users/audit_log (só a conexão da plataforma lê).
   const [owner] = await db
     .select({
       userId: users.id,

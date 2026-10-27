@@ -103,3 +103,12 @@ describe("getPlatformTenant", () => {
     expect(await getPlatformTenant(db, "nao-e-uuid", NOW)).toBeNull();
   });
 });
+
+describe("situação desconhecida", () => {
+  it("é ignorada (vale como todas)", async () => {
+    const db = await createTestDb();
+    await seedPlatformTenant(db);
+    const r = await listPlatformTenants(db, { page: 1, situation: "bogus" as "trial", now: NOW });
+    expect(r.total).toBe(1);
+  });
+});

@@ -78,6 +78,11 @@ export async function scopedProfessionalId(
  * Estabelecimento inativo (teste vencido, bloqueado, cancelado, pagamento
  * atrasado) fica em modo somente leitura: não cria nem move agenda. Cancelar e
  * marcar o resultado de um atendimento continuam permitidos.
+ *
+ * A checagem roda antes da escrita, em transação própria (não na mesma). É
+ * aceitável: o estado só muda por ação do dono da plataforma, e uma escrita
+ * que corra junto com o bloqueio é uma janela de milissegundos sem efeito
+ * além de um agendamento a mais.
  */
 async function assertWritable(db: Db, tenantId: string, now: Date): Promise<void> {
   const [row] = await withTenant(db, tenantId, (tx) =>
