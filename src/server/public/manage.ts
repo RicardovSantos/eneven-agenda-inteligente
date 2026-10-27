@@ -3,7 +3,12 @@ import { bookings, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { formatTime } from "@/lib/dates";
 import { getAvailableDates, getAvailableSlots } from "@/server/agenda/availability";
-import { cancelBooking, findBookingByManageToken, rescheduleBooking } from "@/server/agenda/bookings";
+import {
+  cancelBooking,
+  findBookingByManageToken,
+  rescheduleBooking,
+  setBookingStatus,
+} from "@/server/agenda/bookings";
 import { BookingError } from "@/server/agenda/errors";
 import { loadAvailabilityContext } from "@/server/agenda/load";
 import { diffDays, localDateOf } from "@/server/agenda/time";
@@ -18,6 +23,8 @@ const MAX_TOKEN_LENGTH = 100;
 export type ManageView = {
   tenant: PublicTenant;
   booking: BookingView;
+  /** Agendado e ainda no futuro: dá para confirmar presença pelo link. */
+  canConfirm: boolean;
   /** Ainda dá para remarcar ou cancelar sozinha (status e prazo do salão). */
   canChange: boolean;
   /** `canChange` e o estabelecimento pode receber agendamentos (remarcar ocupa um horário novo). */
@@ -61,6 +68,7 @@ export async function getManageView(
   return {
     tenant: toPublicTenant(resolved.tenant),
     booking,
+    canConfirm: booking.status === "scheduled" && new Date(booking.startsAt).getTime() > now.getTime(),
     canChange,
     canReschedule: canChange && (await tenantCanBook(db, resolved.tenant.slug, now)),
   };
@@ -71,6 +79,23 @@ export async function cancelByToken(db: Db, token: string, now: Date = new Date(
   const resolved = await resolveToken(db, token);
   if (!resolved) throw new BookingError("not_found");
   await cancelBooking(db, resolved.tenantId, resolved.bookingId, "customer", now);
+}
+
+/**
+ * Confirma a presença pelo link. Só de `scheduled` e com o horário no futuro;
+ * já confirmado é sucesso sem mudar nada. Não depende de `canBook`: confirmar
+ * não cria horário. Lança `BookingError`.
+ */
+export async function confirmByToken(db: Db, token: string, now: Date = new Date()): Promise<void> {
+  const resolved = await resolveToken(db, token);
+  if (!resolved) throw new BookingError("not_found");
+  const booking = await getBookingView(db, resolved.tenantId, resolved.bookingId, resolved.tenant.timezone);
+  if (booking.status === "confirmed") return;
+  if (booking.status !== "scheduled") throw new BookingError("invalid_transition");
+  if (new Date(booking.startsAt).getTime() <= now.getTime()) {
+    throw new BookingError("invalid_transition", "Esse horário já passou.");
+  }
+  await setBookingStatus(db, resolved.tenantId, resolved.bookingId, "confirmed");
 }
 
 /** Remarca como cliente, mantendo serviços e profissional. Lança `BookingError`. */

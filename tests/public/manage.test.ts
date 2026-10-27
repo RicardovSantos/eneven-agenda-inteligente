@@ -1,10 +1,11 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { bookings, users } from "@/db/schema";
+import { bookings, tenants, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { bookPublic } from "@/server/public/booking";
 import {
   cancelByToken,
+  confirmByToken,
   getManageView,
   listRescheduleDates,
   listRescheduleSlots,
@@ -132,6 +133,63 @@ describe("cancelByToken", () => {
     await expect(cancelByToken(db, "nada", NOW)).rejects.toMatchObject({ code: "not_found" });
     await cancelByToken(db, token, NOW);
     await expect(cancelByToken(db, token, NOW)).rejects.toMatchObject({ code: "invalid_transition" });
+  });
+});
+
+describe("confirmByToken", () => {
+  const statusOf = async () =>
+    (await db.select().from(bookings).where(eq(bookings.id, bookingId)))[0].status;
+
+  it("confirma um agendamento agendado e a página passa a mostrar confirmado", async () => {
+    await confirmByToken(db, token, NOW);
+    expect(await statusOf()).toBe("confirmed");
+    const view = await getManageView(db, token, NOW);
+    expect(view!.booking.status).toBe("confirmed");
+    expect(view!.canConfirm).toBe(false);
+  });
+
+  it("getManageView: canConfirm só para agendado com horário futuro", async () => {
+    expect((await getManageView(db, token, NOW))!.canConfirm).toBe(true);
+    expect((await getManageView(db, token, local("2030-01-07", "10:30")))!.canConfirm).toBe(false);
+  });
+
+  it("já confirmado: sucesso idempotente, sem mudar nada", async () => {
+    await setBookingStatus(db, seed.tenantId, bookingId, "confirmed");
+    const [before] = await db.select().from(bookings).where(eq(bookings.id, bookingId));
+    await expect(confirmByToken(db, token, NOW)).resolves.toBeUndefined();
+    const [after] = await db.select().from(bookings).where(eq(bookings.id, bookingId));
+    expect(after.status).toBe("confirmed");
+    expect(after.updatedAt.getTime()).toBe(before.updatedAt.getTime());
+  });
+
+  it.each(["completed", "no_show"] as const)("recusa quando está %s", async (status) => {
+    await setBookingStatus(db, seed.tenantId, bookingId, status);
+    await expect(confirmByToken(db, token, NOW)).rejects.toMatchObject({ code: "invalid_transition" });
+    expect(await statusOf()).toBe(status);
+  });
+
+  it("recusa quando está cancelado", async () => {
+    await cancelByToken(db, token, NOW);
+    await expect(confirmByToken(db, token, NOW)).rejects.toMatchObject({ code: "invalid_transition" });
+    expect(await statusOf()).toBe("canceled");
+  });
+
+  it("recusa horário que já passou", async () => {
+    await expect(confirmByToken(db, token, local("2030-01-07", "10:30"))).rejects.toMatchObject({
+      code: "invalid_transition",
+      message: "Esse horário já passou.",
+    });
+    expect(await statusOf()).toBe("scheduled");
+  });
+
+  it("token inválido: not_found", async () => {
+    await expect(confirmByToken(db, "nada", NOW)).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("não exige que o salão possa receber agendamentos (confirmar não cria horário)", async () => {
+    await db.update(tenants).set({ status: "canceled" });
+    await expect(confirmByToken(db, token, NOW)).resolves.toBeUndefined();
+    expect(await statusOf()).toBe("confirmed");
   });
 });
 

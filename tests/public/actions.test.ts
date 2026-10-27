@@ -14,6 +14,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 import { bookAction, getDatesAction, getSlotsAction } from "@/app/[slug]/actions";
 import {
   cancelAction,
+  confirmAction,
   getRescheduleDatesAction,
   getRescheduleSlotsAction,
   rescheduleAction,
@@ -185,6 +186,31 @@ describe("ações de gestão (token)", () => {
     expect(await cancelAction(token)).toEqual({ ok: true });
     const [row] = await db.select().from(bookings);
     expect(row.status).toBe("canceled");
+  });
+
+  it("confirma presença pelo token", async () => {
+    const { token } = await newBooking();
+    expect(await confirmAction(token)).toEqual({ ok: true });
+    expect((await db.select().from(bookings))[0].status).toBe("confirmed");
+    expect(await confirmAction(token)).toEqual({ ok: true });
+  });
+
+  it("confirmar: token inválido e agendamento cancelado voltam com mensagem amigável", async () => {
+    expect(await confirmAction("token-inexistente")).toEqual({ ok: false, error: "Agendamento não encontrado." });
+    const { token } = await newBooking();
+    await cancelAction(token);
+    expect(await confirmAction(token)).toEqual({
+      ok: false,
+      error: "Não é possível mudar o status deste agendamento.",
+    });
+  });
+
+  it("confirmar também é limitado por IP", async () => {
+    for (let i = 0; i < 20; i++) await confirmAction("token-inexistente");
+    expect(await confirmAction("token-inexistente")).toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/^Muitas tentativas/),
+    });
   });
 
   it("fora da janela: mensagem com o nome do salão", async () => {

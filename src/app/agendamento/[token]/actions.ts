@@ -6,6 +6,7 @@ import { getDb } from "@/db/client";
 import { BookingError } from "@/server/agenda/errors";
 import {
   cancelByToken,
+  confirmByToken,
   getManageView,
   listRescheduleDates,
   listRescheduleSlots,
@@ -96,6 +97,21 @@ export async function cancelAction(token: string): Promise<Done | Failure> {
     if (error instanceof BookingError) return { ok: false, error: await messageFor(error, token) };
     unstable_rethrow(error);
     console.error("Falha ao cancelar", error instanceof Error ? error.name : error);
+    return { ok: false, error: GENERIC };
+  }
+}
+
+export async function confirmAction(token: string): Promise<Done | Failure> {
+  const limit = limitManage(await currentClientIp());
+  if (!limit.ok) return { ok: false, error: rateLimitMessage(limit.retryAfterSec) };
+  try {
+    await confirmByToken(await getDb(), token);
+    revalidatePath("/agendamento/[token]", "page");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof BookingError) return { ok: false, error: error.message };
+    unstable_rethrow(error);
+    console.error("Falha ao confirmar presença", error instanceof Error ? error.name : error);
     return { ok: false, error: GENERIC };
   }
 }

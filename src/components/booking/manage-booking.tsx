@@ -1,11 +1,12 @@
 "use client";
 
-import { CalendarPlus, ChevronLeft, Loader2 } from "lucide-react";
+import { CalendarPlus, Check, ChevronLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   cancelAction,
+  confirmAction,
   getRescheduleDatesAction,
   getRescheduleSlotsAction,
   rescheduleAction,
@@ -40,6 +41,7 @@ export function ManageBooking({
   token,
   tenant,
   booking,
+  canConfirm,
   canChange,
   canReschedule,
   today,
@@ -47,6 +49,8 @@ export function ManageBooking({
   token: string;
   tenant: BookingTenant;
   booking: BookingView;
+  /** Agendado e ainda no futuro: mostra "Confirmar presença". */
+  canConfirm: boolean;
   canChange: boolean;
   /** Pode remarcar: dentro do prazo e o salão aceita agendamentos. */
   canReschedule: boolean;
@@ -58,9 +62,11 @@ export function ManageBooking({
   const [error, setError] = useState<string | null>(null);
   const [slot, setSlot] = useState<PickedSlot | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [pending, setPending] = useState<"reschedule" | "cancel" | null>(null);
+  const [pending, setPending] = useState<"reschedule" | "cancel" | "confirm" | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
+  const [confirmedNow, setConfirmedNow] = useState(false);
+  const confirmed = booking.status === "confirmed" || confirmedNow;
   const active = booking.status === "scheduled" || booking.status === "confirmed";
   const canceled = booking.status === "canceled";
 
@@ -85,6 +91,26 @@ export function ManageBooking({
       }
     } catch {
       setError("Não foi possível remarcar agora. Confira sua conexão e tente de novo.");
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function confirm() {
+    if (pending) return;
+    setPending("confirm");
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await confirmAction(token);
+      if (result.ok) {
+        setConfirmedNow(true);
+        router.refresh();
+      } else {
+        setError(result.error);
+      }
+    } catch {
+      setError("Não foi possível confirmar agora. Confira sua conexão e tente de novo.");
     } finally {
       setPending(null);
     }
@@ -202,9 +228,23 @@ export function ManageBooking({
             {canceled ? "Este agendamento foi cancelado." : "Seu agendamento"}
           </h1>
           {active ? (
-            <p className="m-0 text-[15px] text-ink-muted">
-              <span className="font-semibold text-foreground">{STATUS_LABEL[booking.status]}</span>
-            </p>
+            <div className="flex flex-col gap-2">
+              {confirmed ? (
+                <>
+                  <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-(--brand) px-3 py-1 text-sm font-semibold text-white">
+                    <Check className="size-4" aria-hidden="true" />
+                    {STATUS_LABEL.confirmed}
+                  </span>
+                  <p role="status" className="m-0 text-[15px] text-ink-muted">
+                    Presença confirmada. Te esperamos!
+                  </p>
+                </>
+              ) : (
+                <p className="m-0 text-[15px] text-ink-muted">
+                  <span className="font-semibold text-foreground">{STATUS_LABEL[booking.status]}</span>
+                </p>
+              )}
+            </div>
           ) : !canceled ? (
             <p className="m-0 text-[15px] text-ink-muted">Este agendamento já foi encerrado.</p>
           ) : null}
@@ -226,8 +266,24 @@ export function ManageBooking({
       ) : null}
 
       <div className="mt-auto flex flex-col gap-2.5">
+        {active && canConfirm && !confirmed ? (
+          <button type="button" onClick={confirm} disabled={pending !== null} className={brandButton}>
+            {pending === "confirm" ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                Confirmando…
+              </>
+            ) : (
+              "Confirmar presença"
+            )}
+          </button>
+        ) : null}
         {active ? (
-          <a href={`/api/agendamento/${token}/ics`} download className={brandButton}>
+          <a
+            href={`/api/agendamento/${token}/ics`}
+            download
+            className={canConfirm && !confirmed ? `${outlineButton} gap-2` : brandButton}
+          >
             <CalendarPlus className="size-[18px]" aria-hidden="true" />
             Adicionar ao calendário
           </a>
