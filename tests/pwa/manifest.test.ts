@@ -1,4 +1,4 @@
-import manifest from "@/app/manifest";
+import { buildManifest as manifest } from "@/lib/pwa-manifest";
 import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from "@/lib/brand";
 
 describe("manifest", () => {

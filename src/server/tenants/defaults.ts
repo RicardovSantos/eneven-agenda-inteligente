@@ -7,6 +7,7 @@ import {
   users,
 } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { PROFESSIONAL_NAME_MAX } from "@/server/catalog/professionals";
 import { defaultBusinessHours, WEEKDAYS } from "@/lib/weekly-hours";
 import { withTenantTx, type TenantTx } from "@/server/tenant-db";
 
@@ -33,7 +34,7 @@ async function insertOwnerProfessional(
     .insert(professionals)
     .values({
       tenantId,
-      name: input.ownerName,
+      name: input.ownerName.slice(0, PROFESSIONAL_NAME_MAX).trim(),
       color: OWNER_PROFESSIONAL_COLOR,
       userId: input.ownerUserId,
       sortOrder: 0,

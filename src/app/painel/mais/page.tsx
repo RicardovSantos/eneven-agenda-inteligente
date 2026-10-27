@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CopyLinkButton } from "@/components/panel/copy-link-button";
 import { PUBLIC_HOST } from "@/lib/brand";
 import { requireOnboarded } from "@/server/panel/onboarding-gate";
+import { isTenantReleased } from "@/server/tenants/release";
 
 export const metadata: Metadata = { title: "Mais" };
 
@@ -43,9 +44,11 @@ function NavRow({
 export default async function MaisPage() {
   const data = await requireOnboarded();
   const isOwner = data.session.role === "owner";
-  const released =
-    data.session.emailVerified &&
-    (data.tenantStatus === "trial" || data.tenantStatus === "active");
+  const released = isTenantReleased({
+    status: data.tenantStatus,
+    trialEndsAt: data.trialEndsAt,
+    emailVerified: data.session.emailVerified,
+  });
   const link = `${PUBLIC_HOST}/${data.tenantSlug}`;
 
   return (

@@ -1,5 +1,4 @@
 import { Figtree, Outfit } from "next/font/google";
-import { RegisterSw } from "@/components/pwa/register-sw";
 import "./globals.css";
 
 // Metadados e viewport vivem em site-metadata.ts (testáveis fora do next/font).
@@ -27,7 +26,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col">
         {children}
-        <RegisterSw />
       </body>
     </html>
   );

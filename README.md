@@ -109,6 +109,8 @@ O `APP_URL` também é um argumento da imagem (`ARG APP_URL`, padrão `https://a
 
 **Domínio e DNS.** Registro `A agenda` apontando para o IP da VPS, com o proxy da Cloudflare desligado (nuvem cinza); o Easypanel emite o HTTPS. Domínio do serviço na porta 3000.
 
+**Usuário do banco.** `findBookingByManageToken` (link de gestão `/agendamento/{token}`) procura o agendamento fora do RLS, porque o estabelecimento ainda não é conhecido: ela depende de o usuário do `DATABASE_URL` ser superusuário ou dono das tabelas. Se um dia o usuário da conexão for trocado por um sem esses privilégios, revise essa busca antes (as demais consultas passam por `withTenant`).
+
 **Migrações à mão** (dentro do container, no terminal do Easypanel):
 
 ```bash

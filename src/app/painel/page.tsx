@@ -7,6 +7,7 @@ import { formatDayMonth, trialDaysLeft } from "@/lib/trial";
 import { findStaffProfessional, getDayAgenda, getMonthOverview, listPanelProfessionals } from "@/server/agenda/panel-queries";
 import { addDaysToDate, localDateOf, weekdayOf } from "@/server/agenda/time";
 import { requireOnboarded } from "@/server/panel/onboarding-gate";
+import { isTenantReleased } from "@/server/tenants/release";
 import { isRealDate } from "@/server/public/schemas";
 import { listServices } from "@/server/catalog";
 
@@ -79,8 +80,11 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
       professionalIds: s.professionalIds,
     }));
 
-  const released =
-    session.emailVerified && (data.tenantStatus === "trial" || data.tenantStatus === "active");
+  const released = isTenantReleased({
+    status: data.tenantStatus,
+    trialEndsAt: data.trialEndsAt,
+    emailVerified: session.emailVerified,
+  });
 
   return (
     <AgendaScreen

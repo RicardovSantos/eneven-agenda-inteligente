@@ -13,6 +13,7 @@ import type { Db } from "@/db/types";
 import { ensureReadableBrandColor, isHexColor } from "@/lib/color";
 import { normalizeBrazilPhone } from "@/lib/phone";
 import { withTenant } from "@/server/tenant-db";
+import { isTenantActive } from "@/server/tenants/release";
 import { RESERVED_SLUGS } from "@/server/tenants/slug";
 
 /** Cor da marca Eneven, usada quando o salão não escolheu uma. */
@@ -194,10 +195,7 @@ async function resolvePublicTenant(
     .limit(1);
   if (!verifiedOwner) return { tenant, canBook: false, reason: "email_unverified" };
 
-  const active =
-    row.status === "active" ||
-    (row.status === "trial" && row.trialEndsAt.getTime() > now.getTime());
-  if (!active) return { tenant, canBook: false, reason: "inactive" };
+  if (!isTenantActive(row, now)) return { tenant, canBook: false, reason: "inactive" };
 
   const catalog = await getPublicCatalog(db, row.id);
   if (catalog.services.length === 0) return { tenant, canBook: false, reason: "no_services" };

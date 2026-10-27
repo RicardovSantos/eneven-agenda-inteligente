@@ -34,9 +34,9 @@ const input = {
 
 const hm = (t: string) => t.slice(0, 5);
 
-const newOwner = (name: string, email: string) => ({
+const newOwner = (name: string, email: string, ownerName = name) => ({
   businessName: name,
-  ownerName: name,
+  ownerName,
   email,
   whatsapp: "5511999990001",
   passwordHash: null,
@@ -94,6 +94,14 @@ describe("cadastro novo já nasce com horário e profissional", () => {
     const prosB = await withTenant(db, b.tenantId, (tx) => tx.select().from(professionals));
     expect(prosA.map((p) => p.name)).toEqual(["Ana"]);
     expect(prosB.map((p) => p.name)).toEqual(["Beto"]);
+  });
+
+  it("trunca o nome do dono para o limite de nome de profissional (60)", async () => {
+    const longName = "Maria ".repeat(20).trim(); // 119 caracteres
+    const { tenantId } = await createTenantWithOwner(db, newOwner("Studio", "longo@x.com", longName));
+    const [pro] = await withTenant(db, tenantId, (tx) => tx.select().from(professionals));
+    expect(pro.name.length).toBeLessThanOrEqual(60);
+    expect(pro.name).toBe(longName.slice(0, 60).trim());
   });
 
   it("o callback do cadastro roda como dono de novo (o papel do tenant não vaza)", async () => {
