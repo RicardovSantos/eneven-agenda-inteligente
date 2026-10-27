@@ -1,7 +1,7 @@
 import { ilike, or, sql, type SQL } from "drizzle-orm";
 import { customers } from "@/db/schema";
 
-const escapeLike = (value: string) => value.replace(/[\%_]/g, "\$&");
+const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
 /**
  * Condição de busca de cliente: nome (`ilike`) ou, com 3+ dígitos, trecho do

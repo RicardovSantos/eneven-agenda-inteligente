@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { bookingServices, bookings, customers, memberships, professionals, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import type { PanelActor } from "@/server/agenda/panel-ops";
+import { searchCustomers } from "@/server/agenda/panel-ops";
 import { CLIENTS_PAGE_SIZE, LAPSED_DAYS, getClientProfile, listClients } from "@/server/clients";
 import { createTestDb } from "../helpers/test-db";
 import { bookingValues } from "../helpers/agenda-fixtures";
@@ -127,6 +128,19 @@ describe("listClients", () => {
     expect(total).toBe(0);
   });
 
+  it("% e _ na busca são literais (listClients e searchCustomers)", async () => {
+    await addCustomer("Ana 100%", "5511911110001");
+    await addCustomer("Ana_Lima", "5511911110002");
+    await addCustomer("Bruno", "5511911110003");
+    const names = async (q: string) =>
+      (await listClients(db, owner, { query: q, filter: "all", page: 1, now: NOW })).items.map((i) => i.name);
+    expect(await names("%")).toEqual(["Ana 100%"]);
+    expect(await names("_")).toEqual(["Ana_Lima"]);
+    expect((await searchCustomers(db, owner, "0%")).map((c) => c.name)).toEqual(["Ana 100%"]);
+    expect((await searchCustomers(db, owner, "a_")).map((c) => c.name)).toEqual(["Ana_Lima"]);
+    expect(await searchCustomers(db, owner, "%%")).toEqual([]);
+  });
+
   describe("staff", () => {
     let staff: PanelActor;
     beforeEach(async () => {
@@ -156,6 +170,23 @@ describe("listClients", () => {
       const profile = await getClientProfile(db, staff, shared.id, { now: NOW });
       expect(profile.totalCents).toBeNull();
       expect(profile.historyTotal).toBe(1);
+    });
+
+    it("staff com upcoming/lapsed e nextBookingAt ignora agendamento futuro de outro profissional", async () => {
+      const lapsed = await addCustomer("A Sumida", "5511911110001");
+      await addBooking(lapsed.id, day(-(LAPSED_DAYS + 1), 13), "completed", { pro: 1 });
+      // Futuro, mas com a outra profissional: não conta para o staff.
+      await addBooking(lapsed.id, day(3, 13), "scheduled", { pro: 0 });
+      const booked = await addCustomer("B Marcada", "5511911110002");
+      await addBooking(booked.id, day(-(LAPSED_DAYS + 1), 14), "completed", { pro: 1 });
+      await addBooking(booked.id, day(2, 14), "confirmed", { pro: 1 });
+      const lapsedList = await listClients(db, staff, { filter: "lapsed", page: 1, now: NOW });
+      expect(lapsedList.items.map((i) => i.name)).toEqual(["A Sumida"]);
+      expect(lapsedList.items[0].nextBookingAt).toBeNull();
+      const upcoming = await listClients(db, staff, { filter: "upcoming", page: 1, now: NOW });
+      expect(upcoming.items.map((i) => i.name)).toEqual(["B Marcada"]);
+      expect(upcoming.items[0].nextBookingAt).toEqual(day(2, 14));
+      expect(upcoming.total).toBe(1);
     });
 
     it("sem vínculo com profissional não vê nada", async () => {

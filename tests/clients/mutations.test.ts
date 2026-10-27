@@ -50,6 +50,21 @@ describe("createClient", () => {
     });
   });
 
+  it("corrida: duas criações simultâneas do mesmo telefone -> uma cria, a outra phone_taken (unique do banco)", async () => {
+    const results = await Promise.allSettled([
+      createClient(db, owner, { name: "Ana", phone: "11981234321" }),
+      createClient(db, owner, { name: "Ana 2", phone: "(11) 98123-4321" }),
+    ]);
+    const ok = results.filter((r) => r.status === "fulfilled");
+    const failed = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    expect(ok).toHaveLength(1);
+    expect(failed).toHaveLength(1);
+    expect(failed[0].reason).toMatchObject({
+      code: "phone_taken",
+      existingId: (ok[0] as PromiseFulfilledResult<{ id: string }>).value.id,
+    });
+  });
+
   it("valida nome, WhatsApp, e-mail e notas com mensagens por campo", async () => {
     const err = await createClient(db, owner, {
       name: " ",
