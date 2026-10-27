@@ -82,12 +82,16 @@ export function ClientProfile({
               {profile.initials}
             </span>
             <div className="flex min-w-0 flex-col gap-0.5">
-              <h1
-                id="titulo-cliente"
-                className="break-words font-display text-[1.375rem] font-semibold leading-tight"
-              >
+              {/* Um só título de nível 1 por tela: no celular a ficha é a página (h1); no computador a lista é. */}
+              <h1 className="break-words font-display text-[1.375rem] font-semibold leading-tight lg:hidden">
                 {profile.name}
               </h1>
+              <h2
+                id="titulo-cliente"
+                className="break-words font-display text-[1.375rem] font-semibold leading-tight max-lg:hidden"
+              >
+                {profile.name}
+              </h2>
               <span className="text-sm text-ink-muted max-lg:tabular-nums">
                 <span className="lg:hidden">{profile.phoneLabel}</span>
                 <span className="max-lg:hidden">{profile.since}</span>
@@ -200,7 +204,7 @@ export function ClientProfile({
           ) : null}
         </div>
 
-        <Notes key={profile.id} id={profile.id} initial={profile.notes} />
+        <Notes key={`${profile.id}:${profile.notes}`} id={profile.id} initial={profile.notes} />
 
         {/* Histórico */}
         <section

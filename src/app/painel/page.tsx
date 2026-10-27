@@ -5,6 +5,7 @@ import { ResendVerification } from "@/components/panel/resend-verification";
 import { PUBLIC_HOST } from "@/lib/brand";
 import { formatDayMonth, trialDaysLeft } from "@/lib/trial";
 import { findStaffProfessional, getDayAgenda, getMonthOverview, listPanelProfessionals } from "@/server/agenda/panel-queries";
+import { panelBookingOptions } from "@/server/agenda/booking-options";
 import { addDaysToDate, localDateOf, weekdayOf } from "@/server/agenda/time";
 import { requireOnboarded } from "@/server/panel/onboarding-gate";
 import { isTenantReleased } from "@/server/tenants/release";
@@ -69,16 +70,7 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
     listServices(db, session.tenantId),
   ]);
 
-  const professionals = (own ? [own] : allPros).map((p) => ({ id: p.id, name: p.name, color: p.color }));
-  const services = catalog
-    .filter((s) => (own ? s.professionalIds.includes(own.id) : s.professionalIds.length > 0))
-    .map((s) => ({
-      id: s.id,
-      name: s.name,
-      durationMin: s.durationMin,
-      priceCents: s.priceCents,
-      professionalIds: s.professionalIds,
-    }));
+  const { professionals, services } = panelBookingOptions(allPros, catalog, own);
 
   const released = isTenantReleased({
     status: data.tenantStatus,

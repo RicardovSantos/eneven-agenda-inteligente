@@ -122,11 +122,13 @@ const aggFields = (agg: Agg) => ({
 export async function listClients(
   db: Db,
   actor: PanelActor,
-  input: { query?: string; filter: ClientFilter; page: number; now?: Date },
+  /** `pages`: quantas páginas seguidas devolver a partir de `page` ("Carregar mais" soma páginas numa consulta só). */
+  input: { query?: string; filter: ClientFilter; page: number; pages?: number; now?: Date },
 ): Promise<{ items: ClientListItem[]; total: number; hasMore: boolean }> {
   const now = input.now ?? new Date();
   const own = await staffProfessionalId(db, actor);
   const page = Number.isInteger(input.page) && input.page > 0 ? input.page : 1;
+  const pages = Number.isInteger(input.pages) && input.pages! > 0 ? input.pages! : 1;
   const query = input.query?.trim() ?? "";
   const lapsedBefore = new Date(now.getTime() - LAPSED_DAYS * DAY_MS);
 
@@ -147,7 +149,7 @@ export async function listClients(
       .leftJoin(agg, join)
       .where(where)
       .orderBy(asc(customers.name), asc(customers.id))
-      .limit(CLIENTS_PAGE_SIZE)
+      .limit(CLIENTS_PAGE_SIZE * pages)
       .offset((page - 1) * CLIENTS_PAGE_SIZE);
     const [count] = await tx
       .select({ total: sql<number>`count(*)`.mapWith(Number) })
@@ -157,7 +159,7 @@ export async function listClients(
     return {
       items: rows.map((r) => toListItem(r, own === null)),
       total: count.total,
-      hasMore: page * CLIENTS_PAGE_SIZE < count.total,
+      hasMore: (page - 1 + pages) * CLIENTS_PAGE_SIZE < count.total,
     };
   });
 }

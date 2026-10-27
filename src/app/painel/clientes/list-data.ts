@@ -40,19 +40,14 @@ export async function loadClientListProps(
 ): Promise<ClientListProps> {
   const now = new Date();
   const filter = query.filtro === "com-horario" ? "upcoming" : query.filtro === "sem-voltar" ? "lapsed" : "all";
-  const pages = await Promise.all(
-    Array.from({ length: query.pagina }, (_, i) =>
-      listClients(db, actor, { query: query.q, filter, page: i + 1, now }),
-    ),
-  );
-  const last = pages[pages.length - 1];
+  const last = await listClients(db, actor, { query: query.q, filter, page: 1, pages: query.pagina, now });
   const staff = actor.role === "staff";
   const hint = staff
     ? `${plural(last.total)}. Aqui ficam só os clientes que você atendeu.`
     : `${plural(last.total)}. Quem agenda pelo link entra aqui sozinho.`;
 
   return {
-    rows: pages.flatMap((p) => p.items).map((item) => toClientRow(item, now, ctx.timezone, LAPSED_DAYS)),
+    rows: last.items.map((item) => toClientRow(item, now, ctx.timezone, LAPSED_DAYS)),
     total: last.total,
     query: query.q,
     filter: query.filtro,

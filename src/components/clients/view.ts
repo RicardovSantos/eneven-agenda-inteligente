@@ -59,7 +59,6 @@ export function initialsOf(name: string): string {
   return (first + last).toUpperCase();
 }
 
-
 /** "2026-10-06" -> "06/10/2026" (ou "06/10" com `short`). */
 export function dmy(ymd: string, short = false): string {
   const [y, m, d] = ymd.split("-");

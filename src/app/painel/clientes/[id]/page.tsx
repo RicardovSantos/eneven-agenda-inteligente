@@ -8,6 +8,7 @@ import { ClientsLayout } from "@/components/clients/clients-layout";
 import { clientsHref, toProfileView } from "@/components/clients/view";
 import { PUBLIC_HOST } from "@/lib/brand";
 import { findStaffProfessional, listPanelProfessionals } from "@/server/agenda/panel-queries";
+import { panelBookingOptions } from "@/server/agenda/booking-options";
 import { localDateOf } from "@/server/agenda/time";
 import { listServices } from "@/server/catalog";
 import { ClientError, getClientProfile } from "@/server/clients";
@@ -86,16 +87,7 @@ async function loadBookingOptions(
   const own = session.role === "staff" ? await findStaffProfessional(db, session.tenantId, session.userId) : null;
   if (session.role === "staff" && !own) return null;
 
-  const professionals = (own ? [own] : allPros).map((p) => ({ id: p.id, name: p.name, color: p.color }));
-  const services = catalog
-    .filter((s) => (own ? s.professionalIds.includes(own.id) : s.professionalIds.length > 0))
-    .map((s) => ({
-      id: s.id,
-      name: s.name,
-      durationMin: s.durationMin,
-      priceCents: s.priceCents,
-      professionalIds: s.professionalIds,
-    }));
+  const { professionals, services } = panelBookingOptions(allPros, catalog, own);
   if (services.length === 0) return null;
   return {
     today: localDateOf(new Date(), data.timezone),

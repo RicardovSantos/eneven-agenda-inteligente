@@ -120,6 +120,20 @@ describe("listClients", () => {
     expect(p2.hasMore).toBe(false);
   });
 
+  it("`pages` devolve várias páginas seguidas numa consulta só, com hasMore certo", async () => {
+    for (let i = 0; i < CLIENTS_PAGE_SIZE + 1; i++) {
+      await addCustomer(`Cliente ${String(i).padStart(3, "0")}`, `55119${String(10000000 + i)}`);
+    }
+    const one = await listClients(db, owner, { filter: "all", page: 1, pages: 1, now: NOW });
+    expect(one.items).toHaveLength(CLIENTS_PAGE_SIZE);
+    expect(one.hasMore).toBe(true);
+    const two = await listClients(db, owner, { filter: "all", page: 1, pages: 2, now: NOW });
+    expect(two.items).toHaveLength(CLIENTS_PAGE_SIZE + 1);
+    expect(two.items[CLIENTS_PAGE_SIZE].name).toBe(`Cliente ${String(CLIENTS_PAGE_SIZE).padStart(3, "0")}`);
+    expect(two.hasMore).toBe(false);
+    expect(two.total).toBe(CLIENTS_PAGE_SIZE + 1);
+  });
+
   it("não vê clientes de outro estabelecimento", async () => {
     const b = await seedBookable(db);
     await addCustomer("De fora", "5511977770000", b.tenantId);

@@ -26,7 +26,7 @@ for (const viewport of [
 
       // Cai na ficha do cliente novo
       await expect(page).toHaveURL(/\/painel\/clientes\/[0-9a-f-]{36}/);
-      await expect(page.getByRole("heading", { level: 1, name: "Marina Duarte" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: viewport.width < 1024 ? 1 : 2, name: "Marina Duarte" })).toBeVisible();
 
       // Aparece na lista
       if (viewport.width < 1024) {
@@ -48,13 +48,21 @@ for (const viewport of [
 
       // Abre a ficha e edita a observação (salva ao sair do campo)
       await page.getByRole("link", { name: /Marina Duarte/ }).first().click();
-      await expect(page.getByRole("heading", { level: 1, name: "Marina Duarte" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: viewport.width < 1024 ? 1 : 2, name: "Marina Duarte" })).toBeVisible();
       const notes = page.getByLabel("Observações");
       await notes.fill("Alergia a níquel: usar só titânio.");
       await notes.blur();
       await expect(page.getByRole("status").filter({ hasText: "Observações salvas" })).toBeVisible();
       await page.reload();
       await expect(page.getByLabel("Observações")).toHaveValue("Alergia a níquel: usar só titânio.");
+
+      // Editar dados (notas incluídas): a ficha mostra o texto novo sem recarregar
+      await page.getByRole("button", { name: /^Editar( dados)?$/ }).click();
+      const edit = page.getByRole("dialog", { name: "Editar dados" });
+      await edit.getByLabel(/Observações/).fill("Prefere horários de manhã.");
+      await edit.getByRole("button", { name: "Salvar alterações" }).click();
+      await expect(page.getByRole("status").filter({ hasText: "Alterações salvas" })).toBeVisible();
+      await expect(page.getByLabel("Observações", { exact: true })).toHaveValue("Prefere horários de manhã.");
 
       // Agendar: abre o novo agendamento com o cliente já escolhido
       await page.getByRole("button", { name: "Agendar" }).click();
