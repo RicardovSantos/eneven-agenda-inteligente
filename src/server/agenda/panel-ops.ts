@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
   bookingServices,
@@ -29,6 +29,7 @@ import {
   rescheduleBooking,
   setBookingStatus,
 } from "./bookings";
+import { customerMatch } from "./customer-search";
 import { BookingError } from "./errors";
 import { loadAvailabilityContext } from "./load";
 import { findStaffProfessional } from "./panel-queries";
@@ -55,7 +56,7 @@ const notFound = () => new BookingError("not_found");
 const blockNotFound = () => new BookingError("not_found", "Bloqueio não encontrado.");
 
 /** `null` = sem restrição; string = o único profissional que o usuário pode ver (resolvedor compartilhado com a página). */
-async function staffProfessionalId(db: Db, actor: PanelActor): Promise<string | null> {
+export async function staffProfessionalId(db: Db, actor: PanelActor): Promise<string | null> {
   if (actor.role !== "staff") return null;
   const own = await findStaffProfessional(db, actor.tenantId, actor.userId);
   // Profissional sem vínculo (ou inativo) não enxerga nada.
@@ -220,13 +221,10 @@ export async function createPanelBooking(
 
 export type CustomerHit = { id: string; name: string; phone: string };
 
-const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
-
 /** Clientes por nome ou telefone (até 8). `staff` só vê quem já foi atendido por ele. */
 export async function searchCustomers(db: Db, actor: PanelActor, query: string): Promise<CustomerHit[]> {
   const q = query.trim().slice(0, 80);
   if (q.length < 2) return [];
-  const digits = q.replace(/\D/g, "");
   const own = await staffProfessionalId(db, actor);
   return withTenant(db, actor.tenantId, (tx) =>
     tx
@@ -235,10 +233,7 @@ export async function searchCustomers(db: Db, actor: PanelActor, query: string):
       .where(
         and(
           eq(customers.tenantId, actor.tenantId),
-          or(
-            ilike(customers.name, `%${escapeLike(q)}%`),
-            digits.length >= 3 ? sql`${customers.phone} like ${`%${digits}%`}` : undefined,
-          ),
+          customerMatch(q),
           own
             ? inArray(
                 customers.id,
