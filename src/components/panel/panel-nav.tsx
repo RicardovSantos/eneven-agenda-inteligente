@@ -23,7 +23,7 @@ type NavItem = {
 
 const SIDEBAR_ITEMS: NavItem[] = [
   { label: "Agenda", icon: CalendarDays, href: "/painel" },
-  { label: "Clientes", icon: Users },
+  { label: "Clientes", icon: Users, href: "/painel/clientes" },
   { label: "Serviços", icon: Scissors, href: "/painel/servicos" },
   { label: "Equipe", icon: UserRound, href: "/painel/equipe" },
   { label: "Painel", icon: ChartNoAxesColumn },
@@ -32,7 +32,7 @@ const SIDEBAR_ITEMS: NavItem[] = [
 
 const BOTTOM_ITEMS: NavItem[] = [
   { label: "Agenda", icon: CalendarDays, href: "/painel" },
-  { label: "Clientes", icon: Users },
+  { label: "Clientes", icon: Users, href: "/painel/clientes" },
   { label: "Painel", icon: ChartNoAxesColumn },
   { label: "Mais", icon: Ellipsis, href: "/painel/mais" },
 ];
@@ -44,6 +44,8 @@ function isActive(pathname: string, href: string) {
       (p) => pathname === p || pathname.startsWith(`${p}/`),
     );
   }
+  // "Clientes" fica ativo também na ficha (/painel/clientes/{id}).
+  if (href === "/painel/clientes") return pathname === href || pathname.startsWith(`${href}/`);
   return pathname === href;
 }
 

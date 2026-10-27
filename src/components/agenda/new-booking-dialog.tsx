@@ -43,6 +43,7 @@ export function NewBookingDialog({
   professionals,
   defaultProfessionalId,
   lockedProfessionalId,
+  initialCustomer,
   onCreated,
 }: {
   open: boolean;
@@ -55,6 +56,8 @@ export function NewBookingDialog({
   defaultProfessionalId: string | null;
   /** Profissional que usa o painel (`staff`): campo fixo. */
   lockedProfessionalId: string | null;
+  /** Cliente já escolhido ao abrir (ficha do cliente). */
+  initialCustomer?: CustomerHit;
   onCreated: (date: string) => void;
 }) {
   return (
@@ -66,6 +69,7 @@ export function NewBookingDialog({
         professionals={professionals}
         defaultProfessionalId={defaultProfessionalId}
         lockedProfessionalId={lockedProfessionalId}
+        initialCustomer={initialCustomer}
         onClose={onClose}
         onCreated={onCreated}
       />
@@ -80,11 +84,12 @@ function NewBookingForm({
   professionals,
   defaultProfessionalId,
   lockedProfessionalId,
+  initialCustomer,
   onClose,
   onCreated,
 }: Omit<Parameters<typeof NewBookingDialog>[0], "open">) {
   const toast = useToast();
-  const [picked, setPicked] = useState<CustomerHit | null>(null);
+  const [picked, setPicked] = useState<CustomerHit | null>(initialCustomer ?? null);
   const [isNew, setIsNew] = useState(false);
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<{ q: string; hits: CustomerHit[] }>({ q: "", hits: [] });

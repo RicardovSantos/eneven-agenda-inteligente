@@ -13,12 +13,15 @@ export function PanelDialog({
   title,
   titleId,
   onClose,
+  narrow = false,
   children,
 }: {
   open: boolean;
   title: string;
   titleId: string;
   onClose: () => void;
+  /** Caixa de 480px em vez de 560px (formulários curtos). */
+  narrow?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -37,7 +40,7 @@ export function PanelDialog({
         event.preventDefault();
         onClose();
       }}
-      className="m-auto max-h-none w-[min(calc(100vw-2rem),560px)] max-w-none overflow-y-auto rounded-panel border border-line bg-surface p-0 text-foreground shadow-float backdrop:bg-ink/40 max-lg:m-0 max-lg:h-dvh max-lg:max-h-none max-lg:w-screen max-lg:rounded-none max-lg:border-0 lg:max-h-[calc(100dvh-3rem)]"
+      className={`m-auto max-h-none ${narrow ? "w-[min(calc(100vw-2rem),480px)]" : "w-[min(calc(100vw-2rem),560px)]"} max-w-none overflow-y-auto rounded-panel border border-line bg-surface p-0 text-foreground shadow-float backdrop:bg-ink/40 max-lg:m-0 max-lg:h-dvh max-lg:max-h-none max-lg:w-screen max-lg:rounded-none max-lg:border-0 lg:max-h-[calc(100dvh-3rem)]`}
     >
       {open ? (
         <div className="flex min-h-full flex-col gap-5 px-4 pb-8 pt-3 lg:px-6 lg:py-6">
