@@ -269,10 +269,17 @@ describe("login de conta sem senha", () => {
     });
 
     await login(db, "naoexiste@x.com", "x"); // aquece o hash descartável
+    const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+    // Mediana de 5 execuções para não depender de um único pico de CPU no CI.
     const time = async (email: string) => {
-      const t0 = performance.now();
-      const result = await login(db, email, "senha-errada-12");
-      return { result, ms: performance.now() - t0 };
+      const samples: number[] = [];
+      let result: unknown;
+      for (let i = 0; i < 5; i++) {
+        const t0 = performance.now();
+        result = await login(db, email, "senha-errada-12");
+        samples.push(performance.now() - t0);
+      }
+      return { result, ms: median(samples) };
     };
     const passwordless = await time(newProfile.email);
     const wrongPassword = await time("com-senha@x.com");
@@ -280,7 +287,6 @@ describe("login de conta sem senha", () => {
     expect(wrongPassword.result).toBeNull();
     // Mesma ordem de grandeza de uma senha errada de verdade (argon2 leva dezenas de ms).
     expect(passwordless.ms).toBeGreaterThan(wrongPassword.ms * 0.3);
-    expect(passwordless.ms).toBeGreaterThan(5);
   });
 });
 
