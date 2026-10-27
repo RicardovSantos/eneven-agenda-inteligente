@@ -294,3 +294,24 @@ export async function verifyE2eOwnerEmail(db: Db, slug: string) {
   await db.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, owner.userId));
   return { ok: true };
 }
+
+/**
+ * Usuário novo com o papel dado (`reception` ou `staff`) no estabelecimento,
+ * com sessão pronta: para os testes de menu e acesso por papel.
+ */
+export async function seedE2eMember(db: Db, slug: string, role: "owner" | "reception" | "staff") {
+  const tenantId = await tenantIdOf(db, slug);
+  const suffix = Math.random().toString(36).slice(2, 7);
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: `e2e-${role}-${suffix}-${Date.now()}@exemplo.com`,
+      passwordHash: null,
+      name: role === "reception" ? "Rita Recepção" : "Paulo Profissional",
+      emailVerifiedAt: new Date(),
+    })
+    .returning({ id: users.id });
+  await db.insert(memberships).values({ userId: user.id, tenantId, role });
+  const token = await createSession(db, user.id, tenantId);
+  return { token, cookieName: SESSION_COOKIE, userId: user.id };
+}

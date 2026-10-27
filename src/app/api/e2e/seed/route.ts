@@ -4,6 +4,7 @@ import {
   listE2eBookings,
   seedE2eBlock,
   seedE2eBooking,
+  seedE2eMember,
   seedE2eSession,
   seedE2eTenant,
   verifyE2eOwnerEmail,
@@ -36,6 +37,12 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json(await seedE2eBlock(db, body as unknown as SeedBlockOptions));
     case "session":
       return Response.json(await seedE2eSession(db, String(body.slug)));
+    case "member": {
+      if (body.role !== "owner" && body.role !== "reception" && body.role !== "staff") {
+        return Response.json({ error: "papel inválido" }, { status: 400 });
+      }
+      return Response.json(await seedE2eMember(db, String(body.slug), body.role));
+    }
     case "verify-email":
       return Response.json(await verifyE2eOwnerEmail(db, String(body.slug)));
     case "bookings":

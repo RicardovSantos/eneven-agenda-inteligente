@@ -1,8 +1,9 @@
-import { ChevronRight, LogOut, Scissors, Settings, UserRound, type LucideIcon } from "lucide-react";
+import { ChevronRight, LogOut, type LucideIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CopyLinkButton } from "@/components/panel/copy-link-button";
 import { PUBLIC_HOST } from "@/lib/brand";
+import { moreItemsFor } from "@/lib/panel-nav";
 import { requireOnboarded } from "@/server/panel/onboarding-gate";
 import { isTenantReleased } from "@/server/tenants/release";
 
@@ -11,39 +12,19 @@ export const metadata: Metadata = { title: "Mais" };
 const ROW =
   "flex min-h-14 items-center gap-3 px-4 text-base font-medium";
 
-function NavRow({
-  href,
-  icon: Icon,
-  label,
-  enabled = true,
-}: {
-  href: string;
-  icon: LucideIcon;
-  label: string;
-  enabled?: boolean;
-}) {
-  const content = (
-    <>
+function NavRow({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) {
+  return (
+    <Link href={href} className={`${ROW} hover:bg-primary-soft/60`}>
       <Icon className="size-5 text-ink-muted" aria-hidden="true" />
       <span className="flex-1">{label}</span>
       <ChevronRight className="size-5 text-ink-muted" aria-hidden="true" />
-    </>
-  );
-  return enabled ? (
-    <Link href={href} className={`${ROW} hover:bg-primary-soft/60`}>
-      {content}
     </Link>
-  ) : (
-    <span aria-disabled="true" className={`${ROW} cursor-not-allowed`}>
-      <span className="flex flex-1 items-center gap-3 opacity-50">{content}</span>
-      <span className="sr-only">(só o proprietário)</span>
-    </span>
   );
 }
 
 export default async function MaisPage() {
   const data = await requireOnboarded();
-  const isOwner = data.session.role === "owner";
+  const items = moreItemsFor(data.session.role!, data.session.isSuperAdmin);
   const released = isTenantReleased({
     status: data.tenantStatus,
     trialEndsAt: data.trialEndsAt,
@@ -55,22 +36,15 @@ export default async function MaisPage() {
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
       <h1 className="text-[1.75rem] font-semibold">Mais</h1>
 
-      <ul className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-surface">
-        <li>
-          <NavRow href="/painel/servicos" icon={Scissors} label="Serviços" />
-        </li>
-        <li>
-          <NavRow href="/painel/equipe" icon={UserRound} label="Equipe" />
-        </li>
-        <li>
-          <NavRow
-            href="/painel/configuracoes"
-            icon={Settings}
-            label="Configurações"
-            enabled={isOwner}
-          />
-        </li>
-      </ul>
+      {items.length > 0 ? (
+        <ul className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-surface">
+          {items.map((item) => (
+            <li key={item.href}>
+              <NavRow href={item.href} icon={item.icon} label={item.label} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <section
         aria-labelledby="link-title"

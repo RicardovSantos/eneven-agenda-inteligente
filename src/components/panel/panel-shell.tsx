@@ -2,6 +2,7 @@ import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/brand/logo";
 import { SidebarLink } from "./copy-link-button";
+import type { PanelRole } from "@/lib/panel-nav";
 import { BottomNav, SidebarNav } from "./panel-nav";
 
 /** `<form>` de logout: o `/sair` só aceita POST. */
@@ -21,12 +22,16 @@ export function PanelShell({
   userName,
   tenantName,
   publicLink,
+  role,
+  isSuperAdmin,
   children,
 }: {
   userName: string;
   tenantName: string;
   /** Link público do salão quando liberado (e-mail confirmado e conta ativa/em teste); senão `null`. */
   publicLink: { label: string; url: string } | null;
+  role: PanelRole;
+  isSuperAdmin: boolean;
   children: ReactNode;
 }) {
   return (
@@ -37,7 +42,7 @@ export function PanelShell({
           <BrandLogo width={132} />
         </div>
         <div className="flex-1 overflow-y-auto px-3">
-          <SidebarNav />
+          <SidebarNav role={role} isSuperAdmin={isSuperAdmin} />
         </div>
         <div className="flex flex-col gap-3 border-t border-line p-4">
           <SidebarLink label={publicLink?.label ?? ""} url={publicLink?.url ?? null} />
@@ -76,7 +81,7 @@ export function PanelShell({
       <main className="px-4 pb-28 pt-6 lg:px-8 lg:pb-10 lg:pt-8">{children}</main>
       </div>
 
-      <BottomNav />
+      <BottomNav role={role} isSuperAdmin={isSuperAdmin} />
     </div>
   );
 }

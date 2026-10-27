@@ -1,5 +1,8 @@
+import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { SESSION_COOKIE, getSession } from "@/server/auth/session";
 import { getPublicTenant } from "@/server/public/tenant";
 import { createTestDb } from "../helpers/test-db";
 
@@ -78,5 +81,22 @@ describe("rota de apoio do e2e", () => {
 
     expect((await call({ action: "verify-email", slug }, "segredo")).status).toBe(200);
     expect(await getPublicTenant(slug, { db })).toMatchObject({ canBook: true });
+  });
+  it("member: cria usuário com o papel pedido no estabelecimento e devolve uma sessão desse usuário", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("E2E_SEED", "segredo");
+    const { slug } = (await (await call({ action: "tenant" }, "segredo")).json()) as { slug: string };
+
+    expect((await call({ action: "member", slug, role: "reception" })).status).toBe(404);
+    expect((await call({ action: "member", slug, role: "admin" }, "segredo")).status).toBe(400);
+
+    const res = await call({ action: "member", slug, role: "reception" }, "segredo");
+    expect(res.status).toBe(200);
+    const { token, cookieName } = (await res.json()) as { token: string; cookieName: string };
+    const session = await getSession(db, token);
+    expect(cookieName).toBe(SESSION_COOKIE);
+    expect(session).toMatchObject({ role: "reception", isSuperAdmin: false });
+    const [tenant] = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug));
+    expect(session?.tenantId).toBe(tenant.id);
   });
 });

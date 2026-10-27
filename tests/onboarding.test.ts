@@ -282,11 +282,12 @@ describe("guarda: páginas do painel exigem o assistente concluído", () => {
       return name === "page.tsx" ? [full] : [];
     });
 
-  it("toda page.tsx (menos comecar) chama requireOnboarded", () => {
+  it("toda page.tsx (menos comecar) chama requireOnboarded (direto ou por requirePanelRole)", () => {
     const list = pages(root).filter((f) => !f.includes(`${path.sep}comecar${path.sep}`));
     expect(list.length).toBeGreaterThan(0);
     for (const file of list) {
-      expect(readFileSync(file, "utf8"), file).toContain("requireOnboarded(");
+      // requirePanelRole() chama requireOnboarded() por dentro.
+      expect(readFileSync(file, "utf8"), file).toMatch(/require(Onboarded|PanelRole)\(/);
     }
   });
 });

@@ -40,6 +40,8 @@ export default async function PainelLayout({
         userName={userName}
         tenantName={tenantName}
         publicLink={released ? { label, url: `https://${label}` } : null}
+        role={session.role!}
+        isSuperAdmin={session.isSuperAdmin}
       >
         {children}
         <InstallHint />

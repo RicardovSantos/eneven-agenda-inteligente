@@ -8,26 +8,13 @@ import { BusinessInfoForm } from "@/components/settings/business-info-form";
 import { HoursForm } from "@/components/settings/hours-form";
 import { RulesForm } from "@/components/settings/rules-form";
 import { SlugForm } from "@/components/settings/slug-form";
-import { requireOnboarded } from "@/server/panel/onboarding-gate";
+import { requirePanelRole } from "@/server/panel/roles";
 import { defaultApplyToTeam, getBusinessHours } from "@/server/settings";
 
 export const metadata: Metadata = { title: "Configurações" };
 
 export default async function ConfiguracoesPage() {
-  const { session } = await requireOnboarded();
-
-  // Só o proprietário altera as configurações: os demais papéis veem o aviso.
-  if (session.role !== "owner") {
-    return (
-      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
-        <h1 className="text-[1.75rem] font-semibold">Configurações</h1>
-        <p className="rounded-panel border border-line bg-surface p-5 leading-snug text-ink-muted sm:p-6">
-          Só o proprietário pode alterar as configurações do estabelecimento.
-          Fale com ele se algo precisar mudar.
-        </p>
-      </div>
-    );
-  }
+  const { session } = await requirePanelRole(["owner"]);
 
   const db = await getDb();
   const [tenant] = await db
