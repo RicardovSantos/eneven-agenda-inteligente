@@ -10,7 +10,8 @@ export const READ_ONLY_TEXT =
 export function ReadOnlyBanner({ whatsappUrl }: { whatsappUrl: string | null }) {
   return (
     <div
-      role="status"
+      role="region"
+      aria-label="Somente leitura"
       data-testid="read-only-banner"
       className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 bg-[#FFF1E8] px-4 py-3 text-[0.9375rem] leading-snug text-[#9A3412] dark:bg-[#3a2418] dark:text-[#fdba74] lg:px-8"
     >

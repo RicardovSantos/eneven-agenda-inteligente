@@ -111,3 +111,30 @@ export async function endSupport(
     });
   });
 }
+
+/**
+ * Sair durante o suporte: registra `support.ended` (minutos, no estabelecimento
+ * atendido) antes de a sessão ser apagada. Sem suporte em andamento, não faz nada.
+ */
+export async function auditSupportEndOnLogout(
+  db: Db,
+  sessionToken: string,
+  now: Date = new Date(),
+): Promise<void> {
+  const [row] = await db
+    .select({
+      userId: sessions.userId,
+      tenantId: sessions.tenantId,
+      supportStartedAt: sessions.supportStartedAt,
+    })
+    .from(sessions)
+    .where(eq(sessions.id, hashToken(sessionToken)))
+    .limit(1);
+  if (!row?.supportStartedAt) return;
+  await db.insert(auditLog).values({
+    actorUserId: row.userId,
+    tenantId: row.tenantId,
+    action: "support.ended",
+    details: { minutes: Math.round((now.getTime() - row.supportStartedAt.getTime()) / MIN_MS), loggedOut: true },
+  });
+}

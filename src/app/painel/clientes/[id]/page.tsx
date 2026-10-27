@@ -13,7 +13,7 @@ import { localDateOf } from "@/server/agenda/time";
 import { listServices } from "@/server/catalog";
 import { ClientError, getClientProfile } from "@/server/clients";
 import { requireOnboarded } from "@/server/panel/onboarding-gate";
-import { isTenantReleased } from "@/server/tenants/release";
+import { isTenantActive, isTenantReleased } from "@/server/tenants/release";
 import { loadClientListProps, parseClientsQuery } from "../list-data";
 
 export const metadata: Metadata = { title: "Cliente" };
@@ -41,7 +41,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<"/
   const released = isTenantReleased({
     status: data.tenantStatus,
     trialEndsAt: data.trialEndsAt,
-    emailVerified: session.emailVerified,
+    emailVerified: data.linkEmailVerified,
   });
   const [list, booking] = await Promise.all([
     loadClientListProps(db, actor, query, {
@@ -68,6 +68,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<"/
             view.historyTotal > view.history.length ? clientsHref({ id, ...keep, historico: true }) : null
           }
           booking={booking}
+          readOnly={!isTenantActive({ status: data.tenantStatus, trialEndsAt: data.trialEndsAt })}
         />
       }
     />

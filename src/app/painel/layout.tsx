@@ -15,7 +15,7 @@ export const metadata = PWA_METADATA;
 export default async function PainelLayout({
   children,
 }: LayoutProps<"/painel">) {
-  const { userName, tenantName, tenantSlug, tenantStatus, trialEndsAt, session, onboardingCompletedAt } =
+  const { userName, tenantName, tenantSlug, tenantStatus, trialEndsAt, session, onboardingCompletedAt, linkEmailVerified } =
     await getPanelData();
 
   const supportBanner = session.support ? <SupportBanner tenantName={tenantName} /> : null;
@@ -36,7 +36,7 @@ export default async function PainelLayout({
   const released = isTenantReleased({
     status: tenantStatus,
     trialEndsAt,
-    emailVerified: session.emailVerified,
+    emailVerified: linkEmailVerified,
   });
   const label = `${PUBLIC_HOST}/${tenantSlug}`;
   const readOnly = !isTenantActive({ status: tenantStatus, trialEndsAt });

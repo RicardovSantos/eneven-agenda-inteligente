@@ -55,6 +55,8 @@ describe("faixa do modo suporte", () => {
     expect(html).toContain("(suporte)");
     expect(html).toContain("Voltar à plataforma");
     expect(html).toContain("data-support-banner");
+    expect(html).toContain('role="region"');
+    expect(html).not.toContain('role="status"');
   });
 });
 
@@ -79,6 +81,32 @@ describe("dados do painel em modo suporte", () => {
       userName: "Ricardo",
       session: { support: true, role: "owner", tenantId: tenant.id },
     });
+  });
+
+  it("e-mail que libera o link é o do dono, não o do super-admin", async () => {
+    const admin = await seedSuperAdmin(db);
+    const { tenant, owner } = await seedPlatformTenant(db, { name: "Studio Aurora" });
+    state.token = await createSession(db, admin.id, null);
+    await startSupport(db, state.token, { userId: admin.id }, tenant.id);
+    const { users } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    // o super-admin está verificado; o dono não
+    await db.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, admin.id));
+
+    const { getPanelData } = await import("@/server/panel/data");
+    const data = await getPanelData();
+    expect(data.session.emailVerified).toBe(true);
+    expect(data.linkEmailVerified).toBe(false);
+    expect(data.verificationEmail).toBe(owner.email);
+    const { isTenantReleased } = await import("@/server/tenants/release");
+    expect(
+      isTenantReleased({ status: data.tenantStatus, trialEndsAt: data.trialEndsAt, emailVerified: data.linkEmailVerified }),
+    ).toBe(false);
+
+    await db.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, owner.id));
+    vi.resetModules();
+    const again = await (await import("@/server/panel/data")).getPanelData();
+    expect(again.linkEmailVerified).toBe(true);
   });
 
   it("sem suporte e sem vínculo, continua indo para /entrar", async () => {

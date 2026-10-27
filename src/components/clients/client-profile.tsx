@@ -38,6 +38,7 @@ export function ClientProfile({
   listHref,
   allHistoryHref,
   booking,
+  readOnly = false,
 }: {
   profile: ClientProfileView;
   canEdit: boolean;
@@ -47,6 +48,8 @@ export function ClientProfile({
   allHistoryHref: string | null;
   /** Dados do novo agendamento; `null` esconde o botão "Agendar". */
   booking: BookingOptions | null;
+  /** Estabelecimento sem plano ativo: "Agendar" fica desabilitado. */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [scheduling, setScheduling] = useState(false);
@@ -113,7 +116,7 @@ export function ClientProfile({
         {/* Ações */}
         <div className="flex gap-2">
           {booking ? (
-            <Button onClick={() => setScheduling(true)} className="h-[46px] flex-1 lg:h-11">
+            <Button onClick={() => setScheduling(true)} disabled={readOnly} className="h-[46px] flex-1 lg:h-11">
               <Plus className="size-[18px]" aria-hidden="true" />
               Agendar
             </Button>

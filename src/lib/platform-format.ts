@@ -163,6 +163,8 @@ export function auditText(row: AuditRow): string {
       const days = asNumber(d.trialDays);
       return `${actor} criou o estabelecimento (plano ${capitalize(asText(d.plan))}, teste de ${days} ${days === 1 ? "dia" : "dias"})`;
     }
+    case "tenant.owner_invite_sent":
+      return `${actor} enviou o acesso por e-mail ao dono`;
     case "support.started":
       return `${actor} entrou como o estabelecimento (suporte)`;
     case "support.ended":

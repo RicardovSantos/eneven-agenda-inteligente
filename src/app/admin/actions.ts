@@ -17,10 +17,10 @@ import {
   type AdminActor,
 } from "@/server/platform/actions";
 import { PlatformError } from "@/server/platform/errors";
+import { sendOwnerAccessInvite } from "@/server/platform/owner-invite";
 import { updatePlan, type PlanInput } from "@/server/platform/plans";
 import { endSupport, startSupport } from "@/server/platform/support";
 import { TeamError } from "@/server/team/errors";
-import { createOwnerAccessInvite } from "@/server/team/invitations";
 
 /**
  * Ações da plataforma (`/admin`). Cada uma revalida o super-admin na própria
@@ -130,7 +130,7 @@ export async function updatePlanAction(planId: string, input: unknown): Promise<
 export async function sendOwnerInviteAction(tenantId: string): Promise<AdminActionResult> {
   const ctx = await adminContext();
   try {
-    const { emailSent } = await createOwnerAccessInvite(ctx.db, String(tenantId), ctx.actor.userId);
+    const { emailSent } = await sendOwnerAccessInvite(ctx.db, ctx.actor, String(tenantId));
     revalidatePath("/admin", "layout");
     if (!emailSent) {
       return { ok: false, error: "O convite foi criado, mas o e-mail não pôde ser enviado agora." };

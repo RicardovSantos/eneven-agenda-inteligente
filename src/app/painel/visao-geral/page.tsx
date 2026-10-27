@@ -32,7 +32,7 @@ export default async function VisaoGeralPage({ searchParams }: PageProps<"/paine
   const released = isTenantReleased({
     status: data.tenantStatus,
     trialEndsAt: data.trialEndsAt,
-    emailVerified: session.emailVerified,
+    emailVerified: data.linkEmailVerified,
   });
   const items: PendingItem[] = pending.map((p) => ({
     id: p.bookingId,

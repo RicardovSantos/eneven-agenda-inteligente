@@ -58,6 +58,11 @@ describe("ações de /admin: quem não é super-admin", () => {
     expect(await redirectOf(a.activateTenantAction(other.tenant.id))).toBe("NEXT_REDIRECT:/entrar");
     expect(await redirectOf(a.extendTrialAction(other.tenant.id, 7))).toBe("NEXT_REDIRECT:/entrar");
     expect(await redirectOf(a.enterSupportAction(other.tenant.id))).toBe("NEXT_REDIRECT:/entrar");
+    expect(await redirectOf(a.changePlanAction(other.tenant.id, await planId(db, "studio")))).toBe(
+      "NEXT_REDIRECT:/entrar",
+    );
+    expect(await redirectOf(a.sendOwnerInviteAction(other.tenant.id))).toBe("NEXT_REDIRECT:/entrar");
+    expect(await redirectOf(a.leaveSupportAction())).toBe("NEXT_REDIRECT:/entrar");
     expect(await redirectOf(a.updatePlanAction(await planId(db, "essencial"), {}))).toBe(
       "NEXT_REDIRECT:/entrar",
     );
@@ -183,7 +188,7 @@ describe("ações de /admin: super-admin", () => {
   });
 
   it("envia o acesso por e-mail ao dono e revoga o convite anterior", async () => {
-    await asAdmin();
+    const admin = await asAdmin();
     const a = await actions();
     const { tenant } = await seedPlatformTenant(db);
     expect(await a.sendOwnerInviteAction(tenant.id)).toEqual({
@@ -194,6 +199,19 @@ describe("ações de /admin: super-admin", () => {
     const rows = await db.select().from(invitations).where(eq(invitations.tenantId, tenant.id));
     expect(rows).toHaveLength(2);
     expect(rows.filter((r) => r.revokedAt === null)).toHaveLength(1);
+    const audits = await db.select().from(auditLog).where(eq(auditLog.tenantId, tenant.id));
+    const sent = audits.filter((r) => r.action === "tenant.owner_invite_sent");
+    expect(sent).toHaveLength(2);
+    expect(sent[0]).toMatchObject({ actorUserId: admin.id, details: { emailSent: true } });
+  });
+
+  it("enviar acesso com id malformado ou inexistente devolve 'não encontrado', sem auditar", async () => {
+    await asAdmin();
+    const a = await actions();
+    const notFound = { ok: false, error: "Estabelecimento não encontrado." };
+    expect(await a.sendOwnerInviteAction("não-é-uuid")).toEqual(notFound);
+    expect(await a.sendOwnerInviteAction("00000000-0000-4000-8000-000000000000")).toEqual(notFound);
+    expect(await db.select().from(auditLog)).toHaveLength(0);
   });
 
   it("'Entrar como' inicia o suporte na própria sessão e vai para /painel; 'Voltar' volta ao detalhe", async () => {

@@ -75,7 +75,7 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
   const released = isTenantReleased({
     status: data.tenantStatus,
     trialEndsAt: data.trialEndsAt,
-    emailVerified: session.emailVerified,
+    emailVerified: data.linkEmailVerified,
   });
 
   return (
@@ -101,10 +101,21 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
 function Banners({ data }: { data: Awaited<ReturnType<typeof requireOnboarded>> }) {
   const isTrial = data.tenantStatus === "trial";
   const daysLeft = trialDaysLeft(data.trialEndsAt);
-  if (data.session.emailVerified && !isTrial) return null;
+  if (data.linkEmailVerified && !isTrial) return null;
   return (
     <div className="flex flex-col gap-3">
-      {!data.session.emailVerified ? <ResendVerification email={data.userEmail} /> : null}
+      {!data.linkEmailVerified ? (
+        data.session.support ? (
+          // Suporte não dispara e-mail para o dono: só informa.
+          <p className="rounded-field border-l-[3px] border-danger bg-danger-soft px-4 py-3 text-sm leading-snug">
+            O dono ainda não confirmou o e-mail (
+            <strong className="break-all font-semibold">{data.verificationEmail}</strong>): o link de agendamento só é
+            liberado depois disso.
+          </p>
+        ) : (
+          <ResendVerification email={data.verificationEmail} />
+        )
+      ) : null}
       {isTrial ? (
         <p className="rounded-field bg-primary-soft px-4 py-3 text-sm leading-snug text-primary">
           {daysLeft > 0 ? (

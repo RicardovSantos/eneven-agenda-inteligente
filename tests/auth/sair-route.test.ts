@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { sessions } from "@/db/schema";
+import { auditLog, sessions } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { createSession, hashToken } from "@/server/auth/session";
 import { signup } from "@/server/auth/signup";
@@ -125,5 +125,28 @@ describe("POST /sair", () => {
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("/painel");
     expect(await sessionExists()).toBe(true);
+  });
+
+  it("sair no meio do suporte registra support.ended (minutos, estabelecimento atendido) antes de apagar a sessão", async () => {
+    const { seedPlatformTenant, seedSuperAdmin } = await import("../helpers/platform-fixtures");
+    const { startSupport } = await import("@/server/platform/support");
+    const admin = await seedSuperAdmin(db);
+    const { tenant } = await seedPlatformTenant(db);
+    const adminToken = await createSession(db, admin.id, null);
+    await startSupport(db, adminToken, { userId: admin.id }, tenant.id, new Date(Date.now() - 5 * 60_000));
+
+    const response = await route.POST(request({ origin: `https://${HOST}`, token: adminToken }));
+    expect(response.status).toBe(303);
+    const rows = await db.select().from(auditLog).where(eq(auditLog.action, "support.ended"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ tenantId: tenant.id, actorUserId: admin.id, details: { minutes: 5 } });
+    expect(
+      (await db.select().from(sessions).where(eq(sessions.id, hashToken(adminToken)))).length,
+    ).toBe(0);
+  });
+
+  it("sair fora do suporte não escreve auditoria", async () => {
+    await route.POST(request({ origin: `https://${HOST}`, token }));
+    expect(await db.select().from(auditLog)).toHaveLength(0);
   });
 });

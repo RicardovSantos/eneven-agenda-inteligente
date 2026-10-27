@@ -1,8 +1,8 @@
 import { cache } from "react";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
-import { tenants, users } from "@/db/schema";
+import { memberships, tenants, users } from "@/db/schema";
 import { requireTenantSession } from "@/server/auth/guard";
 
 /**
@@ -32,5 +32,21 @@ export const getPanelData = cache(async () => {
     .limit(1);
 
   if (!row) redirect("/entrar");
-  return { session, ...row };
+
+  // A confirmação de e-mail que libera o link é a do DONO do estabelecimento.
+  // No modo suporte a sessão é do super-admin: vale o dono, não ele.
+  let linkEmailVerified = session.emailVerified;
+  let verificationEmail = row.userEmail;
+  if (session.support) {
+    const [owner] = await db
+      .select({ email: users.email, emailVerifiedAt: users.emailVerifiedAt })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(and(eq(memberships.tenantId, session.tenantId), eq(memberships.role, "owner")))
+      .orderBy(users.createdAt)
+      .limit(1);
+    linkEmailVerified = owner?.emailVerifiedAt != null;
+    verificationEmail = owner?.email ?? row.userEmail;
+  }
+  return { session, ...row, linkEmailVerified, verificationEmail };
 });

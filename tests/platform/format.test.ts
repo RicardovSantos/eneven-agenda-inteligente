@@ -106,6 +106,9 @@ describe("histórico", () => {
     expect(auditText(row("tenant.created_by_admin", { plan: "profissional", trialDays: 14 }))).toBe(
       "Ricardo criou o estabelecimento (plano Profissional, teste de 14 dias)",
     );
+    expect(auditText(row("tenant.owner_invite_sent", { emailSent: true }))).toBe(
+      "Ricardo enviou o acesso por e-mail ao dono",
+    );
     expect(auditText(row("support.started", {}))).toBe("Ricardo entrou como o estabelecimento (suporte)");
     expect(auditText(row("support.ended", { minutes: 12 }))).toBe("Ricardo saiu do modo suporte (12 min)");
     expect(auditText(row("google_link", {}, "Marina"))).toBe("Marina ligou a conta ao Google");

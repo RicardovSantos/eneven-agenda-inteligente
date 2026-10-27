@@ -18,7 +18,8 @@ export function SupportBanner({ tenantName }: { tenantName: string }) {
   return (
     <div
       data-support-banner=""
-      role="status"
+      role="region"
+      aria-label="Modo suporte"
       className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 bg-ink px-4 text-[0.8125rem] leading-tight text-canvas lg:h-12 lg:px-8 lg:text-sm"
     >
       <p className="line-clamp-2 min-w-0" title={`Você está vendo como ${tenantName} (suporte).`}>
