@@ -8,8 +8,10 @@ import { BusinessInfoForm } from "@/components/settings/business-info-form";
 import { HoursForm } from "@/components/settings/hours-form";
 import { RulesForm } from "@/components/settings/rules-form";
 import { SlugForm } from "@/components/settings/slug-form";
+import { TeamAccessCard } from "@/components/settings/team-access-card";
 import { requirePanelRole } from "@/server/panel/roles";
 import { defaultApplyToTeam, getBusinessHours } from "@/server/settings";
+import { listInvitableProfessionals, listTeamAccess } from "@/server/team/members";
 
 export const metadata: Metadata = { title: "Configurações" };
 
@@ -25,6 +27,10 @@ export default async function ConfiguracoesPage() {
   if (!tenant) redirect("/entrar");
   const hours = await getBusinessHours(db, session.tenantId);
   const applyToTeamDefault = await defaultApplyToTeam(db, session.tenantId);
+  const [team, invitable] = await Promise.all([
+    listTeamAccess(db, session.tenantId),
+    listInvitableProfessionals(db, session.tenantId),
+  ]);
 
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
@@ -61,6 +67,22 @@ export default async function ConfiguracoesPage() {
         }}
       />
       <SlugForm currentSlug={tenant.slug} />
+      <TeamAccessCard
+        members={team.map((row) =>
+          row.kind === "member"
+            ? row
+            : {
+                kind: "invite" as const,
+                invitationId: row.invitationId,
+                name: row.name,
+                email: row.email,
+                role: row.role,
+                professionalName: row.professionalName,
+                expired: row.expired,
+              },
+        )}
+        professionals={invitable}
+      />
     </div>
   );
 }

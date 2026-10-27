@@ -3,8 +3,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type TextFieldProps = Omit<ComponentProps<"input">, "id" | "name"> & {
-  /** Vira o `id` e o `name` do campo. */
+  /** Vira o `name` do campo e, sem `id`, também o `id`. */
   name: string;
+  /** `id` próprio, quando o nome repete o de outro campo da mesma página. */
+  id?: string;
   label: string;
   /** Mensagem de erro do campo (texto já em português). */
   error?: ReactNode;
@@ -21,6 +23,7 @@ type TextFieldProps = Omit<ComponentProps<"input">, "id" | "name"> & {
 /** Rótulo visível, campo, ajuda e erro ligados por `aria-describedby`. */
 export function TextField({
   name,
+  id = name,
   label,
   error,
   hint,
@@ -29,22 +32,22 @@ export function TextField({
   below,
   ...inputProps
 }: TextFieldProps) {
-  const errorId = `${name}-error`;
-  const hintId = `${name}-hint`;
+  const errorId = `${id}-error`;
+  const hintId = `${id}-hint`;
   const describedBy =
-    [error ? errorId : null, !error && hint ? hintId : null, below ? `${name}-below` : null]
+    [error ? errorId : null, !error && hint ? hintId : null, below ? `${id}-below` : null]
       .filter(Boolean)
       .join(" ") || undefined;
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3">
-        <Label htmlFor={name}>{label}</Label>
+        <Label htmlFor={id}>{label}</Label>
         {labelAside}
       </div>
       <div className="relative">
         <Input
-          id={name}
+          id={id}
           name={name}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
@@ -58,7 +61,7 @@ export function TextField({
         ) : null}
       </div>
       {below ? (
-        <div id={`${name}-below`} className="text-[0.8125rem] leading-snug text-ink-muted">
+        <div id={`${id}-below`} className="text-[0.8125rem] leading-snug text-ink-muted">
           {below}
         </div>
       ) : null}

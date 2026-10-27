@@ -23,7 +23,14 @@ import {
 import { createSession } from "@/server/auth/session";
 import { signup } from "@/server/auth/signup";
 import { currentClientIp } from "@/server/security/client-ip";
-import { limitForgotPassword, limitLogin, limitSignup } from "@/server/security/limits";
+import {
+  limitAcceptInvite,
+  limitForgotPassword,
+  limitLogin,
+  limitSignup,
+} from "@/server/security/limits";
+import { acceptInvitation } from "@/server/team/accept";
+import { TeamError } from "@/server/team/errors";
 import { rateLimitMessage } from "@/server/security/rate-limit";
 
 export type AuthFormState = {
@@ -116,6 +123,10 @@ export async function loginAction(
   const limit = limitLogin(await currentClientIp(), normalizeEmail(parsed.data.email));
   if (!limit.ok) return { error: rateLimitMessage(limit.retryAfterSec) };
 
+  // Vindo de "Entrar" na página do convite (`/entrar?convite=`): depois de
+  // entrar, aceita o convite e a sessão nasce no estabelecimento dele.
+  const invite = field(formData, "convite");
+
   let token: string;
   let redirectTo: string;
   try {
@@ -123,8 +134,24 @@ export async function loginAction(
     const result = await login(db, parsed.data.email, parsed.data.password);
     if (!result) return { error: LOGIN_FAILED_MESSAGE };
     const target = await resolveLoginTarget(db, result.userId);
+    let tenantId = target.tenantId;
     redirectTo = target.redirectTo;
-    token = await createSession(db, result.userId, target.tenantId);
+    if (invite) {
+      // Conta que não é a do convite (ou convite que não vale mais): entra
+      // normalmente e a página do convite explica o que houve.
+      const back = `/convite/${encodeURIComponent(invite)}`;
+      redirectTo = back;
+      if (limitAcceptInvite(await currentClientIp()).ok) {
+        try {
+          const accepted = await acceptInvitation(db, invite, { userId: result.userId });
+          tenantId = accepted.tenantId;
+          redirectTo = "/painel";
+        } catch (error) {
+          if (!(error instanceof TeamError)) throw error;
+        }
+      }
+    }
+    token = await createSession(db, result.userId, tenantId);
     await destroyCurrentSession(db);
   } catch (error) {
     console.error("Falha no login", error);

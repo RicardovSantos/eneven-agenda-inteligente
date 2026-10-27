@@ -4,6 +4,7 @@ import { tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { SESSION_COOKIE, getSession } from "@/server/auth/session";
 import { getPublicTenant } from "@/server/public/tenant";
+import { getInvitation } from "@/server/team/accept";
 import { createTestDb } from "../helpers/test-db";
 
 const state = vi.hoisted(() => ({ db: undefined as unknown }));
@@ -98,5 +99,25 @@ describe("rota de apoio do e2e", () => {
     expect(session).toMatchObject({ role: "reception", isSuperAdmin: false });
     const [tenant] = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug));
     expect(session?.tenantId).toBe(tenant.id);
+  });
+  it("invite: emite um convite de equipe e devolve token e id (só com autorização)", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("E2E_SEED", "segredo");
+    const { slug } = (await (await call({ action: "tenant", extraProfessionals: ["Léo"] }, "segredo")).json()) as {
+      slug: string;
+    };
+    const body = { action: "invite", slug, name: "Léo", email: "leo@exemplo.com", role: "staff", professionalIndex: 1 };
+
+    expect((await call(body)).status).toBe(404);
+    expect((await call({ ...body, role: "owner" }, "segredo")).status).toBe(400);
+
+    const res = await call(body, "segredo");
+    expect(res.status).toBe(200);
+    const { token, invitationId } = (await res.json()) as { token: string; invitationId: string };
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(invitationId).toMatch(/^[0-9a-f-]{36}$/);
+
+    const view = await getInvitation(db, token);
+    expect(view).toMatchObject({ status: "valid", email: "leo@exemplo.com", role: "staff", name: "Léo" });
   });
 });

@@ -6,7 +6,16 @@ import { getDb } from "@/db/client";
 import type { Db } from "@/db/types";
 import { z } from "zod";
 import type { WeeklyHours } from "@/lib/weekly-hours";
+import { requireTenantSession } from "@/server/auth/guard";
 import { requireOwner } from "@/server/settings/access";
+import { TeamError } from "@/server/team/errors";
+import {
+  inviteMember,
+  resendInvitation,
+  revokeInvitation,
+  type TeamActor,
+} from "@/server/team/invitations";
+import { removeMember } from "@/server/team/members";
 import {
   SettingsError,
   checkSlugAvailability,
@@ -194,4 +203,94 @@ export async function checkSlugAction(raw: string): Promise<SlugAvailability> {
     unstable_rethrow(error);
     return { status: "invalid" };
   }
+}
+
+// --- Acessos da equipe (só o proprietário; o token do convite só vai por e-mail) ---
+
+export type TeamActionState = {
+  ok?: boolean;
+  /** Confirmação para o toast. */
+  message?: string;
+  /** Erro geral (faixa no diálogo ou toast). */
+  error?: string;
+  /** Erro por campo, pelo `name` do campo. */
+  fieldErrors?: Record<string, string>;
+  /** `false`: o convite foi criado, mas o provedor de e-mail falhou. */
+  emailSent?: boolean;
+  at?: number;
+};
+
+const EMAIL_NOT_SENT = "Convite criado, mas o e-mail não foi enviado. Use “Reenviar convite”.";
+const TEAM_GENERIC_ERROR = "Não foi possível concluir agora. Tente novamente em instantes.";
+
+/**
+ * Ator vindo da sessão (nunca da entrada); a regra "só o proprietário" é do
+ * módulo da equipe, que recusa os demais papéis com `forbidden`.
+ */
+async function runTeam(
+  work: (ctx: { db: Db; actor: TeamActor }) => Promise<Partial<TeamActionState>>,
+): Promise<TeamActionState> {
+  try {
+    const session = await requireTenantSession();
+    const actor: TeamActor = {
+      tenantId: session.tenantId,
+      userId: session.userId,
+      role: session.role ?? "staff",
+    };
+    const result = await work({ db: await getDb(), actor });
+    revalidatePath("/painel/configuracoes");
+    revalidatePath("/painel/equipe");
+    return { ok: true, ...result, at: Date.now() };
+  } catch (error) {
+    if (error instanceof TeamError) {
+      return error.code === "validation"
+        ? { ok: false, fieldErrors: error.fieldErrors, at: Date.now() }
+        : { ok: false, error: error.message, at: Date.now() };
+    }
+    unstable_rethrow(error);
+    console.error("Falha nos acessos da equipe", error);
+    return { ok: false, error: TEAM_GENERIC_ERROR, at: Date.now() };
+  }
+}
+
+export async function inviteMemberAction(
+  _previous: TeamActionState,
+  formData: FormData,
+): Promise<TeamActionState> {
+  return runTeam(async ({ db, actor }) => {
+    const role = text(formData, "role");
+    const { emailSent } = await inviteMember(db, actor, {
+      name: text(formData, "name"),
+      email: text(formData, "email"),
+      // Valor fora da lista cai na validação do módulo ("Escolha o tipo de acesso.").
+      role: role as "reception" | "staff",
+      professionalId: role === "staff" ? text(formData, "professionalId") || undefined : undefined,
+    });
+    return emailSent
+      ? { message: "Convite enviado", emailSent: true }
+      : { message: EMAIL_NOT_SENT, emailSent: false };
+  });
+}
+
+export async function resendInvitationAction(invitationId: string): Promise<TeamActionState> {
+  return runTeam(async ({ db, actor }) => {
+    const { emailSent } = await resendInvitation(db, actor, String(invitationId));
+    return emailSent
+      ? { message: "Convite reenviado", emailSent: true }
+      : { message: EMAIL_NOT_SENT, emailSent: false };
+  });
+}
+
+export async function revokeInvitationAction(invitationId: string): Promise<TeamActionState> {
+  return runTeam(async ({ db, actor }) => {
+    await revokeInvitation(db, actor, String(invitationId));
+    return { message: "Convite cancelado" };
+  });
+}
+
+export async function removeMemberAction(userId: string): Promise<TeamActionState> {
+  return runTeam(async ({ db, actor }) => {
+    await removeMember(db, actor, String(userId));
+    return { message: "Acesso removido" };
+  });
 }

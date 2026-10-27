@@ -135,3 +135,34 @@ export async function removeMember(db: Db, actor: TeamActor, userId: string): Pr
     );
   });
 }
+
+/** Profissionais ativos, deste estabelecimento, que ainda não têm acesso (opções do convite "Profissional"). */
+export async function listInvitableProfessionals(
+  db: Db,
+  tenantId: string,
+): Promise<{ id: string; name: string }[]> {
+  return withTenant(db, tenantId, (tx) =>
+    tx
+      .select({ id: professionals.id, name: professionals.name })
+      .from(professionals)
+      .where(
+        and(
+          eq(professionals.tenantId, tenantId),
+          eq(professionals.active, true),
+          isNull(professionals.userId),
+        ),
+      )
+      .orderBy(asc(professionals.sortOrder), asc(professionals.createdAt), asc(professionals.id)),
+  );
+}
+
+/** Ids dos profissionais ligados a um usuário (o "Tem acesso" da tela Equipe). */
+export async function professionalIdsWithAccess(db: Db, tenantId: string): Promise<Set<string>> {
+  const rows = await withTenant(db, tenantId, (tx) =>
+    tx
+      .select({ id: professionals.id, userId: professionals.userId })
+      .from(professionals)
+      .where(eq(professionals.tenantId, tenantId)),
+  );
+  return new Set(rows.filter((r) => r.userId !== null).map((r) => r.id));
+}

@@ -4,16 +4,18 @@ import { ProfessionalsScreen } from "@/components/catalog/professionals-screen";
 import { requirePanelRole } from "@/server/panel/roles";
 import { listProfessionals, listServices } from "@/server/catalog";
 import { getBusinessHours } from "@/server/settings";
+import { professionalIdsWithAccess } from "@/server/team/members";
 
 export const metadata: Metadata = { title: "Equipe" };
 
 export default async function EquipePage() {
   const { session } = await requirePanelRole(["owner", "reception"]);
   const db = await getDb();
-  const [professionals, services, businessHours] = await Promise.all([
+  const [professionals, services, businessHours, withAccess] = await Promise.all([
     listProfessionals(db, session.tenantId),
     listServices(db, session.tenantId),
     getBusinessHours(db, session.tenantId),
+    professionalIdsWithAccess(db, session.tenantId),
   ]);
 
   return (
@@ -26,6 +28,7 @@ export default async function EquipePage() {
         serviceIds: p.serviceIds,
         hours: p.hours,
         futureBookings: p.futureBookings,
+        hasAccess: withAccess.has(p.id),
       }))}
       services={services.map((s) => ({ id: s.id, name: s.name }))}
       businessHours={businessHours}

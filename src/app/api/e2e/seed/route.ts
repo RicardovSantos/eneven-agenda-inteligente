@@ -4,12 +4,14 @@ import {
   listE2eBookings,
   seedE2eBlock,
   seedE2eBooking,
+  seedE2eInvite,
   seedE2eMember,
   seedE2eSession,
   seedE2eTenant,
   verifyE2eOwnerEmail,
   type SeedBlockOptions,
   type SeedBookingOptions,
+  type SeedInviteOptions,
   type SeedTenantOptions,
 } from "@/server/e2e/seed";
 
@@ -42,6 +44,12 @@ export async function POST(request: Request): Promise<Response> {
         return Response.json({ error: "papel inválido" }, { status: 400 });
       }
       return Response.json(await seedE2eMember(db, String(body.slug), body.role));
+    }
+    case "invite": {
+      if (body.role !== "reception" && body.role !== "staff") {
+        return Response.json({ error: "papel inválido" }, { status: 400 });
+      }
+      return Response.json(await seedE2eInvite(db, body as unknown as SeedInviteOptions));
     }
     case "verify-email":
       return Response.json(await verifyE2eOwnerEmail(db, String(body.slug)));
