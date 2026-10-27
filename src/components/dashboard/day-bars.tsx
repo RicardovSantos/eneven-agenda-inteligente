@@ -171,7 +171,7 @@ function Chart({
   const heightOf = (d: Day) => (d.count === 0 ? null : `${(d.count / scale) * PLOT_FILL}%`);
   const activeDay = active === null ? null : days[active];
   const activeHeight = activeDay ? (heightOf(activeDay) ?? "2px") : null;
-  const tooltipSide = active === null ? "" : active < 4 ? "start" : active > count - 5 ? "end" : "center";
+  const tooltipSide = active === null ? "" : active / count < 0.3 ? "start" : (active + 1) / count > 0.7 ? "end" : "center";
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -240,7 +240,8 @@ function Chart({
               className="pointer-events-none absolute z-10 whitespace-nowrap rounded-field bg-ink px-3 py-2 text-[0.8125rem] font-medium tabular-nums text-surface shadow-float"
               style={{
                 left: `${(((active ?? 0) + 0.5) / count) * 100}%`,
-                bottom: `calc(${activeHeight} + 8px)`,
+                // Acima da barra, mas nunca acima do topo do gráfico (não cobre título nem legenda).
+                bottom: `min(calc(${activeHeight} + 8px), calc(100% - 36px))`,
                 transform:
                   tooltipSide === "start"
                     ? "translateX(-12px)"

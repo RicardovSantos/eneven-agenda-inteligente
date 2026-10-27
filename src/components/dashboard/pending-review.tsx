@@ -2,7 +2,7 @@
 
 import { ChevronRight, CircleAlert, Loader2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { completeBookingAction, noShowBookingAction } from "@/app/painel/actions";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -28,6 +28,7 @@ export function PendingReview({ items }: { items: PendingItem[] }) {
   // Linhas já resolvidas: somem na hora, antes de a página recarregar os números.
   const [done, setDone] = useState<Set<string>>(new Set());
   const visible = items.filter((i) => !done.has(i.id));
+  const close = useCallback(() => setOpen(false), []);
 
   if (visible.length === 0 && !open) return null;
   const count = visible.length;
@@ -45,8 +46,8 @@ export function PendingReview({ items }: { items: PendingItem[] }) {
         <p className="min-w-[360px] flex-1 text-[0.9375rem]">
           <strong className="font-semibold">
             {count === 1
-              ? "1 atendimento de dias anteriores está sem resultado."
-              : `${count} atendimentos de dias anteriores estão sem resultado.`}
+              ? "1 atendimento que já terminou está sem resultado."
+              : `${count} atendimentos que já terminaram estão sem resultado.`}
           </strong>{" "}
           <span className="text-ink-muted">
             Marque como atendido ou faltou para o faturamento ficar certo.
@@ -83,7 +84,7 @@ export function PendingReview({ items }: { items: PendingItem[] }) {
       <ReviewDialog
         open={open}
         items={visible}
-        onClose={() => setOpen(false)}
+        onClose={close}
         onResolved={(id) => setDone((current) => new Set(current).add(id))}
       />
     </>

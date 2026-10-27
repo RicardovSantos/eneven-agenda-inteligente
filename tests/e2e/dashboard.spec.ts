@@ -47,7 +47,7 @@ for (const viewport of [
 
       // Aviso e revisão
       await expect(
-        page.getByText(mobile ? "2 atendimentos sem resultado" : "2 atendimentos de dias anteriores estão sem resultado."),
+        page.getByText(mobile ? "2 atendimentos sem resultado" : "2 atendimentos que já terminaram estão sem resultado."),
       ).toBeVisible();
       await page.getByRole("button", { name: /Revisar agora/ }).click();
       const dialog = page.getByRole("dialog", { name: "Atendimentos sem resultado" });
