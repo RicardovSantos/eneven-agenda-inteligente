@@ -5,6 +5,7 @@ export type TeamErrorCode =
   | "other_tenant"
   | "invalid_invitation"
   | "wrong_account"
+  | "google_failed"
   | "not_found"
   | "rate_limited";
 
@@ -15,6 +16,7 @@ const MESSAGES: Record<TeamErrorCode, string> = {
   other_tenant: "Esse e-mail já está ligado a outro estabelecimento.",
   invalid_invitation: "Este convite não vale mais. Peça um novo a quem convidou você.",
   wrong_account: "Entre com a conta do e-mail convidado para aceitar.",
+  google_failed: "Não foi possível entrar com o Google. Tente de novo ou use seu e-mail.",
   not_found: "Não encontrado.",
   rate_limited: "Você enviou convites demais por hoje. Tente de novo amanhã.",
 };

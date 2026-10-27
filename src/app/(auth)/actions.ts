@@ -31,6 +31,7 @@ import {
 } from "@/server/security/limits";
 import { acceptInvitation } from "@/server/team/accept";
 import { TeamError } from "@/server/team/errors";
+import { inviteErrorFlag } from "@/server/team/error-flags";
 import { rateLimitMessage } from "@/server/security/rate-limit";
 
 export type AuthFormState = {
@@ -140,7 +141,7 @@ export async function loginAction(
       // Conta que não é a do convite (ou convite que não vale mais): entra
       // normalmente e a página do convite explica o que houve.
       const back = `/convite/${encodeURIComponent(invite)}`;
-      redirectTo = back;
+      redirectTo = `${back}?erro=limite`;
       if (limitAcceptInvite(await currentClientIp()).ok) {
         try {
           const accepted = await acceptInvitation(db, invite, { userId: result.userId });
@@ -148,6 +149,7 @@ export async function loginAction(
           redirectTo = "/painel";
         } catch (error) {
           if (!(error instanceof TeamError)) throw error;
+          redirectTo = `${back}?erro=${inviteErrorFlag(error)}`;
         }
       }
     }

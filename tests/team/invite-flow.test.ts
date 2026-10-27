@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   jar: new Map<string, string>(),
   ip: "198.51.100.7",
   claims: {} as Record<string, unknown>,
+  exchangeFails: false,
 }));
 
 vi.mock("@/db/client", () => ({ getDb: async () => state.db }));
@@ -49,7 +50,9 @@ vi.mock("arctic", () => ({
       return url;
     }
     validateAuthorizationCode() {
-      return Promise.resolve({ idToken: () => "id-token" });
+      return state.exchangeFails
+        ? Promise.reject(new Error("access_denied"))
+        : Promise.resolve({ idToken: () => "id-token" });
     }
   },
   generateState: () => "state-fixo",
@@ -105,6 +108,7 @@ describe("aceite de convite: telas e ações", () => {
     vi.mocked(sendEmail).mockResolvedValue(undefined);
     state.jar = new Map();
     state.ip = "198.51.100.7";
+    state.exchangeFails = false;
     db = await createTestDb();
     state.db = db;
     owner = await seedOwnerTenant(db, "Studio Defendi", "dona@defendi.com");
@@ -256,7 +260,7 @@ describe("aceite de convite: telas e ações", () => {
           form({ email: "outra@x.com", password: "senha-da-outra-1", convite: token }),
         ),
       );
-      expect(go).toBe(`NEXT_REDIRECT:/convite/${token}`);
+      expect(go).toBe(`NEXT_REDIRECT:/convite/${token}?erro=conta`);
       // Sessão comum (sem estabelecimento): não vira membro do convite.
       expect((await sessionTenant())?.tenantId).toBeNull();
       expect(await db.select().from(memberships).where(eq(memberships.tenantId, tenantId))).toHaveLength(1);
@@ -381,7 +385,7 @@ describe("aceite de convite: telas e ações", () => {
         ea_invite: signInviteCookie(token),
       });
       expect(response.cookies.get("ea_session")).toBeUndefined();
-      expect(response.headers.get("location")).toMatch(/\/(convite\/.*\?erro=google|entrar\?erro=google)$/);
+      expect(response.headers.get("location")).toBe(`${APP_URL}/convite/${token}?erro=google`);
     });
 
     it("cookie do convite adulterado ou sem intent=invite é ignorado: fluxo normal do Google", async () => {
@@ -394,6 +398,46 @@ describe("aceite de convite: telas e ações", () => {
       // Conta nova pelo fluxo normal: vai completar o cadastro, nunca entra no convite.
       expect(b.headers.get("location")).toBe(`${APP_URL}/cadastro/completar`);
       expect(await db.select().from(memberships).where(eq(memberships.tenantId, tenantId))).toHaveLength(1);
+    });
+
+    it("cancelou ou falhou no Google (troca do código): volta ao convite com erro=google", async () => {
+      const token = await issue("rita@gmail.com");
+      state.exchangeFails = true;
+      const response = await callback({ ...flowCookies("invite"), ea_invite: signInviteCookie(token) });
+      expect(response.headers.get("location")).toBe(`${APP_URL}/convite/${token}?erro=google`);
+      expect(response.cookies.get("ea_session")).toBeUndefined();
+    });
+
+    it("convite de proprietário com Google de conta nova: erro=conta (a página pede o e-mail certo)", async () => {
+      const { createOwnerAccessInviteForTests } = await import("@/server/team/invitations");
+      const { token } = await createOwnerAccessInviteForTests(db, tenantId, owner.userId);
+      state.claims = claims("novo-dono@gmail.com");
+      const response = await callback({ ...flowCookies("invite"), ea_invite: signInviteCookie(token) });
+      expect(response.headers.get("location")).toBe(`${APP_URL}/convite/${token}?erro=conta`);
+    });
+
+    it("profissional já ligado a outra pessoa: erro=invalido", async () => {
+      const token = await issue("bia@gmail.com", "staff", "Bia");
+      await db.update(professionals).set({ userId: owner.userId }).where(eq(professionals.id, proId));
+      state.claims = claims("bia@gmail.com");
+      const response = await callback({ ...flowCookies("invite"), ea_invite: signInviteCookie(token) });
+      expect(response.headers.get("location")).toBe(`${APP_URL}/convite/${token}?erro=invalido`);
+      expect(response.cookies.get("ea_session")).toBeUndefined();
+    });
+
+    it("GET /convite/{token}/google respeita o limite por IP antes de ler o banco", async () => {
+      const token = await issue("rita@gmail.com");
+      const limits = await import("@/server/security/limits");
+      for (let i = 0; i < 120; i++) limits.limitPublicRead(state.ip);
+      const { GET } = await import("@/app/convite/[token]/google/route");
+      const response = await GET(
+        new NextRequest(`http://interno:3000/convite/${token}/google`, {
+          headers: { "x-forwarded-for": state.ip },
+        }),
+        { params: Promise.resolve({ token }) },
+      );
+      expect(response.headers.get("location")).toBe(`${APP_URL}/convite/${token}?erro=limite`);
+      expect(response.cookies.get("ea_invite")).toBeUndefined();
     });
 
     it("limita as tentativas por IP também no retorno do Google", async () => {

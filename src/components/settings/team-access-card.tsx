@@ -77,8 +77,13 @@ export function TeamAccessCard({
     const target = removing;
     if (!target) return;
     startTransition(async () => {
-      finish(await removeMemberAction(target.userId), "Acesso removido");
-      setRemoving(null);
+      try {
+        finish(await removeMemberAction(target.userId), "Acesso removido");
+      } catch {
+        show("Não foi possível concluir agora. Tente novamente em instantes.", "error");
+      } finally {
+        setRemoving(null);
+      }
     });
   };
 

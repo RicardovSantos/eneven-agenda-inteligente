@@ -9,8 +9,9 @@ import { describe, expect, it } from "vitest";
  */
 const SRC = join(process.cwd(), "src");
 const TEAM_DIR = join(SRC, "server", "team");
+// Só a definição (invitations.ts) e o seed do e2e; qualquer outro arquivo, inclusive de team/, falha.
 const ALLOWED = new Set(
-  ["src/app/api/e2e/seed/route.ts", "src/server/e2e/seed.ts"].map((p) => p.split("/").join(sep)),
+  ["src/server/team/invitations.ts", "src/app/api/e2e/seed/route.ts", "src/server/e2e/seed.ts"].map((p) => p.split("/").join(sep)),
 );
 
 function walk(dir: string): string[] {
@@ -22,9 +23,7 @@ function walk(dir: string): string[] {
 }
 
 const outsideTeamAndSeed = () =>
-  walk(SRC)
-    .filter((file) => !file.startsWith(TEAM_DIR + sep))
-    .filter((file) => !ALLOWED.has(relative(process.cwd(), file)));
+  walk(SRC).filter((file) => !ALLOWED.has(relative(process.cwd(), file)));
 
 describe("emissores de convite só para testes", () => {
   const issuerNames = walk(TEAM_DIR)

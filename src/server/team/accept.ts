@@ -12,7 +12,6 @@ import type { Db } from "@/db/types";
 import { revokeUnusedEmailTokens } from "@/server/auth/email-tokens";
 import {
   discardUnverifiedCredentials,
-  GOOGLE_ERROR_MESSAGE,
   GOOGLE_PROVIDER,
   resolveGoogleUser,
   type GoogleProfile,
@@ -278,13 +277,14 @@ async function resolveUser(
   if ("googleProfile" in input) {
     const profile = input.googleProfile;
     if (normalizeEmail(profile.email) !== inv.email) throw wrongAccount(inv.email);
-    if (!profile.emailVerified) throw new TeamError("wrong_account", GOOGLE_ERROR_MESSAGE);
+    if (!profile.emailVerified) throw new TeamError("google_failed");
 
     const resolved = await resolveGoogleUser(tx, profile, now);
-    if (resolved.kind === "error") throw new TeamError("wrong_account", GOOGLE_ERROR_MESSAGE);
+    if (resolved.kind === "error") throw new TeamError("google_failed");
 
     if (resolved.kind === "new") {
-      if (isOwnerInvite) throw invalid();
+      // Convite de proprietário é do dono que já existe: Google de outro e-mail não cria conta.
+      if (isOwnerInvite) throw wrongAccount(inv.email);
       const created = await tx
         .insert(users)
         .values({ email: inv.email, name: profile.name, passwordHash: null, emailVerifiedAt: now })

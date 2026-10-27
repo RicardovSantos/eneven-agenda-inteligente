@@ -26,10 +26,16 @@ const TAGLINE = "Sua agenda do dia, onde você estiver.";
 const ROLE_TEXT = { reception: "Recepção", staff: "Profissional" } as const;
 
 /** Mensagem do `?erro=` que a volta do Google deixa na URL. */
-function errorMessage(flag: string | undefined, email: string): string | undefined {
+function errorMessage(
+  flag: string | undefined,
+  email: string,
+  isOwnerInvite: boolean,
+): string | undefined {
   switch (flag) {
     case "conta":
-      return wrongAccount(email).message;
+      return isOwnerInvite ? `Use o e-mail ${email} para entrar.` : wrongAccount(email).message;
+    case "invalido":
+      return new TeamError("invalid_invitation").message;
     case "google":
       return GOOGLE_ERROR_MESSAGE;
     case "limite":
@@ -75,7 +81,7 @@ export default async function ConvitePage({
   }
 
   const isOwnerInvite = view.role === "owner";
-  const alert = errorMessage(typeof erro === "string" ? erro : undefined, view.email);
+  const alert = errorMessage(typeof erro === "string" ? erro : undefined, view.email, isOwnerInvite);
 
   // E-mail da conta que está logada neste navegador (se houver).
   let sessionEmail: string | null = null;

@@ -379,7 +379,7 @@ describe("aceitar convites", () => {
       const e = await failureOf(
         acceptInvitation(db, token, { googleProfile: google({ emailVerified: false }) }, NOW),
       );
-      expect(e.code).toBe("wrong_account");
+      expect(e.code).toBe("google_failed");
       expect(await db.select().from(oauthAccounts)).toHaveLength(0);
     });
 

@@ -4,7 +4,6 @@ import { getDb } from "@/db/client";
 import { sessionCookieOptions } from "@/server/auth/cookie";
 import { INVITE_COOKIE } from "@/server/auth/cookie-names";
 import {
-  GOOGLE_ERROR_MESSAGE,
   GOOGLE_PENDING_COOKIE,
   GOOGLE_PENDING_MAX_AGE_SECONDS,
   OAUTH_INTENT_COOKIE,
@@ -30,6 +29,7 @@ import { getClientIp } from "@/server/security/rate-limit";
 import { limitAcceptInvite } from "@/server/security/limits";
 import { acceptInvitation } from "@/server/team/accept";
 import { TeamError } from "@/server/team/errors";
+import { inviteErrorFlag } from "@/server/team/error-flags";
 
 type Outcome =
   | { to: string; session?: string; pending?: string }
@@ -53,7 +53,15 @@ export async function GET(request: NextRequest) {
     outcome = { to: "error" };
   }
 
-  const destination = outcome.to === "error" ? "/entrar?erro=google" : outcome.to;
+  // Falha ou cancelamento no fluxo do convite: volta ao convite (token do cookie assinado).
+  const failedInviteToken =
+    request.cookies.get(OAUTH_INTENT_COOKIE)?.value === "invite"
+      ? readInviteCookie(request.cookies.get(INVITE_COOKIE)?.value)
+      : null;
+  const errorTo = failedInviteToken
+    ? `/convite/${encodeURIComponent(failedInviteToken)}?erro=google`
+    : "/entrar?erro=google";
+  const destination = outcome.to === "error" ? errorTo : outcome.to;
   // Sem endereço público confiável (APP_URL ausente) o redirecionamento é
   // relativo: a origem da requisição, atrás do proxy, é a interna.
   const response = base
@@ -135,16 +143,6 @@ async function handle(request: NextRequest, base: string): Promise<Outcome> {
   return { to: redirectTo, session };
 }
 
-/** Flag de `?erro=` da página do convite para cada recusa. */
-function inviteErrorFlag(error: TeamError): string {
-  if (error.code === "wrong_account") {
-    return error.message === GOOGLE_ERROR_MESSAGE ? "google" : "conta";
-  }
-  if (error.code === "already_member") return "membro";
-  if (error.code === "other_tenant") return "outro";
-  return "google";
-}
-
 /**
  * Aceita o convite com o perfil do Google (e-mail verificado igual ao do
  * convite) e abre a sessão no estabelecimento do convite. Recusas voltam à
@@ -168,7 +166,7 @@ async function acceptInviteWithGoogle(
   } catch (error) {
     if (!(error instanceof TeamError)) throw error;
     return {
-      to: error.code === "invalid_invitation" ? back : `${back}?erro=${inviteErrorFlag(error)}`,
+      to: `${back}?erro=${inviteErrorFlag(error)}`,
     };
   }
 

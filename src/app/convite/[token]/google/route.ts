@@ -5,6 +5,8 @@ import { INVITE_COOKIE } from "@/server/auth/cookie-names";
 import { OAUTH_COOKIE_MAX_AGE_SECONDS, publicBaseUrl } from "@/server/auth/google";
 import { startGoogleFlow } from "@/server/auth/google-start";
 import { signInviteCookie } from "@/server/auth/invite-cookie";
+import { limitPublicRead } from "@/server/security/limits";
+import { getClientIp } from "@/server/security/rate-limit";
 import { getInvitation } from "@/server/team/accept";
 
 /**
@@ -20,6 +22,11 @@ export async function GET(
   const { token } = await params;
   const base = publicBaseUrl(request.nextUrl.origin);
   const back = `${base}/convite/${encodeURIComponent(token)}`;
+
+  // Antes de ler o banco: 120 / min por IP.
+  if (!limitPublicRead(getClientIp(request.headers)).ok) {
+    return NextResponse.redirect(`${back}?erro=limite`);
+  }
 
   const view = await getInvitation(await getDb(), token);
   if (view.status !== "valid") return NextResponse.redirect(back);
