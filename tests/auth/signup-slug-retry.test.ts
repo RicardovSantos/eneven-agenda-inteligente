@@ -6,6 +6,7 @@ import { AuthError } from "@/server/auth/errors";
 import { signup } from "@/server/auth/signup";
 import { generateUniqueSlug } from "@/server/tenants/slug";
 import { createTestDb } from "../helpers/test-db";
+import { getDefaultPlanId } from "@/server/platform/plans";
 
 // O gerador de slug é trocado por um dublê para simular a corrida: ele
 // devolve um slug que já foi ocupado entre a consulta e o INSERT.
@@ -27,7 +28,7 @@ describe("cadastro: colisão de slug por corrida", () => {
     slugMock.mockReset();
     db = await createTestDb();
     // Outro estabelecimento já ocupa "defendi-studio".
-    await db.insert(tenants).values({ slug: "defendi-studio", name: "Outro", trialEndsAt: new Date() });
+    await db.insert(tenants).values({ slug: "defendi-studio", name: "Outro", trialEndsAt: new Date(), planId: await getDefaultPlanId(db) });
   });
 
   it("slug ocupado uma vez: tenta de novo e cadastra com o slug livre", async () => {

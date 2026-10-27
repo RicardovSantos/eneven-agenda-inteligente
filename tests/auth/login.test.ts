@@ -12,6 +12,7 @@ import {
 } from "@/server/auth/session";
 import { signup } from "@/server/auth/signup";
 import { createTestDb } from "../helpers/test-db";
+import { getDefaultPlanId } from "@/server/platform/plans";
 
 describe("password", () => {
   it("gera hash argon2id e verifica", async () => {
@@ -142,7 +143,7 @@ describe("login e sessão", () => {
   it("não usa o papel de outro tenant", async () => {
     const [other] = await db
       .insert(tenants)
-      .values({ slug: "outro", name: "Outro", trialEndsAt: new Date() })
+      .values({ slug: "outro", name: "Outro", trialEndsAt: new Date(), planId: await getDefaultPlanId(db) })
       .returning();
     const token = await createSession(db, r.userId, other.id);
     expect((await getSession(db, token))?.role).toBeNull();

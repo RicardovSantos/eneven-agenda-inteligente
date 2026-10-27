@@ -10,6 +10,7 @@ import {
   users,
 } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { getDefaultPlanId } from "@/server/platform/plans";
 
 export type PublicSeed = {
   tenantId: string;
@@ -46,6 +47,7 @@ export async function seedBookable(db: Db, options: Options = {}): Promise<Publi
       name: "Studio Defendi",
       status: options.status ?? "trial",
       trialEndsAt: options.trialEndsAt ?? new Date("2099-01-01T00:00:00.000Z"),
+      planId: await getDefaultPlanId(db),
       slotIntervalMin: 30,
       minNoticeMin: 60,
       maxDaysAhead: 30,

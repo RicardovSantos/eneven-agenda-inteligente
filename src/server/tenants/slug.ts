@@ -23,6 +23,7 @@ export const RESERVED_SLUGS: readonly string[] = [
   "confirmar-email",
   "recuperar-senha",
   "agendamento",
+  "convite",
   "_next",
 ];
 

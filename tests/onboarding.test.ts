@@ -23,6 +23,7 @@ import { saveService } from "@/server/catalog";
 import { updateBranding, uploadLogo } from "@/server/settings";
 import { withTenant, withTenantTx } from "@/server/tenant-db";
 import { createTestDb } from "./helpers/test-db";
+import { getDefaultPlanId } from "@/server/platform/plans";
 
 const input = {
   businessName: "Defendi Studio",
@@ -231,7 +232,12 @@ describe("ensureTenantDefaults (estabelecimentos anteriores ao seed)", () => {
     const db = await createTestDb();
     const [tenant] = await db
       .insert(tenants)
-      .values({ slug: "antigo", name: "Antigo", trialEndsAt: new Date(Date.now() + 86_400_000) })
+      .values({
+        slug: "antigo",
+        name: "Antigo",
+        trialEndsAt: new Date(Date.now() + 86_400_000),
+        planId: await getDefaultPlanId(db),
+      })
       .returning();
     const [user] = await db
       .insert(users)

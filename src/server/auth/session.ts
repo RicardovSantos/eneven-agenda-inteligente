@@ -20,18 +20,24 @@ export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-/** Cria a sessão e devolve o token em texto (vai para o cookie). */
+/** Cria a sessão, registra o último acesso e devolve o token em texto (vai para o cookie). */
 export async function createSession(
   db: Db,
   userId: string,
   tenantId: string | null,
 ): Promise<string> {
   const token = randomBytes(32).toString("base64url");
-  await db.insert(sessions).values({
-    id: hashToken(token),
-    userId,
-    tenantId,
-    expiresAt: new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000),
+  await db.transaction(async (tx) => {
+    await tx.insert(sessions).values({
+      id: hashToken(token),
+      userId,
+      tenantId,
+      expiresAt: new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000),
+    });
+    await tx
+      .update(users)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(users.id, userId));
   });
   return token;
 }
