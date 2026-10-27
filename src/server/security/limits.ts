@@ -29,6 +29,14 @@ export const bookingByPhoneLimiter = createRateLimiter({ limit: 5, windowMs: HOU
 export const publicReadByIpLimiter = createRateLimiter({ limit: 120, windowMs: MINUTE_MS });
 export const manageByIpLimiter = createRateLimiter({ limit: 20, windowMs: 10 * MINUTE_MS });
 
+/**
+ * Convites da equipe: no máximo 20 por dia por estabelecimento (envio e
+ * reenvio); aceitar um convite = 10 / 15 min por IP (cada tentativa gasta hash
+ * de senha e lê o banco).
+ */
+export const inviteByTenantLimiter = createRateLimiter({ limit: 20, windowMs: 24 * HOUR_MS });
+export const acceptInviteByIpLimiter = createRateLimiter({ limit: 10, windowMs: 15 * MINUTE_MS });
+
 /** Junta os resultados: recusa se qualquer um recusar, com o maior tempo de espera. */
 function combine(results: RateLimitResult[]): RateLimitResult {
   const blocked = results.filter(
@@ -80,6 +88,16 @@ export function limitPublicRead(ip: string, now?: number): RateLimitResult {
 
 export function limitManage(ip: string, now?: number): RateLimitResult {
   return manageByIpLimiter.hit(ip, now);
+}
+
+/** Conta um envio de convite do estabelecimento (`tenantId` vem da sessão). */
+export function limitInviteSend(tenantId: string, now?: number): RateLimitResult {
+  return inviteByTenantLimiter.hit(tenantId, now);
+}
+
+/** Só o IP, na ação que aceita o convite. */
+export function limitAcceptInvite(ip: string, now?: number): RateLimitResult {
+  return acceptInviteByIpLimiter.hit(ip, now);
 }
 
 /** Zera todos os limitadores (só para testes). */

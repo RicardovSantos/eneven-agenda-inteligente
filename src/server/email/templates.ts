@@ -52,6 +52,8 @@ export const verifyLink = (token: string) =>
 export const resetLink = (token: string) =>
   `${appUrl()}/recuperar-senha/${encodeURIComponent(token)}`;
 
+export const inviteLink = (token: string) => `${appUrl()}/convite/${encodeURIComponent(token)}`;
+
 type Layout = {
   heading: string;
   /** Texto já escapado (pode conter `<strong>` próprio). */
@@ -149,6 +151,73 @@ export function buildResetEmail(input: { email: string; link: string }): EmailCo
       body,
       "",
       `Criar nova senha: ${input.link}`,
+      "",
+      note,
+      "",
+      "Eneven Agendamentos Inteligentes",
+    ].join("\n"),
+  };
+}
+
+const INVITE_ROLE_LABEL = { reception: "recepção", staff: "profissional" } as const;
+
+/**
+ * Convite de acesso à agenda. O assunto é texto puro (sem HTML), mas quebras de
+ * linha do nome do estabelecimento são trocadas por espaço (cabeçalho). No
+ * HTML, nome da pessoa e do estabelecimento passam por `escapeHtml`.
+ */
+export function buildInviteEmail(input: {
+  name: string;
+  tenantName: string;
+  role: "owner" | "reception" | "staff";
+  link: string;
+}): EmailContent {
+  const first = firstName(input.name);
+  const tenantName = input.tenantName.replace(/[\r\n]+/g, " ").trim();
+
+  if (input.role === "owner") {
+    const body = `Olá, ${first}. A agenda de ${tenantName} já está pronta. Crie sua senha para entrar.`;
+    const note = "O link vale por 7 dias e só pode ser usado uma vez.";
+    return {
+      subject: "Sua agenda na Eneven está pronta",
+      html: renderLayout({
+        heading: "Sua agenda está pronta",
+        bodyHtml: escapeHtml(body),
+        buttonLabel: "Criar minha senha",
+        link: input.link,
+        noteHtml: escapeHtml(note),
+      }),
+      text: [
+        "Sua agenda está pronta",
+        "",
+        body,
+        "",
+        `Criar minha senha: ${input.link}`,
+        "",
+        note,
+        "",
+        "Eneven Agendamentos Inteligentes",
+      ].join("\n"),
+    };
+  }
+
+  const body = `Olá, ${first}. ${tenantName} convidou você para acessar a agenda como ${INVITE_ROLE_LABEL[input.role]}.`;
+  const note = "O link vale por 7 dias. Se você não esperava este convite, ignore este e-mail.";
+  return {
+    subject: `${tenantName} convidou você para a agenda`,
+    html: renderLayout({
+      heading: "Você foi convidado",
+      bodyHtml: escapeHtml(body),
+      buttonLabel: "Aceitar convite",
+      link: input.link,
+      noteHtml: escapeHtml(note),
+    }),
+    text: [
+      "Você foi convidado",
+      "",
+      body,
+      "",
+      `Aceitar convite: ${input.link}`,
       "",
       note,
       "",
