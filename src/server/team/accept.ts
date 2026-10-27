@@ -23,7 +23,7 @@ import { newPasswordSchema, toFieldErrors } from "@/server/auth/schemas";
 import { hashToken } from "@/server/auth/session";
 import { withTenantTx } from "@/server/tenant-db";
 import { z } from "zod";
-import { TeamError, wrongAccount } from "./errors";
+import { TeamError, UUID, wrongAccount } from "./errors";
 
 export type InvitationView =
   | {
@@ -38,12 +38,11 @@ export type InvitationView =
 
 export type AcceptInput =
   | { userId: string }
-  | { name: string; password: string }
+  /** `name` é obrigatório no convite de equipe; o convite de proprietário só pede a senha. */
+  | { name?: string; password: string }
   | { googleProfile: GoogleProfile };
 
 type InvitationRow = typeof invitations.$inferSelect;
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const invalid = () => new TeamError("invalid_invitation");
 
@@ -98,14 +97,13 @@ export async function getInvitation(
   };
 }
 
-const credentialsSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Informe seu nome.")
-    .max(120, "Seu nome pode ter no máximo 120 caracteres."),
-  password: newPasswordSchema,
-});
+const nameSchema = z
+  .string()
+  .trim()
+  .min(1, "Informe seu nome.")
+  .max(120, "Seu nome pode ter no máximo 120 caracteres.");
+const teamCredentialsSchema = z.object({ name: nameSchema, password: newPasswordSchema });
+const ownerCredentialsSchema = z.object({ password: newPasswordSchema });
 
 /** Garante que o usuário (já travado) não tem vínculo com este nem com outro estabelecimento. */
 async function assertNoMembership(tx: Db, userId: string, tenantId: string): Promise<void> {
@@ -171,7 +169,11 @@ export async function acceptInvitation(
   // gastar o convite: senha fraca não consome o link.
   let credentials: Credentials | null = null;
   if ("password" in input) {
-    const parsed = credentialsSchema.safeParse({ name: input.name, password: input.password });
+    // Convite de proprietário só pede a senha (o dono já tem nome).
+    const parsed =
+      pre.role === "owner"
+        ? ownerCredentialsSchema.safeParse({ password: input.password })
+        : teamCredentialsSchema.safeParse({ name: input.name, password: input.password });
     if (!parsed.success) {
       const fieldErrors = toFieldErrors(parsed.error);
       throw new TeamError(
@@ -181,7 +183,7 @@ export async function acceptInvitation(
       );
     }
     credentials = {
-      name: parsed.data.name,
+      name: (parsed.data as { name?: string }).name ?? "",
       passwordHash: await hashPassword(parsed.data.password),
     };
   }

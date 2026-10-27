@@ -1,7 +1,9 @@
 import { eq } from "drizzle-orm";
+import { expect } from "vitest";
 import { memberships, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { signup } from "@/server/auth/signup";
+import { TeamError } from "@/server/team/errors";
 import type { TeamActor } from "@/server/team/invitations";
 
 export const NOW = new Date("2026-10-27T12:00:00Z");
@@ -23,4 +25,15 @@ export async function seedOwnerTenant(db: Db, name: string, email: string) {
 
 export async function membershipsOf(db: Db, userId: string) {
   return db.select().from(memberships).where(eq(memberships.userId, userId));
+}
+
+/** Espera que a promessa rejeite com `TeamError` e devolve o erro. */
+export async function failureOf(promise: Promise<unknown>): Promise<TeamError> {
+  try {
+    await promise;
+  } catch (error) {
+    expect(error).toBeInstanceOf(TeamError);
+    return error as TeamError;
+  }
+  throw new Error("esperava TeamError");
 }

@@ -4,7 +4,7 @@ import { memberships, professionals, users } from "@/db/schema";
 import { signup } from "@/server/auth/signup";
 import { acceptInvitation } from "@/server/team/accept";
 import { TeamError } from "@/server/team/errors";
-import { inviteMember, type TeamActor } from "@/server/team/invitations";
+import { inviteMemberForTests as inviteMember, type TeamActor } from "@/server/team/invitations";
 import { resetRateLimitsForTests } from "@/server/security/limits";
 import { withTenant } from "@/server/tenant-db";
 import { seedProfessional } from "../helpers/agenda-fixtures";

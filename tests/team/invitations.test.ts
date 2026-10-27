@@ -1,33 +1,25 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { invitations, memberships, professionals } from "@/db/schema";
+import { invitations, memberships, professionals, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { hashToken } from "@/server/auth/session";
 import { resetRateLimitsForTests } from "@/server/security/limits";
-import { TeamError } from "@/server/team/errors";
 import {
   createOwnerAccessInvite,
+  createOwnerAccessInviteForTests,
   INVITE_TTL_DAYS,
   inviteMember,
+  inviteMemberForTests,
   resendInvitation,
+  resendInvitationForTests,
   revokeInvitation,
   type TeamActor,
 } from "@/server/team/invitations";
 import { listTeamAccess } from "@/server/team/members";
 import { withTenant } from "@/server/tenant-db";
 import { seedProfessional } from "../helpers/agenda-fixtures";
-import { DAY, NOW, seedOwnerTenant } from "../helpers/team-fixtures";
+import { DAY, failureOf, NOW, seedOwnerTenant } from "../helpers/team-fixtures";
 import { createTestDb } from "../helpers/test-db";
-
-async function failureOf(promise: Promise<unknown>): Promise<TeamError> {
-  try {
-    await promise;
-  } catch (error) {
-    expect(error).toBeInstanceOf(TeamError);
-    return error as TeamError;
-  }
-  throw new Error("esperava TeamError");
-}
 
 describe("convites da equipe", () => {
   let db: Db;
@@ -46,7 +38,7 @@ describe("convites da equipe", () => {
   });
 
   it("convida recepção: aparece como invite, com validade de 7 dias e token só em hash", async () => {
-    const { invitationId, token } = await inviteMember(
+    const { invitationId, token } = await inviteMemberForTests(
       db,
       owner,
       { name: "Rita", email: "  Rita@Exemplo.com ", role: "reception" },
@@ -76,7 +68,7 @@ describe("convites da equipe", () => {
 
   it("envia o e-mail com o link /convite/{token}", async () => {
     const info = vi.spyOn(console, "info");
-    const { token } = await inviteMember(
+    const { token } = await inviteMemberForTests(
       db,
       owner,
       { name: "Rita", email: "rita@exemplo.com", role: "reception" },
@@ -278,14 +270,14 @@ describe("convites da equipe", () => {
   });
 
   it("reenviar gera novo token (o antigo deixa de valer) e renova a validade", async () => {
-    const { invitationId, token } = await inviteMember(
+    const { invitationId, token } = await inviteMemberForTests(
       db,
       owner,
       { name: "R", email: "r@x.com", role: "reception" },
       NOW,
     );
     const later = new Date(NOW.getTime() + 5 * DAY);
-    const resent = await resendInvitation(db, owner, invitationId, later);
+    const resent = await resendInvitationForTests(db, owner, invitationId, later);
     expect(resent.token).not.toBe(token);
     const [row] = await withTenant(db, tenantId, (tx) =>
       tx.select().from(invitations).where(eq(invitations.id, invitationId)),
@@ -299,7 +291,7 @@ describe("convites da equipe", () => {
 
   it("createOwnerAccessInvite cria convite owner para o dono atual", async () => {
     const admin = (await seedOwnerTenant(db, "Plataforma", "admin@eneven.com")).userId;
-    const { invitationId, token } = await createOwnerAccessInvite(db, tenantId, admin, NOW);
+    const { invitationId, token } = await createOwnerAccessInviteForTests(db, tenantId, admin, NOW);
     const [row] = await withTenant(db, tenantId, (tx) =>
       tx.select().from(invitations).where(eq(invitations.id, invitationId)),
     );
@@ -315,5 +307,65 @@ describe("convites da equipe", () => {
     expect(
       await db.select().from(memberships).where(eq(memberships.tenantId, tenantId)),
     ).toHaveLength(1);
+  });
+
+  it("as funções públicas NÃO devolvem o token (só o e-mail leva o link)", async () => {
+    const info = vi.spyOn(console, "info");
+    const invited = await inviteMember(
+      db,
+      owner,
+      { name: "Rita", email: "rita@x.com", role: "reception" },
+      NOW,
+    );
+    expect(Object.keys(invited).sort()).toEqual(["emailSent", "invitationId"]);
+    const link = (info.mock.calls.at(-1)?.[0] as string).match(/\/convite\/([^\s]+)/)?.[1];
+    expect(link).toBeTruthy();
+    expect(JSON.stringify(invited)).not.toContain(link as string);
+
+    const resent = await resendInvitation(db, owner, invited.invitationId, NOW);
+    expect(Object.keys(resent).sort()).toEqual(["emailSent", "invitationId"]);
+
+    const admin = (await seedOwnerTenant(db, "Plataforma", "admin@eneven.com")).userId;
+    const ownerInvite = await createOwnerAccessInvite(db, tenantId, admin, NOW);
+    expect(Object.keys(ownerInvite).sort()).toEqual(["emailSent", "invitationId"]);
+  });
+
+  it("reenviar refaz as checagens: e-mail que virou membro/ligado a outro estabelecimento e profissional indisponível", async () => {
+    const pro = await seedProfessional(db, tenantId, "Bia");
+    const staff = await inviteMember(
+      db,
+      owner,
+      { name: "Bia", email: "bia@x.com", role: "staff", professionalId: pro.id },
+      NOW,
+    );
+    await db.update(professionals).set({ userId: ownerUserId }).where(eq(professionals.id, pro.id));
+    const e1 = await failureOf(resendInvitation(db, owner, staff.invitationId, NOW));
+    expect(e1.code).toBe("validation");
+    expect(e1.fieldErrors?.professionalId).toBeTruthy();
+    await db.update(professionals).set({ userId: null }).where(eq(professionals.id, pro.id));
+    await db.update(professionals).set({ active: false }).where(eq(professionals.id, pro.id));
+    expect((await failureOf(resendInvitation(db, owner, staff.invitationId, NOW))).code).toBe(
+      "validation",
+    );
+    await db.update(professionals).set({ active: true }).where(eq(professionals.id, pro.id));
+    await resendInvitation(db, owner, staff.invitationId, NOW);
+
+    const other = await seedOwnerTenant(db, "Outro", "outra@outro.com");
+    const rita = await inviteMember(db, owner, { name: "R", email: "rita@x.com", role: "reception" }, NOW);
+    // o e-mail passou a pertencer a outro estabelecimento depois do convite
+    const [ritaUser] = await db
+      .insert(users)
+      .values({ email: "rita@x.com", name: "Rita", emailVerifiedAt: NOW })
+      .returning();
+    await db.insert(memberships).values({ userId: ritaUser.id, tenantId: other.tenantId, role: "reception" });
+    expect((await failureOf(resendInvitation(db, owner, rita.invitationId, NOW))).code).toBe(
+      "other_tenant",
+    );
+    // ... e depois ao próprio estabelecimento
+    await db.delete(memberships).where(eq(memberships.userId, ritaUser.id));
+    await db.insert(memberships).values({ userId: ritaUser.id, tenantId, role: "reception" });
+    const again = await failureOf(resendInvitation(db, owner, rita.invitationId, NOW));
+    expect(again.code).toBe("already_member");
+    expect(again.message).toBe("Essa pessoa já tem acesso.");
   });
 });

@@ -2,7 +2,7 @@ import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import { invitations, memberships, professionals, sessions, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { withTenant, withTenantTx } from "@/server/tenant-db";
-import { TeamError } from "./errors";
+import { TeamError, UUID } from "./errors";
 import type { TeamActor } from "./invitations";
 
 export type MemberRow =
@@ -25,7 +25,6 @@ export type MemberRow =
       expired: boolean;
     };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ROLE_RANK = { owner: 0, reception: 1, staff: 2 } as const;
 
 /**
@@ -87,22 +86,18 @@ export async function listTeamAccess(
       professionalName: m.role === "staff" ? (proByUser.get(m.userId) ?? null) : null,
     }));
 
-  const pending: MemberRow[] = invites.flatMap((i): MemberRow[] =>
-    i.role === "owner"
-      ? []
-      : [
-          {
-            kind: "invite",
-            invitationId: i.id,
-            name: i.name,
-            email: i.email,
-            role: i.role,
-            professionalName: i.professionalId ? (proById.get(i.professionalId) ?? null) : null,
-            sentAt: i.sentAt,
-            expired: i.expiresAt.getTime() <= now.getTime(),
-          },
-        ],
-  );
+  const pending: MemberRow[] = invites
+    .filter((i): i is typeof i & { role: "reception" | "staff" } => i.role !== "owner")
+    .map((i) => ({
+      kind: "invite",
+      invitationId: i.id,
+      name: i.name,
+      email: i.email,
+      role: i.role,
+      professionalName: i.professionalId ? (proById.get(i.professionalId) ?? null) : null,
+      sentAt: i.sentAt,
+      expired: i.expiresAt.getTime() <= now.getTime(),
+    }));
 
   return [...members, ...pending];
 }

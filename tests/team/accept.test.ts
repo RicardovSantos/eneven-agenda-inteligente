@@ -9,28 +9,17 @@ import { createSession, getSession } from "@/server/auth/session";
 import type { GoogleProfile } from "@/server/auth/google";
 import { resetRateLimitsForTests } from "@/server/security/limits";
 import { acceptInvitation, getInvitation } from "@/server/team/accept";
-import { TeamError } from "@/server/team/errors";
 import {
-  createOwnerAccessInvite,
-  inviteMember,
+  createOwnerAccessInviteForTests as createOwnerAccessInvite,
+  inviteMemberForTests as inviteMember,
   revokeInvitation,
   type TeamActor,
 } from "@/server/team/invitations";
 import { removeMember } from "@/server/team/members";
 import { withTenant } from "@/server/tenant-db";
 import { seedProfessional } from "../helpers/agenda-fixtures";
-import { DAY, membershipsOf, NOW, seedOwnerTenant } from "../helpers/team-fixtures";
+import { DAY, failureOf, membershipsOf, NOW, seedOwnerTenant } from "../helpers/team-fixtures";
 import { createTestDb } from "../helpers/test-db";
-
-async function failureOf(promise: Promise<unknown>): Promise<TeamError> {
-  try {
-    await promise;
-  } catch (error) {
-    expect(error).toBeInstanceOf(TeamError);
-    return error as TeamError;
-  }
-  throw new Error("esperava TeamError");
-}
 
 const PASSWORD = "senha-da-equipe-1";
 
@@ -260,8 +249,10 @@ describe("aceitar convites", () => {
     });
 
     it("conta com vínculo em outro estabelecimento: other_tenant", async () => {
+      // Simula a corrida: o convite é criado quando o e-mail ainda não tinha vínculo
+      // em lugar nenhum, e a pessoa entra em outro estabelecimento antes de aceitar.
+      // Por isso o aceite precisa conferir os vínculos de novo (não só o convite).
       const other = await seedOwnerTenant(db, "Outro", "rita@x.com");
-      // convite criado antes de o e-mail ter vínculo: insere direto
       const { token } = await invite("reception", "rita2@x.com");
       await db.update(users).set({ email: "rita2@x.com" }).where(eq(users.id, other.userId));
       const e = await failureOf(acceptInvitation(db, token, { userId: other.userId }, NOW));
@@ -305,7 +296,8 @@ describe("aceitar convites", () => {
         email: "dona@studio.com",
         hasAccount: true,
       });
-      const result = await acceptInvitation(db, token, { name: "Dona Nova", password: PASSWORD }, NOW);
+      // o convite de proprietário só pede a senha
+      const result = await acceptInvitation(db, token, { password: PASSWORD }, NOW);
       expect(result).toEqual({ userId: owner.userId, tenantId });
 
       const [row] = await db.select().from(users).where(eq(users.id, owner.userId));
@@ -316,8 +308,23 @@ describe("aceitar convites", () => {
         { userId: owner.userId, tenantId, role: "owner" },
       ]);
       expect(
-        (await failureOf(acceptInvitation(db, token, { name: "D", password: PASSWORD }, NOW))).code,
+        (await failureOf(acceptInvitation(db, token, { password: PASSWORD }, NOW))).code,
       ).toBe("invalid_invitation");
+    });
+
+    it("convite de equipe continua exigindo o nome", async () => {
+      const { token } = await invite();
+      const e = await failureOf(acceptInvitation(db, token, { password: PASSWORD }, NOW));
+      expect(e.code).toBe("validation");
+      expect(e.fieldErrors?.name).toBeTruthy();
+    });
+
+    it("convite de proprietário valida a senha", async () => {
+      const admin = (await seedOwnerTenant(db, "Plataforma", "admin@eneven.com")).userId;
+      const { token } = await createOwnerAccessInvite(db, tenantId, admin, NOW);
+      const e = await failureOf(acceptInvitation(db, token, { password: "curta" }, NOW));
+      expect(e.fieldErrors?.password).toBeTruthy();
+      expect(await getInvitation(db, token, NOW)).toMatchObject({ status: "valid" });
     });
 
     it("com userId de outra pessoa: wrong_account", async () => {

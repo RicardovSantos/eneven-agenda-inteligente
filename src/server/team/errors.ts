@@ -36,3 +36,6 @@ export class TeamError extends Error {
 /** "Entre com {e-mail} para aceitar." */
 export const wrongAccount = (email: string) =>
   new TeamError("wrong_account", `Entre com ${email} para aceitar.`);
+
+/** Formato de UUID (confere o texto antes de ir ao banco, que falharia com erro cru). */
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

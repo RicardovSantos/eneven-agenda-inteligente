@@ -5,23 +5,12 @@ import type { Db } from "@/db/types";
 import { createSession } from "@/server/auth/session";
 import { resetRateLimitsForTests } from "@/server/security/limits";
 import { acceptInvitation } from "@/server/team/accept";
-import { TeamError } from "@/server/team/errors";
-import { inviteMember, type TeamActor } from "@/server/team/invitations";
+import { inviteMemberForTests as inviteMember, type TeamActor } from "@/server/team/invitations";
 import { listTeamAccess, removeMember } from "@/server/team/members";
 import { withTenant } from "@/server/tenant-db";
 import { seedProfessional } from "../helpers/agenda-fixtures";
-import { membershipsOf, NOW, seedOwnerTenant } from "../helpers/team-fixtures";
+import { failureOf, membershipsOf, NOW, seedOwnerTenant } from "../helpers/team-fixtures";
 import { createTestDb } from "../helpers/test-db";
-
-async function failureOf(promise: Promise<unknown>): Promise<TeamError> {
-  try {
-    await promise;
-  } catch (error) {
-    expect(error).toBeInstanceOf(TeamError);
-    return error as TeamError;
-  }
-  throw new Error("esperava TeamError");
-}
 
 describe("acessos da equipe", () => {
   let db: Db;
