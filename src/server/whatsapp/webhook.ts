@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
-import { whatsappMessages } from "@/db/schema";
+import { whatsappInboundEvents, whatsappMessages } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { withTenant } from "@/server/tenant-db";
 import {
@@ -139,20 +139,33 @@ export async function handleMetaWebhookPost(
       // 2. Processa mensagens recebidas (respostas de botão ou texto livre)
       if (value.messages && Array.isArray(value.messages)) {
         for (const m of value.messages) {
+          if (typeof m.id !== "string" || !m.id || typeof m.from !== "string" || !m.from) continue;
+          // Claim persistente impede que entregas concorrentes da Meta repitam efeitos.
+          // Se o processo parar durante o envio, permanece processing para revisão;
+          // reenvio automático poderia duplicar uma mensagem já aceita pela Meta.
+          const claimed = await db.insert(whatsappInboundEvents).values({ id: m.id }).onConflictDoNothing().returning({ id: whatsappInboundEvents.id });
+          if (!claimed.length) continue;
           const fromPhone = m.from;
-
+          try {
           // Clique em botão interativo
           if (m.type === "button" && m.button?.payload) {
-            await processInteractiveButtonReply(db, m.button.payload, fromPhone);
+            const result = await processInteractiveButtonReply(db, m.button.payload, fromPhone);
+            if (result.uncertain) throw new Error("Envio de resposta com resultado incerto.");
           } else if (m.type === "interactive" && m.interactive?.button_reply) {
-            await processInteractiveButtonReply(
+            const result = await processInteractiveButtonReply(
               db,
               m.interactive.button_reply.id,
               fromPhone,
             );
+            if (result.uncertain) throw new Error("Envio de resposta com resultado incerto.");
           } else if (m.type === "text") {
             // Mensagem livre de texto
-            await processFreeTextMessage(db, fromPhone);
+            if (!(await processFreeTextMessage(db, fromPhone)).ok) throw new Error("Envio de resposta com resultado incerto.");
+          }
+          await db.update(whatsappInboundEvents).set({ state: "completed", completedAt: new Date() }).where(eq(whatsappInboundEvents.id, m.id));
+          } catch (error) {
+            await db.update(whatsappInboundEvents).set({ state: "uncertain" }).where(eq(whatsappInboundEvents.id, m.id));
+            throw error;
           }
         }
       }

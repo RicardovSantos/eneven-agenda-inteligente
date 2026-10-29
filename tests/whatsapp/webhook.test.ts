@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { bookings, tenants, whatsappMessages } from "@/db/schema";
+import { bookings, tenants, whatsappInboundEvents, whatsappMessages } from "@/db/schema";
 import { setWhatsAppChannelForTests } from "@/server/whatsapp/channel";
 import { FakeWhatsAppChannel } from "@/server/whatsapp/fake-client";
 import { handleMetaWebhookPost } from "@/server/whatsapp/webhook";
@@ -326,6 +326,27 @@ describe("Meta WhatsApp Webhook Handling", () => {
       expect(reply.type).toBe("text");
       expect(typeof reply.payload === "string" && reply.payload).toContain(tenant.name);
       expect(reply.payload).toContain("https://wa.me/5511988887777");
+      await handleMetaWebhookPost(db, textPayload, sign(textPayload), secret);
+      expect(fakeChannel.sentMessages).toHaveLength(1);
+      const [event] = await db.select().from(whatsappInboundEvents).where(eq(whatsappInboundEvents.id, "wamid.incoming.text"));
+      expect(event.state).toBe("completed");
+    });
+
+    it("marca envio com erro como incerto e não repete automaticamente", async () => {
+      const db = await createTestDb();
+      const tenant = await seedTenant(db, "webhook-uncertain");
+      await withTenant(db, tenant.id, (tx) => tx.insert(whatsappMessages).values({
+        tenantId: tenant.id, recipientPhone: "5511999997777", wamId: "wamid.outbound-uncertain", status: "sent",
+      }));
+      const payload = JSON.stringify({ object: "whatsapp_business_account", entry: [{ changes: [{ value: { messages: [
+        { from: "5511999997777", id: "wamid.uncertain", type: "text", text: { body: "oi" } },
+      ] } }] }] });
+      fakeChannel.setNextError("falha de rede");
+      await expect(handleMetaWebhookPost(db, payload, sign(payload), secret)).rejects.toThrow();
+      const [event] = await db.select().from(whatsappInboundEvents).where(eq(whatsappInboundEvents.id, "wamid.uncertain"));
+      expect(event.state).toBe("uncertain");
+      await handleMetaWebhookPost(db, payload, sign(payload), secret);
+      expect(fakeChannel.sentMessages).toHaveLength(0);
     });
   });
 });

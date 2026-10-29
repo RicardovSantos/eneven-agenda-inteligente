@@ -652,4 +652,23 @@ export type NewWhatsappMessage = typeof whatsappMessages.$inferInsert;
 export type WhatsappQueueItem = typeof whatsappQueue.$inferSelect;
 export type NewWhatsappQueueItem = typeof whatsappQueue.$inferInsert;
 
+/** Links adicionais de gestão para notificações; somente o hash é persistido. */
+export const bookingManageTokens = pgTable("booking_manage_tokens", {
+  tokenHash: text("token_hash").primaryKey(),
+  tenantId: tenantIdColumn(),
+  bookingId: uuid("booking_id").notNull(),
+  expiresAt: timestamptz("expires_at").notNull(),
+}, (t) => [
+  foreignKey({ name: "booking_manage_tokens_booking_fk", columns: [t.tenantId, t.bookingId], foreignColumns: [bookings.tenantId, bookings.id] }).onDelete("cascade"),
+  index("booking_manage_tokens_booking_idx").on(t.tenantId, t.bookingId),
+]);
+
+/** Registro global de IDs da Meta; não contém telefone nem conteúdo da mensagem. */
+export const whatsappInboundEvents = pgTable("whatsapp_inbound_events", {
+  id: text("id").primaryKey(),
+  state: text("state").notNull().default("processing"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  completedAt: timestamptz("completed_at"),
+}, (t) => [check("whatsapp_inbound_event_state_check", sql`${t.state} in ('processing', 'completed', 'uncertain')`)]);
+
 

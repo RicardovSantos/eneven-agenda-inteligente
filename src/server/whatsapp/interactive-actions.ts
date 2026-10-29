@@ -14,7 +14,7 @@ export async function processInteractiveButtonReply(
   db: Db,
   buttonId: string,
   fromPhone: string,
-): Promise<{ ok: boolean; action?: string; error?: string }> {
+): Promise<{ ok: boolean; action?: string; error?: string; uncertain?: boolean }> {
   const parts = buttonId.split(":");
   if (parts.length !== 3 || !parts[2]) return { ok: false, error: "Payload inválido" };
 
@@ -58,7 +58,7 @@ export async function processInteractiveButtonReply(
         fromPhone,
         `Para escolher um novo horário para o seu agendamento, toque no link a seguir:\n${link}`,
       );
-      return sent.ok ? { ok: true, action: "reschedule_link_sent" } : { ok: false, error: sent.error };
+      return sent.ok ? { ok: true, action: "reschedule_link_sent" } : { ok: false, error: sent.error, uncertain: true };
     }
 
     default:

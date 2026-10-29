@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gt, inArray } from "drizzle-orm";
 import {
   bookingServices,
+  bookingManageTokens,
   bookings,
   professionalServices,
   services,
@@ -390,5 +391,18 @@ export async function findBookingByManageToken(
     .where(eq(bookings.manageTokenHash, hashToken(token)))
     .orderBy(asc(bookings.id))
     .limit(1);
-  return row ?? null;
+  if (row) return row;
+  const [extra] = await db.select({ tenantId: bookingManageTokens.tenantId, bookingId: bookingManageTokens.bookingId })
+    .from(bookingManageTokens)
+    .where(and(eq(bookingManageTokens.tokenHash, hashToken(token)), gt(bookingManageTokens.expiresAt, new Date())))
+    .limit(1);
+  return extra ?? null;
+}
+
+/** Emite outro link sem invalidar o link anterior; nunca grava o token em texto. */
+export async function issueAdditionalManageToken(db: Db, tenantId: string, bookingId: string, expiresAt: Date): Promise<string> {
+  if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) throw new Error("Validade inválida.");
+  const { token, hash } = newManageToken();
+  await withTenant(db, tenantId, (tx) => tx.insert(bookingManageTokens).values({ tokenHash: hash, tenantId, bookingId, expiresAt }));
+  return token;
 }

@@ -1,10 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
   tenantNotificationSettings,
+  bookingManageTokens,
+  whatsappInboundEvents,
   whatsappMessages,
 } from "@/db/schema";
 import { withTenant } from "@/server/tenant-db";
-import { seedTenant } from "../helpers/agenda-fixtures";
+import { seedBooking, seedTenant } from "../helpers/agenda-fixtures";
 import {
   expectEveryAgendaAppTableHasRls,
   expectRlsViolation,
@@ -64,5 +66,25 @@ describe("Plano 4 (PostgreSQL real) - Esquema e RLS do WhatsApp", () => {
       ),
     );
     expectRlsViolation(err);
+  });
+
+  it("isola tokens adicionais e impede acesso do papel de tenant ao registro global", async () => {
+    const a = await seedTenant(db, "pg-token-a");
+    const b = await seedTenant(db, "pg-token-b");
+    const booking = await seedBooking(db, a.id);
+    await withTenant(db, a.id, (tx) => tx.insert(bookingManageTokens).values({
+      tokenHash: "token-hash", tenantId: a.id, bookingId: booking.id, expiresAt: new Date(Date.now() + 60_000),
+    }));
+    expect(await withTenant(db, b.id, (tx) => tx.select().from(bookingManageTokens))).toHaveLength(0);
+    const err = await failure(withTenant(db, b.id, (tx) => tx.select().from(whatsappInboundEvents)));
+    expect(err).not.toBeNull();
+  });
+
+  it("aceita apenas uma reivindicação concorrente do mesmo evento da Meta", async () => {
+    const eventId = `wamid.pg.${Date.now()}`;
+    const claims = await Promise.all(Array.from({ length: 5 }, () =>
+      db.insert(whatsappInboundEvents).values({ id: eventId }).onConflictDoNothing().returning({ id: whatsappInboundEvents.id }),
+    ));
+    expect(claims.flat()).toHaveLength(1);
   });
 });
