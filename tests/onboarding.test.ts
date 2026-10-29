@@ -23,6 +23,7 @@ import { saveService } from "@/server/catalog";
 import { updateBranding, uploadLogo } from "@/server/settings";
 import { withTenant, withTenantTx } from "@/server/tenant-db";
 import { createTestDb } from "./helpers/test-db";
+import { getDefaultPlanId } from "@/server/platform/plans";
 
 const input = {
   businessName: "Defendi Studio",
@@ -231,7 +232,12 @@ describe("ensureTenantDefaults (estabelecimentos anteriores ao seed)", () => {
     const db = await createTestDb();
     const [tenant] = await db
       .insert(tenants)
-      .values({ slug: "antigo", name: "Antigo", trialEndsAt: new Date(Date.now() + 86_400_000) })
+      .values({
+        slug: "antigo",
+        name: "Antigo",
+        trialEndsAt: new Date(Date.now() + 86_400_000),
+        planId: await getDefaultPlanId(db),
+      })
       .returning();
     const [user] = await db
       .insert(users)
@@ -276,11 +282,12 @@ describe("guarda: páginas do painel exigem o assistente concluído", () => {
       return name === "page.tsx" ? [full] : [];
     });
 
-  it("toda page.tsx (menos comecar) chama requireOnboarded", () => {
+  it("toda page.tsx (menos comecar) chama requireOnboarded (direto ou por requirePanelRole)", () => {
     const list = pages(root).filter((f) => !f.includes(`${path.sep}comecar${path.sep}`));
     expect(list.length).toBeGreaterThan(0);
     for (const file of list) {
-      expect(readFileSync(file, "utf8"), file).toContain("requireOnboarded(");
+      // requirePanelRole() chama requireOnboarded() por dentro.
+      expect(readFileSync(file, "utf8"), file).toMatch(/require(Onboarded|PanelRole)\(/);
     }
   });
 });

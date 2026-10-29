@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db/client";
 import { sessionCookieOptions } from "@/server/auth/cookie";
 import { SESSION_COOKIE, destroySession } from "@/server/auth/session";
+import { auditSupportEndOnLogout } from "@/server/platform/support";
 
 /**
  * O `Origin` do pedido precisa ser o próprio site (mesmo host). Atrás do proxy
@@ -29,7 +30,12 @@ export async function POST(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (token) {
     try {
-      await destroySession(await getDb(), token);
+      const db = await getDb();
+      // Saiu no meio do suporte: o encerramento entra na auditoria antes de a sessão sumir.
+      await auditSupportEndOnLogout(db, token).catch((error) =>
+        console.error("Falha ao registrar o fim do suporte", error),
+      );
+      await destroySession(db, token);
     } catch (error) {
       console.error("Falha ao encerrar a sessão", error);
     }

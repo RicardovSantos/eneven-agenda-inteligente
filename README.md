@@ -7,7 +7,24 @@ SaaS de agendamento multiempresa para negócios que trabalham com hora marcada (
 - Cadastro (senha ou Google), confirmação de e-mail e assistente de primeiros passos (estabelecimento, horário, serviços e equipe).
 - Página pública de agendamento em `/{slug}` (serviço, profissional, dia e horário, confirmação, calendário `.ics`, remarcar e cancelar por link) com prévia de compartilhamento.
 - Painel: agenda (mês e dia, detalhe do agendamento, novo agendamento, bloqueios, confirmar, remarcar, atendido, faltou e cancelar), serviços, equipe e configurações (dados, marca, horário, regras e link).
-- Menu com o link de agendamento para copiar, liberado quando o e-mail está confirmado e a conta está ativa ou em teste. Clientes e Painel de indicadores ficam como "Em breve".
+- Menu com o link de agendamento para copiar, liberado quando o e-mail está confirmado e a conta está ativa ou em teste.
+- Clientes, Visão geral (indicadores do mês), acessos da equipe por convite e a Plataforma (`/admin`) do dono da Eneven, descritos abaixo.
+
+### Clientes
+
+`/painel/clientes`: lista com busca por nome ou WhatsApp (o cliente entra sozinho ao agendar pelo link, ou é criado à mão em "Novo cliente"), ficha com contato, observações (salvas ao sair do campo), histórico de atendimentos, total gasto e o botão "Agendar", que abre o novo agendamento com o cliente já escolhido. WhatsApp repetido é recusado com um atalho para o cadastro existente. Profissionais veem só os clientes que atenderam e não veem o total gasto.
+
+### Visão geral
+
+"Painel" no menu abre `/painel/visao-geral` (só o proprietário): faturamento realizado do mês e comparação com o anterior, ticket médio, previsto para os próximos 30 dias, taxa de faltas, agendamentos por dia (gráfico com tooltip por mouse, toque ou teclado, e tabela para leitores de tela), serviços mais vendidos e faturamento por profissional. Atendimentos que já terminaram sem resultado aparecem num aviso com "Revisar agora", que marca atendido ou faltou ali mesmo. O mês fica na URL (`?mes=2026-10`).
+
+### Acessos da equipe
+
+Em Configurações, o cartão "Acessos da equipe" convida pessoas por e-mail como **Recepção** (agenda, clientes, serviços e equipe) ou **Profissional** (só a própria agenda e os próprios clientes), cancela ou reenvia convites e remove acessos. O link do convite (`/convite/{token}`) vale uma vez e por tempo limitado; quem aceita cria a senha ou entra com o Google. Quem já tem vínculo com outro estabelecimento ainda não pode aceitar (a escolha de estabelecimento fica para depois).
+
+### Plataforma (`/admin`)
+
+Só para o super-admin (dono da plataforma): lista de estabelecimentos com busca, filtro por situação e números (MRR, em teste, agendamentos dos últimos 30 dias), ficha com histórico, estender o teste, trocar o plano, bloquear (modo somente leitura: a página pública sai do ar e o painel não marca novos horários), cancelar a conta, criar um estabelecimento e enviar o acesso ao dono por e-mail, e editar os planos em `/admin/planos`. "Entrar como o estabelecimento" abre o painel do salão em modo suporte, com uma faixa no topo e registro no histórico, até "Voltar à plataforma". Para dar esse acesso a uma conta, veja "Promover um usuário que já existe a super-admin" em [Deploy](#deploy).
 
 ## Stack
 
@@ -41,6 +58,7 @@ O `.env.example` lista todas. Em produção (`NODE_ENV=production`) algumas são
 | `EMAIL_FROM` | remetente (`nao-responda@eneven.com.br`) | obrigatória com o token |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | botão "Entrar com Google" | opcionais |
 | `LEGAL_OWNER_NAME`, `LEGAL_OWNER_DOC`, `LEGAL_CONTACT_EMAIL` | responsável, CPF ou CNPJ (omitido se vazio) e e-mail de contato nas páginas `/termos` e `/privacidade` | opcionais (padrões: Ricardo Santos e eneventech@gmail.com) |
+| `SUPPORT_WHATSAPP` | WhatsApp da Eneven com DDI (`5511999999999`): botão "Falar com a Eneven" na faixa de somente leitura do painel; sem ela a faixa aparece sem o botão | opcional |
 
 ## Termos de uso e política de privacidade
 
@@ -77,12 +95,16 @@ pnpm build       # build de produção
 
 ```bash
 pnpm exec playwright install chromium   # uma vez
-pnpm test:e2e                            # página pública, agenda do painel e o fluxo completo
+pnpm test:e2e                            # a suíte inteira (tests/e2e/*.spec.ts)
 ```
 
-O comando sobe o `pnpm dev` na porta 3100 com um PGlite só dele (`.data/pglite-e2e`, apagado a cada execução) e a rota de apoio `/api/e2e/seed`, que cria estabelecimentos e agendamentos de teste. Essa rota só responde quando `E2E_SEED` está definido, o processo não é de produção e o cabeçalho `x-e2e-seed` traz o mesmo segredo; fora disso devolve 404. **Pare o `pnpm dev` antes de rodar** (o Next aceita um servidor de desenvolvimento por pasta). `tests/e2e/full-flow.spec.ts` percorre tudo: cadastro, primeiros passos, página pública, agenda, confirmar, remarcar e cancelar (a confirmação do e-mail é simulada pela rota de apoio). Para rodar só um arquivo: `pnpm test:e2e tests/e2e/full-flow.spec.ts`. Os testes ficam em `tests/e2e/`, fora do `pnpm test` e do CI por enquanto; a primeira execução é lenta porque o modo de desenvolvimento compila cada rota na primeira visita.
+O comando sobe o `pnpm dev` na porta 3100 com um PGlite só dele (`.data/pglite-e2e`, apagado a cada execução) e a rota de apoio `/api/e2e/seed`, que cria estabelecimentos, agendamentos, sessões, convites e o super-admin de teste. Essa rota só responde quando `E2E_SEED` está definido, o processo não é de produção e o cabeçalho `x-e2e-seed` traz o mesmo segredo; fora disso devolve 404. **Pare o `pnpm dev` antes de rodar** (o Next aceita um servidor de desenvolvimento por pasta). Antes dos testes, `tests/e2e/global-setup.ts` visita algumas rotas públicas e do painel, porque o modo de desenvolvimento compila cada rota na primeira visita. `tests/e2e/full-flow.spec.ts` percorre tudo: cadastro, primeiros passos, página pública, agenda, confirmar, remarcar e cancelar (a confirmação do e-mail é simulada pela rota de apoio). Para rodar só um arquivo: `pnpm test:e2e tests/e2e/full-flow.spec.ts`.
 
-O CI (`.github/workflows/ci.yml`) roda lint, typecheck e testes a cada push na `main` e em todo pull request (uma nova execução na mesma branch cancela a anterior). O job `test-pg` sobe um PostgreSQL 17 e roda `pnpm test:pg` (RLS com `withTenant` e a trava de dupla reserva sob concorrência), o que o PGlite local não prova; localmente `pnpm test:pg` só roda com `TEST_DATABASE_URL` apontando para um Postgres (sem ela avisa e sai).
+Regras para a suíte continuar estável: cada teste cria o próprio estabelecimento pela rota de apoio (nunca usa dados de outro arquivo), datas são relativas ao dia de hoje em São Paulo (nada de data fixa que caia no passado ou num domingo) e as esperas são por estado da tela (`expect(...).toBeVisible()`, `expect.poll`), nunca por tempo.
+
+As specs de captura de tela para revisão visual ficam em `tests/e2e/`, mas são excluídas da suíte padrão. Para executá-las, defina `SHOTS_DIR` e rode `pnpm exec playwright test -c playwright.capturas.config.ts` (crie o diretório de saída antes).
+
+O CI (`.github/workflows/ci.yml`) roda lint, typecheck e testes a cada push na `main` e em todo pull request (uma nova execução na mesma branch cancela a anterior). O job `test-pg` sobe um PostgreSQL 17 e roda `pnpm test:pg` (RLS com `withTenant` e a trava de dupla reserva sob concorrência), o que o PGlite local não prova; localmente `pnpm test:pg` só roda com `TEST_DATABASE_URL` apontando para um Postgres (sem ela avisa e sai). O job `e2e` instala o Chromium do Playwright e roda `pnpm test:e2e` com o mesmo servidor de desenvolvimento e PGlite próprio (a rota de apoio continua desligada em produção); se falhar, os traces ficam no artefato `playwright-traces` da execução (abra com `pnpm exec playwright show-trace <arquivo>.zip`).
 
 ## Como trocar a logo
 
@@ -103,6 +125,7 @@ A aplicação roda em um container (`Dockerfile`, Node 24 Alpine) no Easypanel, 
 | `SESSION_SECRET` | aleatório (`openssl rand -hex 32`) |
 | `ZEPTOMAIL_TOKEN` e `EMAIL_FROM` | envio de e-mails |
 | `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` | opcionais |
+| `SUPPORT_WHATSAPP` | opcional (`5511999999999`): botão "Falar com a Eneven" na faixa de somente leitura |
 | `LEGAL_*` | opcionais |
 
 O `APP_URL` também é um argumento da imagem (`ARG APP_URL`, padrão `https://agenda.eneven.com.br`) nos estágios de build e final: no build grava o endereço nas páginas estáticas e, na imagem final, vira a variável de ambiente padrão (a variável do Easypanel, se existir, prevalece). Em produção a aplicação nunca cai em `localhost`: sem `APP_URL` ela falha em vez de mandar links errados. Localmente, `pnpm build` funciona sem `APP_URL` (a checagem é ignorada só durante o `next build`), porque páginas estáticas como a inicial gravam nele o endereço da imagem de compartilhamento. Se o domínio mudar, passe `--build-arg APP_URL=...` (ou crie o argumento no Easypanel) e refaça o build.
@@ -123,6 +146,14 @@ node dist/migrate.mjs
 SUPER_ADMIN_PASSWORD='uma-senha-longa' node dist/create-super-admin.mjs email@exemplo.com "Nome"
 ```
 
+**Promover um usuário que já existe a super-admin** (por exemplo, a sua conta de dono de estabelecimento; não pede senha nem mexe nela):
+
+```bash
+node dist/create-super-admin.mjs --promote email@exemplo.com
+```
+
+Depois de entrar, o menu do painel ganha "Plataforma" (`/admin`): lista de estabelecimentos, planos, "Entrar como o estabelecimento" (modo suporte, com faixa e registro no histórico) e "Meu estabelecimento" de volta ao seu painel.
+
 **Gerar `dist/` localmente** (para testar fora do Docker): `pnpm build:migrate` e `pnpm build:admin`.
 
 **App instalável (PWA).** `/manifest.webmanifest` vem de `src/app/manifest.ts` e o service worker é gerado em `public/sw.js` (modelo em `scripts/pwa/sw.template.js`; registrado só em produção). Ele guarda em cache apenas `/offline.html`, a logo leve e os ícones da marca; navegações vão sempre à rede e, sem conexão, mostram a página offline. Nada de `/api/*`, Server Actions ou páginas do painel entra no cache. A versão do cache (`CACHE_VERSION`) é o hash dos arquivos de `public/brand/`, calculado por `pnpm brand` (que roda no `predev` e no `prebuild`, inclusive no Docker): não há nada para aumentar à mão.
@@ -133,3 +164,5 @@ SUPER_ADMIN_PASSWORD='uma-senha-longa' node dist/create-super-admin.mjs email@ex
 
 - Documento de projeto: [docs/superpowers/specs/2026-10-24-eneven-agenda-inteligente-design.md](docs/superpowers/specs/2026-10-24-eneven-agenda-inteligente-design.md)
 - Plano 1, fundação: [docs/superpowers/plans/2026-10-24-plano-1-fundacao.md](docs/superpowers/plans/2026-10-24-plano-1-fundacao.md)
+- Plano 2, agenda: [docs/superpowers/plans/2026-10-24-plano-2-agenda.md](docs/superpowers/plans/2026-10-24-plano-2-agenda.md) (pendências em [2026-10-24-plano-2-pendencias.md](docs/superpowers/plans/2026-10-24-plano-2-pendencias.md))
+- Plano 3, clientes, painel e plataforma: [docs/superpowers/plans/2026-10-27-plano-3-clientes-painel-plataforma.md](docs/superpowers/plans/2026-10-27-plano-3-clientes-painel-plataforma.md) (pendências em [2026-10-27-plano-3-pendencias.md](docs/superpowers/plans/2026-10-27-plano-3-pendencias.md))

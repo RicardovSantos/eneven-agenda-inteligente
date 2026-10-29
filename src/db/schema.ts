@@ -46,6 +46,12 @@ export const bookingStatus = pgEnum("booking_status", [
   "canceled",
 ]);
 
+export const invitationRole = pgEnum("invitation_role", [
+  "owner",
+  "reception",
+  "staff",
+]);
+
 export const bookingSource = pgEnum("booking_source", ["public", "panel"]);
 
 export const canceledBy = pgEnum("canceled_by", ["customer", "staff"]);
@@ -59,6 +65,25 @@ const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({
 
 const timestamptz = (name: string) =>
   timestamp(name, { withTimezone: true, mode: "date" });
+
+/**
+ * Planos da plataforma (catálogo global: sem `tenant_id`, sem RLS e sem grant
+ * para `agenda_app`). Populada pela migração `0005_plano3.sql`.
+ */
+export const plans = pgTable("plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** `essencial` | `profissional` | `studio`. */
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  /** Preço mensal em centavos. */
+  priceCents: integer("price_cents").notNull(),
+  /** Nulo = profissionais ilimitados. */
+  maxProfessionals: integer("max_professionals"),
+  monthlyMessages: integer("monthly_messages").notNull(),
+  active: boolean("active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+});
 
 /** Estabelecimento (tenant). */
 export const tenants = pgTable("tenants", {
@@ -83,6 +108,15 @@ export const tenants = pgTable("tenants", {
   /** Janela antes do horário em que o cliente ainda pode cancelar sozinho (minutos). */
   cancelWindowMin: integer("cancel_window_min").notNull().default(120),
   onboardingCompletedAt: timestamptz("onboarding_completed_at"),
+  /**
+   * Plano contratado. Em 0004 a coluna nasce nula; 0005 preenche com o
+   * Essencial e aplica `SET NOT NULL` (o drizzle-kit só gera a forma final).
+   */
+  planId: uuid("plan_id")
+    .notNull()
+    .references(() => plans.id, { onDelete: "restrict" }),
+  /** Primeira vez que o estabelecimento virou `active`. */
+  activatedAt: timestamptz("activated_at"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
 });
 
@@ -97,6 +131,7 @@ export const users = pgTable(
     name: text("name").notNull(),
     isSuperAdmin: boolean("is_super_admin").notNull().default(false),
     emailVerifiedAt: timestamptz("email_verified_at"),
+    lastLoginAt: timestamptz("last_login_at"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [check("users_email_lowercase", sql`${t.email} = lower(${t.email})`)],
@@ -151,6 +186,8 @@ export const sessions = pgTable(
       onDelete: "cascade",
     }),
     expiresAt: timestamptz("expires_at").notNull(),
+    /** Preenchido quando um super admin entra em modo suporte nesta sessão. */
+    supportStartedAt: timestamptz("support_started_at"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [index("sessions_user_id_idx").on(t.userId)],
@@ -450,6 +487,48 @@ export const bookingServices = pgTable(
   ],
 );
 
+/**
+ * Convite para entrar na equipe. RLS `tenant_isolation` criada em
+ * `0005_plano3.sql` (o drizzle-kit não expressa RLS).
+ */
+export const invitations = pgTable(
+  "invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    /** Sempre em minúsculas (garantido por constraint). */
+    email: text("email").notNull(),
+    name: text("name").notNull(),
+    role: invitationRole("role").notNull(),
+    /** Nulo = sem vínculo com profissional (a FK composta não é checada com MATCH SIMPLE). */
+    professionalId: uuid("professional_id"),
+    tokenHash: text("token_hash").notNull().unique(),
+    invitedByUserId: uuid("invited_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    expiresAt: timestamptz("expires_at").notNull(),
+    acceptedAt: timestamptz("accepted_at"),
+    revokedAt: timestamptz("revoked_at"),
+    sentAt: timestamptz("sent_at").notNull().defaultNow(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    // ATENÇÃO: em 0004 esta FK foi ajustada à mão para
+    // `ON DELETE SET NULL ("professional_id")` (PostgreSQL 15+): o SET NULL
+    // padrão do drizzle-kit anularia também `tenant_id` (NOT NULL). Se 0004
+    // for regerada, repita o ajuste (mesmo caso de booking_services_service_fk).
+    foreignKey({
+      name: "invitations_professional_fk",
+      columns: [t.tenantId, t.professionalId],
+      foreignColumns: [professionals.tenantId, professionals.id],
+    }).onDelete("set null"),
+    index("invitations_tenant_email_idx").on(t.tenantId, t.email),
+    check("invitations_email_lowercase", sql`${t.email} = lower(${t.email})`),
+  ],
+);
+
+export type Plan = typeof plans.$inferSelect;
+export type Invitation = typeof invitations.$inferSelect;
 export type Tenant = typeof tenants.$inferSelect;
 export type TenantLogo = typeof tenantLogos.$inferSelect;
 export type BusinessHour = typeof businessHours.$inferSelect;

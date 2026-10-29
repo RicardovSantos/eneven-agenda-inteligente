@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { memberships, tenants, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { isUniqueViolation } from "@/server/db-errors";
+import { getDefaultPlanId } from "@/server/platform/plans";
 import { seedTenantDefaults } from "@/server/tenants/defaults";
 import { generateUniqueSlug } from "@/server/tenants/slug";
 import { AuthError } from "./errors";
@@ -102,6 +103,7 @@ export async function createTenantWithOwner(
   ) => Promise<void>,
 ): Promise<{ userId: string; tenantId: string; slug: string }> {
   const trialEndsAt = new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+  const planId = await getDefaultPlanId(db);
 
   for (let attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt++) {
     const slug = await generateUniqueSlug(db, input.businessName);
@@ -114,6 +116,7 @@ export async function createTenantWithOwner(
             name: input.businessName,
             status: "trial",
             trialEndsAt,
+            planId,
             whatsapp: input.whatsapp,
           })
           .returning({ id: tenants.id });

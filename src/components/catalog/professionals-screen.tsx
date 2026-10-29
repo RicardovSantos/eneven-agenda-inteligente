@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, Plus } from "lucide-react";
+import { Check, KeyRound, Loader2, Plus } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import {
@@ -39,6 +39,8 @@ export type ProfessionalItem = {
   serviceIds: string[];
   hours: WeeklyHours;
   futureBookings: number;
+  /** Ligado a um usuário (tem acesso ao painel). */
+  hasAccess?: boolean;
 };
 
 export type ServiceOption = { id: string; name: string };
@@ -148,6 +150,7 @@ export function ProfessionalsScreen({
                       >
                         <ColorDot color={p.color} size={10} />
                         {p.name}
+                        {p.hasAccess ? <AccessTag /> : null}
                       </button>
                     </td>
                     <td className="border-b border-line/60 px-3 py-3.5">
@@ -183,6 +186,7 @@ export function ProfessionalsScreen({
                     <span className="flex min-w-0 items-center gap-2.5 font-semibold">
                       <ColorDot color={p.color} size={10} />
                       <span className="truncate">{p.name}</span>
+                      {p.hasAccess ? <AccessTag /> : null}
                     </span>
                     <StatusBadge tone={p.active ? "on" : "off"}>
                       {p.active ? "Ativo" : "Inativo"}
@@ -248,6 +252,16 @@ export function ProfessionalsScreen({
         ) : null}
       </ConfirmDialog>
     </>
+  );
+}
+
+/** Pequeno aviso de que a pessoa entra no painel (profissional ligado a um usuário). */
+function AccessTag() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">
+      <KeyRound className="size-3" aria-hidden="true" />
+      Tem acesso
+    </span>
   );
 }
 

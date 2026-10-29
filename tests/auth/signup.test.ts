@@ -6,6 +6,7 @@ import { isUniqueViolation } from "@/server/db-errors";
 import { verifyPassword } from "@/server/auth/password";
 import { signup } from "@/server/auth/signup";
 import { createTestDb } from "../helpers/test-db";
+import { getDefaultPlanId } from "@/server/platform/plans";
 
 const input = {
   businessName: "Defendi Studio",
@@ -86,7 +87,7 @@ describe("isUniqueViolation", () => {
 
     const slugError = await db
       .insert(tenants)
-      .values({ slug: "defendi-studio", name: "x", trialEndsAt: new Date() })
+      .values({ slug: "defendi-studio", name: "x", trialEndsAt: new Date(), planId: await getDefaultPlanId(db) })
       .then(
         () => null,
         (e: unknown) => e,

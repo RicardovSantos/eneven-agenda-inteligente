@@ -13,6 +13,8 @@ export type SessionInfo = {
   role: "owner" | "reception" | "staff" | null;
   isSuperAdmin: boolean;
   emailVerified: boolean;
+  /** Super-admin dentro de um estabelecimento ("entrar como"). */
+  support: boolean;
 };
 
 /** O banco guarda só o hash SHA-256 do token (o token nunca é gravado). */
@@ -20,18 +22,24 @@ export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-/** Cria a sessão e devolve o token em texto (vai para o cookie). */
+/** Cria a sessão, registra o último acesso e devolve o token em texto (vai para o cookie). */
 export async function createSession(
   db: Db,
   userId: string,
   tenantId: string | null,
 ): Promise<string> {
   const token = randomBytes(32).toString("base64url");
-  await db.insert(sessions).values({
-    id: hashToken(token),
-    userId,
-    tenantId,
-    expiresAt: new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000),
+  await db.transaction(async (tx) => {
+    await tx.insert(sessions).values({
+      id: hashToken(token),
+      userId,
+      tenantId,
+      expiresAt: new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000),
+    });
+    await tx
+      .update(users)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(users.id, userId));
   });
   return token;
 }
@@ -55,6 +63,7 @@ export async function getSession(
       role: memberships.role,
       isSuperAdmin: users.isSuperAdmin,
       emailVerifiedAt: users.emailVerifiedAt,
+      supportStartedAt: sessions.supportStartedAt,
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
@@ -69,10 +78,19 @@ export async function getSession(
     .limit(1);
 
   if (!row) return null;
+
+  // Modo suporte: o papel vem da sessão + super-admin, não de vínculo. Sem
+  // super-admin, uma sessão de suporte não vale nada (nem o vínculo comum).
+  const support = row.supportStartedAt !== null;
+  let role = row.role;
+  if (support) {
+    role = row.isSuperAdmin && row.tenantId !== null ? "owner" : null;
+  }
   return {
     userId: row.userId,
     tenantId: row.tenantId,
-    role: row.role,
+    role,
+    support,
     isSuperAdmin: row.isSuperAdmin,
     emailVerified: row.emailVerifiedAt !== null,
   };

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Plataforma: estabelecimentos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;family=Outfit:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F7F6FC}
+a{color:#3E07D2}a:hover{color:#2C0597}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="min-height: 900px; background: #F7F6FC; color: #29303C; font-family: 'Figtree', system-ui, sans-serif; display: flex; flex-direction: column;">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E6E3F0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; padding: 0 32px; min-height: 64px;">
+    <div style="display: flex; align-items: center; gap: 28px; flex-wrap: wrap;">
+      <img src="/_blob/4c7ab5678f2c7edfc071f0b3c5d2a0b4" alt="Eneven Agendamentos Inteligentes" style="width: 124px;">
+      <nav aria-label="Plataforma" style="display: flex; gap: 4px;">
+        <a href="#" aria-current="page" style="display: flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 10px; background: #EEE8FD; color: #3E07D2; font-weight: 600; text-decoration: none; font-size: 15px;">Estabelecimentos</a>
+        <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 10px; color: #5E6475; font-weight: 500; text-decoration: none; font-size: 15px;">Planos</a>
+      </nav>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 10px; color: #29303C; font-weight: 500; text-decoration: none; font-size: 15px;">Meu estabelecimento</a>
+      <button type="button" style="display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: #29303C; font: 500 15px 'Figtree', sans-serif; cursor: pointer;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>
+        Sair
+      </button>
+    </div>
+  </header>
+
+  <main style="box-sizing: border-box; width: 100%; max-width: 1376px; margin: 0 auto; padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <h1 style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 28px;">Estabelecimentos</h1>
+        <p style="margin: 0; font-size: 14px; color: #5E6475;">Todos os salões da plataforma, com teste, plano e uso.</p>
+      </div>
+      <a href="#" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 10px; background: #3E07D2; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 15px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+        Novo estabelecimento
+      </a>
+    </div>
+
+    <section aria-label="Números da plataforma" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+      <div style="background: #FFFFFF; border: 1px solid #E6E3F0; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 4px;">
+        <span style="font-size: 14px; font-weight: 600; color: #5E6475;">Receita mensal (MRR)</span>
+        <span class="num" style="font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 30px;">R$ 409,30</span>
+        <span class="num" style="font-size: 13px; color: #5E6475;">7 assinaturas ativas</span>
+      </div>
+      <div style="background: #FFFFFF; border: 1px solid #E6E3F0; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 4px;">
+        <span style="font-size: 14px; font-weight: 600; color: #5E6475;">Em teste</span>
+        <span class="num" style="font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 30px;">5</span>
+        <span class="num" style="font-size: 13px; color: #5E6475;">2 terminam nesta semana</span>
+      </div>
+      <div style="background: #FFFFFF; border: 1px solid #E6E3F0; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 4px;">
+        <span style="font-size: 14px; font-weight: 600; color: #5E6475;">Conversão do teste</span>
+        <span class="num" style="font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 30px;">58%</span>
+        <span class="num" style="font-size: 13px; color: #5E6475;">7 de 12 viraram assinatura</span>
+      </div>
+      <div style="background: #FFFFFF; border: 1px solid #E6E3F0; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 4px;">
+        <span style="font-size: 14px; font-weight: 600; color: #5E6475;">Agendamentos em 30 dias</span>
+        <span class="num" style="font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 30px;">1.284</span>
+        <span class="num" style="font-size: 13px; color: #5E6475;">61% pela página pública</span>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+      <div role="group" aria-label="Filtrar por situação" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <sc-for list="{{filters}}" as="f" hint-placeholder-count="6">
+          <button type="button" aria-pressed="{{f.pressed}}" style="{{f.style}}">{{f.label}} <span class="num" style="{{f.countStyle}}">{{f.count}}</span></button>
+        </sc-for>
+      </div>
+      <label style="margin-left: auto; flex: 0 1 300px; display: flex; align-items: center; gap: 10px; min-height: 44px; box-sizing: border-box; padding: 0 14px; background: #FFFFFF; border: 1px solid #E6E3F0; border-radius: 10px; color: #5E6475;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Buscar estabelecimento</span>
+        <input type="search" placeholder="Nome, link ou e-mail do dono" style="flex: 1; min-width: 0; border: 0; outline: none; font: 400 15px 'Figtree', sans-serif; color: #29303C; background: transparent;">
+      </label>
+    </div>
+
+    <div style="background: #FFFFFF; border: 1px solid #E6E3F0; border-radius: 16px; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 15px; min-width: 900px;">
+        <thead>
+          <tr style="text-align: left; color: #5E6475; font-size: 13px;">
+            <th scope="col" style="padding: 14px 20px; font-weight: 600; border-bottom: 1px solid #E6E3F0;">Estabelecimento</th>
+            <th scope="col" style="padding: 14px 12px; font-weight: 600; border-bottom: 1px solid #E6E3F0;">Dono</th>
+            <th scope="col" style="padding: 14px 12px; font-weight: 600; border-bottom: 1px solid #E6E3F0;">Situação</th>
+            <th scope="col" style="padding: 14px 12px; font-weight: 600; border-bottom: 1px solid #E6E3F0;">Plano</th>
+            <th scope="col" style="padding: 14px 12px; font-weight: 600; border-bottom: 1px solid #E6E3F0; text-align: right;">Agend. 30 dias</th>
+            <th scope="col" style="padding: 14px 20px; font-weight: 600; border-bottom: 1px solid #E6E3F0;">Último acesso</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+            <tr style="cursor: pointer;">
+              <td style="padding: 12px 20px; border-bottom: 1px solid #EEEBF6;">
+                <a href="AdminDetalhe.dc.html" style="display: flex; flex-direction: column; gap: 2px; color: #29303C; text-decoration: none;">
+                  <span style="font-weight: 600;">{{r.name}}</span>
+                  <span style="font-size: 13px; color: #5E6475;">/{{r.slug}}</span>
+                </a>
+              </td>
+              <td style="padding: 12px; border-bottom: 1px solid #EEEBF6;">
+                <span style="display: flex; flex-direction: column; gap: 2px;">
+                  <span>{{r.owner}}</span>
+                  <span style="font-size: 13px; color: #5E6475;">{{r.email}}</span>
+                </span>
+              </td>
+              <td style="padding: 12px; border-bottom: 1px solid #EEEBF6;">
+                <span style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                  <span style="{{r.badge}}">{{r.status}}</span>
+                  <span class="num" style="font-size: 13px; color: #5E6475;">{{r.when}}</span>
+                </span>
+              </td>
+              <td style="padding: 12px; border-bottom: 1px solid #EEEBF6;">{{r.plan}}</td>
+              <td class="num" style="padding: 12px; border-bottom: 1px solid #EEEBF6; text-align: right;">{{r.bookings}}</td>
+              <td class="num" style="padding: 12px 20px; border-bottom: 1px solid #EEEBF6; color: #5E6475;">{{r.seen}}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var base = 'display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 999px; font: 500 14px Figtree, sans-serif; cursor: pointer; ';
+    var fl = [
+      { label: 'Todos', count: 15, on: true },
+      { label: 'Em teste', count: 5 },
+      { label: 'Ativos', count: 7 },
+      { label: 'Pagamento atrasado', count: 1 },
+      { label: 'Somente leitura', count: 1 },
+      { label: 'Cancelados', count: 1 }
+    ];
+    var filters = fl.map(function (f) {
+      return {
+        label: f.label, count: f.count, pressed: f.on ? 'true' : 'false',
+        style: base + (f.on ? 'border: 1px solid #3E07D2; background: #EEE8FD; color: #3E07D2; font-weight: 600;' : 'border: 1px solid #E6E3F0; background: #FFFFFF; color: #29303C;'),
+        countStyle: 'font-size: 13px; ' + (f.on ? 'color: #3E07D2;' : 'color: #5E6475;')
+      };
+    });
+    var badges = {
+      trial: 'color: #3E07D2; background: #EEE8FD;',
+      active: 'color: #0B7A44; background: #E8F7EF;',
+      late: 'color: #B23A0A; background: #FFF1E8;',
+      expired: 'color: #B23A0A; background: #FFF1E8;',
+      ro: 'color: #5E6475; background: #EEEBF6;',
+      canceled: 'color: #5E6475; background: #EEEBF6;'
+    };
+    var raw = [
+      { name: 'Studio Aurora Piercing', slug: 'studio-aurora', owner: 'Marina Duarte', email: 'marina@studioaurora.com', status: 'Em teste', k: 'trial', when: 'Termina em 2 dias', plan: 'Profissional', bookings: 38, seen: 'Hoje, 09:12' },
+      { name: 'Espaço Bella Unhas', slug: 'bella-unhas', owner: 'Renata Lopes', email: 'renata.lopes@gmail.com', status: 'Ativo', k: 'active', when: 'Renova em 12/11', plan: 'Essencial', bookings: 164, seen: 'Hoje, 08:40' },
+      { name: 'Barbearia do Vale', slug: 'barbearia-do-vale', owner: 'Caio Mendes', email: 'caio@barbeariadovale.com.br', status: 'Ativo', k: 'active', when: 'Renova em 03/11', plan: 'Studio', bookings: 402, seen: 'Ontem, 19:05' },
+      { name: 'Clínica Pele Leve', slug: 'pele-leve', owner: 'Tatiane Rocha', email: 'contato@peleleve.com.br', status: 'Pagamento atrasado', k: 'late', when: 'Venceu há 3 dias', plan: 'Profissional', bookings: 97, seen: 'Ontem, 14:22' },
+      { name: 'Ateliê Cabelo &amp; Cor', slug: 'atelie-cabelo-cor', owner: 'Simone Prates', email: 'simone.prates@outlook.com', status: 'Em teste', k: 'trial', when: 'Termina em 6 dias', plan: 'Essencial', bookings: 12, seen: '25/10, 21:10' },
+      { name: 'Lash Design Carol', slug: 'lash-carol', owner: 'Carolina Viana', email: 'carol.lash@gmail.com', status: 'Teste vencido', k: 'expired', when: 'Venceu em 22/10', plan: 'Essencial', bookings: 0, seen: '21/10, 10:03' },
+      { name: 'Studio Ink Norte', slug: 'ink-norte', owner: 'Rafael Couto', email: 'rafael@inknorte.com', status: 'Ativo', k: 'active', when: 'Renova em 19/11', plan: 'Profissional', bookings: 121, seen: '26/10, 17:48' },
+      { name: 'Sobrancelhas Mila', slug: 'mila-sobrancelhas', owner: 'Camila Freitas', email: 'mila.freitas@gmail.com', status: 'Somente leitura', k: 'ro', when: 'Desde 10/10', plan: 'Essencial', bookings: 0, seen: '09/10, 15:30' },
+      { name: 'Estética Corpo em Forma', slug: 'corpo-em-forma', owner: 'Patrícia Gomes', email: 'patricia@corpoemforma.com.br', status: 'Cancelado', k: 'canceled', when: 'Em 01/10', plan: 'Essencial', bookings: 0, seen: '30/09, 11:15' }
+    ];
+    var rows = raw.map(function (r) {
+      return {
+        name: r.name.replace('&amp;', '&'), slug: r.slug, owner: r.owner, email: r.email, status: r.status, when: r.when, plan: r.plan, bookings: r.bookings, seen: r.seen,
+        badge: 'font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; ' + badges[r.k]
+      };
+    });
+    return { filters: filters, rows: rows };
+  }
+}
+</script>
+</body>
+</html>

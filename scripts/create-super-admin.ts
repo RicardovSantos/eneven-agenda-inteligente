@@ -3,6 +3,10 @@
  *
  *   SUPER_ADMIN_PASSWORD='uma-senha-longa' pnpm create-super-admin email@exemplo.com "Nome"
  *
+ * Ou promove uma conta que já existe (sem senha, a conta mantém a dela):
+ *
+ *   pnpm create-super-admin --promote email@exemplo.com
+ *
  * A senha vem só da variável de ambiente (nunca por argumento, para não ficar
  * no histórico do terminal). Em produção, defina DATABASE_URL.
  */
@@ -12,11 +16,29 @@ import { users } from "../src/db/schema";
 import { normalizeEmail } from "../src/server/auth/login";
 import { hashPassword } from "../src/server/auth/password";
 import { signupSchema } from "../src/server/auth/schemas";
+import { promoteSuperAdmin } from "../src/server/platform/super-admin";
 
 const MIN_PASSWORD_LENGTH = 12;
 
 async function main() {
-  const [rawEmail, ...nameParts] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  if (args[0] === "--promote") {
+    const email = args[1];
+    if (!email || args.length > 2) {
+      throw new Error("Uso: pnpm create-super-admin --promote <e-mail>");
+    }
+    await withDb(async (db) => {
+      const result = await promoteSuperAdmin(db, email);
+      console.log(
+        result.alreadySuperAdmin
+          ? `${result.email} já é super-admin.`
+          : `Super-admin promovido: ${result.email}`,
+      );
+    });
+    return;
+  }
+
+  const [rawEmail, ...nameParts] = args;
   const name = nameParts.join(" ").trim();
   const password = process.env.SUPER_ADMIN_PASSWORD ?? "";
 
@@ -35,8 +57,7 @@ async function main() {
     );
   }
 
-  const db = await getDb();
-  try {
+  await withDb(async (db) => {
     const [existing] = await db
       .select({ id: users.id })
       .from(users)
@@ -52,6 +73,15 @@ async function main() {
       emailVerifiedAt: new Date(),
     });
     console.log(`Super-admin criado: ${name} <${email}>`);
+  });
+}
+
+type ScriptDb = Awaited<ReturnType<typeof getDb>>;
+
+async function withDb(run: (db: ScriptDb) => Promise<void>) {
+  const db = await getDb();
+  try {
+    await run(db);
   } finally {
     // Encerra a conexão para o processo poder sair (postgres-js: end; PGlite: close).
     const client = (

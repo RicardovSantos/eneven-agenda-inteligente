@@ -300,3 +300,30 @@
     animation: none;
   }
 }
+
+/*
+ * Faixa do modo suporte (`data-support-banner`, 56px no celular e 48px no
+ * computador): fixa no topo do painel. O que gruda no topo da janela (menu
+ * lateral, topo do celular, colunas de edição e da agenda) desce a altura dela,
+ * para nada ficar escondido nem sobrar rolagem.
+ */
+body:has([data-support-banner]) {
+  --banner-h: 3.5rem;
+}
+body:has([data-support-banner]) :is([class~="sticky"], [class*="lg:sticky"])[class*="top-0"]:not([data-support-banner]) {
+  top: var(--banner-h);
+}
+body:has([data-support-banner]) [class~="min-h-dvh"] {
+  min-height: calc(100dvh - var(--banner-h));
+}
+@media (min-width: 1024px) {
+  body:has([data-support-banner]) {
+    --banner-h: 3rem;
+  }
+  body:has([data-support-banner]) :is([class~="sticky"], [class*="lg:sticky"])[class*="h-dvh"] {
+    height: calc(100dvh - var(--banner-h));
+  }
+  body:has([data-support-banner]) [class*="lg:min-h-dvh"] {
+    min-height: calc(100dvh - var(--banner-h));
+  }
+}

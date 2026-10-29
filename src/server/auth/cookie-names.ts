@@ -19,6 +19,12 @@ export const OAUTH_VERIFIER_COOKIE = cookieName("ea_oauth_verifier");
 export const OAUTH_INTENT_COOKIE = cookieName("ea_oauth_intent");
 export const GOOGLE_PENDING_COOKIE = cookieName("ea_google_pending");
 
+/** Token do convite da equipe durante o "Continuar com Google" (assinado, 10 min). */
+export const INVITE_COOKIE = cookieName("ea_invite");
+
+/** Rótulo do HMAC do cookie do convite. Fixo e diferente do rótulo do perfil pendente. */
+export const INVITE_COOKIE_PURPOSE = "ea_invite";
+
 /**
  * Rótulo que entra no HMAC do perfil pendente. Fixo (não muda com o prefixo
  * `__Host-`) e diferente de qualquer outro valor assinado.

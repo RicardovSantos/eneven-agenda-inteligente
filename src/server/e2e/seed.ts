@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import sharp from "sharp";
 import {
   bookingServices,
@@ -21,6 +21,7 @@ import { createSession } from "@/server/auth/session";
 import { createTenantWithOwner } from "@/server/auth/signup";
 import { listProfessionals, saveProfessional, saveService } from "@/server/catalog";
 import { uploadLogo } from "@/server/settings";
+import { inviteMemberForTests } from "@/server/team/invitations";
 import { withTenant } from "@/server/tenant-db";
 
 /**
@@ -293,4 +294,86 @@ export async function verifyE2eOwnerEmail(db: Db, slug: string) {
   if (!owner) throw new Error(`Proprietário não encontrado: ${slug}`);
   await db.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, owner.userId));
   return { ok: true };
+}
+
+/**
+ * Usuário novo com o papel dado (`reception` ou `staff`) no estabelecimento,
+ * com sessão pronta: para os testes de menu e acesso por papel.
+ */
+export async function seedE2eMember(db: Db, slug: string, role: "owner" | "reception" | "staff") {
+  const tenantId = await tenantIdOf(db, slug);
+  const suffix = Math.random().toString(36).slice(2, 7);
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: `e2e-${role}-${suffix}-${Date.now()}@exemplo.com`,
+      passwordHash: null,
+      name: role === "reception" ? "Rita Recepção" : "Paulo Profissional",
+      emailVerifiedAt: new Date(),
+    })
+    .returning({ id: users.id });
+  await db.insert(memberships).values({ userId: user.id, tenantId, role });
+  const token = await createSession(db, user.id, tenantId);
+  return { token, cookieName: SESSION_COOKIE, userId: user.id };
+}
+
+export type SeedInviteOptions = {
+  slug: string;
+  name: string;
+  email: string;
+  role: "reception" | "staff";
+  /** Índice do profissional (ordem de criação); obrigatório para `staff`. */
+  professionalIndex?: number;
+};
+
+/**
+ * Convite de equipe emitido pelo proprietário, devolvendo o token (que em
+ * produção só vai por e-mail): o e2e abre o link sem ler uma caixa de entrada.
+ */
+export async function seedE2eInvite(db: Db, options: SeedInviteOptions) {
+  const tenantId = await tenantIdOf(db, options.slug);
+  const [owner] = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.role, "owner")))
+    .limit(1);
+  if (!owner) throw new Error(`Proprietário não encontrado: ${options.slug}`);
+
+  let professionalId: string | undefined;
+  if (options.role === "staff") {
+    const pros = await withTenant(db, tenantId, (tx) =>
+      tx
+        .select({ id: professionals.id })
+        .from(professionals)
+        .where(eq(professionals.tenantId, tenantId))
+        .orderBy(asc(professionals.sortOrder), asc(professionals.createdAt), asc(professionals.id)),
+    );
+    professionalId = pros[options.professionalIndex ?? 0]?.id;
+  }
+  const { token, invitationId } = await inviteMemberForTests(
+    db,
+    { tenantId, userId: owner.userId, role: "owner" },
+    { name: options.name, email: options.email, role: options.role, professionalId },
+  );
+  return { token, invitationId };
+}
+
+/**
+ * Dono da plataforma (super-admin, sem estabelecimento) com sessão pronta: o
+ * Playwright entra em `/admin` sem passar pelo login nem por `create-super-admin`.
+ */
+export async function seedE2eSuperAdmin(db: Db) {
+  const suffix = Math.random().toString(36).slice(2, 7);
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: `e2e-admin-${suffix}-${Date.now()}@exemplo.com`,
+      passwordHash: null,
+      name: "Ricardo",
+      emailVerifiedAt: new Date(),
+      isSuperAdmin: true,
+    })
+    .returning({ id: users.id });
+  const token = await createSession(db, user.id, null);
+  return { token, cookieName: SESSION_COOKIE, userId: user.id };
 }

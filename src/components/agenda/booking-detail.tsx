@@ -58,11 +58,14 @@ export function BookingDetail({
   booking,
   today,
   timezone,
+  readOnly = false,
   onClose,
 }: {
   booking: DayBooking;
   today: string;
   timezone: string;
+  /** Estabelecimento sem plano ativo: "Remarcar" fica desabilitado. */
+  readOnly?: boolean;
   onClose: () => void;
 }) {
   const toast = useToast();
@@ -294,7 +297,7 @@ export function BookingDetail({
 
             {active ? (
               <div className="grid grid-cols-3 gap-2">
-                <button type="button" className={TILE} disabled={pending !== null} onClick={() => setMode("reschedule")}>
+                <button type="button" className={TILE} disabled={pending !== null || readOnly} onClick={() => setMode("reschedule")}>
                   <RotateCcw className="size-5" aria-hidden="true" />
                   Remarcar
                 </button>

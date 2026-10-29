@@ -16,18 +16,21 @@ export function LoginForm({
   notice,
   alert,
   googleEnabled = false,
+  invite,
 }: {
   notice?: string;
   /** Erro geral vindo da URL (ex.: falha ao entrar com o Google). */
   alert?: string;
   /** Mostra "Entrar com Google" (só quando as credenciais estão configuradas). */
   googleEnabled?: boolean;
+  /** Convite a aceitar depois de entrar (a página do convite manda para cá). */
+  invite?: { token: string; email: string };
 }) {
   const [state, formAction, pending] = useActionState<AuthFormState, FormData>(
     loginAction,
     INITIAL_STATE,
   );
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(invite?.email ?? "");
   const formRef = useRef<HTMLFormElement>(null);
 
   const errors = state.fieldErrors ?? {};
@@ -55,6 +58,7 @@ export function LoginForm({
           noValidate
           className="flex flex-col gap-4"
         >
+          {invite ? <input type="hidden" name="convite" value={invite.token} /> : null}
           {notice ? <FormNotice>{notice}</FormNotice> : null}
           {(state.error ?? shownAlert) ? (
             <FormAlert>{state.error ?? shownAlert}</FormAlert>
@@ -95,7 +99,7 @@ export function LoginForm({
           </div>
         </form>
 
-        {googleEnabled ? <GoogleSection intent="login" /> : null}
+        {googleEnabled && !invite ? <GoogleSection intent="login" /> : null}
       </div>
 
       <p className="text-ink-muted">

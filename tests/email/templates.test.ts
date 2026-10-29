@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  buildInviteEmail,
   buildResetEmail,
   buildVerifyEmail,
   escapeHtml,
+  inviteLink,
 } from "@/server/email/templates";
 
 afterEach(() => vi.unstubAllEnvs());
@@ -90,5 +92,57 @@ describe("buildResetEmail", () => {
       "O link vale por 1 hora. Se não foi você, ignore este e-mail: sua senha continua a mesma.",
     );
     expect(mail.text).toContain(link);
+  });
+});
+
+describe("buildInviteEmail", () => {
+  it("inviteLink aponta para /convite/{token}", () => {
+    vi.stubEnv("APP_URL", "https://app.eneven.com.br/");
+    expect(inviteLink("abc_-123")).toBe("https://app.eneven.com.br/convite/abc_-123");
+  });
+
+  it("usa o assunto com o nome do estabelecimento, o link e escapa nomes no html", () => {
+    const link = "https://app.eneven.com.br/convite/tok";
+    const mail = buildInviteEmail({
+      name: "Rita <b>Souza</b>",
+      tenantName: `Studio "Bela" & <i>Cia</i>`,
+      role: "reception",
+      link,
+    });
+    expect(mail.subject).toBe(`Studio "Bela" & <i>Cia</i> convidou você para a agenda`);
+    expect(mail.html).toContain(`href="${link}"`);
+    expect(mail.html).toContain("Studio &quot;Bela&quot; &amp; &lt;i&gt;Cia&lt;/i&gt;");
+    expect(mail.html).toContain("Rita");
+    expect(mail.html).not.toContain("<i>Cia</i>");
+    expect(mail.html).not.toContain("<b>Souza</b>");
+    expect(mail.html).toContain("O link vale por 7 dias.");
+    expect(mail.text).toContain(link);
+  });
+
+  it("descreve o papel (recepção ou profissional)", () => {
+    const base = { name: "Rita", tenantName: "Studio", link: "https://x.com/convite/t" };
+    expect(buildInviteEmail({ ...base, role: "reception" }).text).toContain("recepção");
+    expect(buildInviteEmail({ ...base, role: "staff" }).text).toContain("profissional");
+  });
+
+  it("convite de proprietário: assunto próprio", () => {
+    const mail = buildInviteEmail({
+      name: "Dona Ana",
+      tenantName: "Studio",
+      role: "owner",
+      link: "https://x.com/convite/t",
+    });
+    expect(mail.subject).toBe("Sua agenda na Eneven está pronta");
+    expect(mail.text).toContain("Studio");
+  });
+
+  it("não deixa quebra de linha no assunto", () => {
+    const mail = buildInviteEmail({
+      name: "R",
+      tenantName: "Studio\r\nBcc: x@y.com",
+      role: "staff",
+      link: "https://x.com/convite/t",
+    });
+    expect(mail.subject).not.toMatch(/[\r\n]/);
   });
 });

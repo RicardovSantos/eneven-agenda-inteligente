@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Plataforma: um estabelecimento</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;family=Outfit:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F7F6FC}
+a{color:#3E07D2}a:hover{color:#2C0597}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="min-height: 900px; background: #F7F6FC; color: #29303C; font-family: 'Figtree', system-ui, sans-serif; display: flex; flex-direction: column;">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E6E3F0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; padding: 0 32px; min-height: 64px;">
+    <div style="display: flex; align-items: center; gap: 28px; flex-wrap: wrap;">
+      <img src="/_blob/4c7ab5678f2c7edfc071f0b3c5d2a0b4" alt="Eneven Agendamentos Inteligentes" style="width: 124px;">
+      <nav aria-label="Plataforma" style="display: flex; gap: 4px;">
+        <a href="Admin.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 10px; background: #EEE8FD; color: #3E07D2; font-weight: 600; text-decoration: none; font-size: 15px;">Estabelecimentos</a>
+        <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 10px; color: #5E6475; font-weight: 500; text-decoration: none; font-size: 15px;">Planos</a>
+      </nav>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 10px; color: #29303C; font-weight: 500; text-decoration: none; font-size: 15px;">Meu estabelecimento</a>
+      <button type="button" style="display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: #29303C; font: 500 15px 'Figtree', sans-serif; cursor: pointer;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>
+        Sair
+      </button>
+    </div>
+  </header>
+
+  <main style="box-sizing: border-box; width: 100%; max-width: 1180px; margin: 0 auto; padding: 20px 32px 40px; display: flex; flex-direction: column; gap: 20px;">
+    <a href="Admin.dc.html" style="align-self: flex-start; display: flex; align-items: center; gap: 4px; min-height: 40px; color: #5E6475; text-decoration: none; font-size: 15px; font-weight: 500;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+      Estabelecimentos
+    </a>
+
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;">
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <span aria-hidden="true" style="width: 56px; height: 56px; border-radius: 16px; background: #0E7C86; color: #FFFFFF; display: grid; place-items: center; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 20px; flex: none;">SA</span>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+            <h1 style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 28px;">Studio Aurora Piercing</h1>
+            <span style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; color: #3E07D2; background: #EEE8FD;">Em teste</span>
+          </div>
+          <a href="#" style="font-size: 15px;">agenda.eneven.com.br/studio-aurora</a>
+        </div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+        <a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #E6E3F0; background: #FFFFFF; color: #29303C; text-decoration: none; font-weight: 600; font-size: 15px;">Abrir página</a>
+        <a href="#" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 10px; background: #3E07D2; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 15px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg>
+          Entrar como o estabelecimento
+        </a>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start;">
+      <section aria-labelledby="t-assin" style="background: #FFFFFF; border: 1px solid #E6E3F0; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
+        <h2 id="t-assin" style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 20px;">Assinatura</h2>
+        <dl style="margin: 0; display: grid; grid-template-columns: 140px minmax(0, 1fr); row-gap: 10px; font-size: 15px;">
+          <dt style="color: #5E6475;">Situação</dt><dd style="margin: 0; font-weight: 600;">Em teste</dd>
+          <dt style="color: #5E6475;">Teste termina</dt><dd class="num" style="margin: 0; font-weight: 600;">29/10/2026, em 2 dias</dd>
+          <dt style="color: #5E6475;">Cadastro</dt><dd class="num" style="margin: 0; font-weight: 600;">15/10/2026, pelo Google</dd>
+        </dl>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="a-plano" style="font-size: 14px; font-weight: 600;">Plano</label>
+          <select id="a-plano" style="min-height: 44px; padding: 0 12px; border: 1px solid #E6E3F0; border-radius: 10px; font: 400 15px 'Figtree', sans-serif; color: #29303C; background: #FFFFFF;"><option>Profissional · R$ 69,90 · até 6 profissionais</option></select>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 14px; font-weight: 600;">Estender o teste</span>
+          <div role="group" aria-label="Estender o teste" style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <button type="button" style="min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #E6E3F0; background: #FFFFFF; color: #29303C; font: 600 14px 'Figtree', sans-serif; cursor: pointer;">+ 7 dias</button>
+            <button type="button" style="min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #E6E3F0; background: #FFFFFF; color: #29303C; font: 600 14px 'Figtree', sans-serif; cursor: pointer;">+ 14 dias</button>
+            <button type="button" style="min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #E6E3F0; background: #FFFFFF; color: #29303C; font: 600 14px 'Figtree', sans-serif; cursor: pointer;">+ 30 dias</button>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px; border-top: 1px solid #EEEBF6; padding-top: 16px;">
+          <button type="button" style="min-height: 44px; padding: 0 16px; border: 0; border-radius: 10px; background: #3E07D2; color: #FFFFFF; font: 600 15px 'Figtree', sans-serif; cursor: pointer;">Ativar assinatura</button>
+          <button type="button" style="min-height: 44px; padding: 0 16px; border: 1px solid #E6E3F0; border-radius: 10px; background: #FFFFFF; color: #C2410C; font: 600 15px 'Figtree', sans-serif; cursor: pointer;">Bloquear</button>
+        </div>
+        <p style="margin: 0; font-size: 13px; color: #5E6475;">Bloquear deixa o painel só para consulta e tira a página de agendamento do ar. Os dados ficam guardados.</p>
+      </section>
+
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <section aria-labelledby="t-dono" style="background: #FFFFFF; border: 1px solid #E6E3F0; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px;">
+          <h2 id="t-dono" style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 20px;">Dono</h2>
+          <dl style="margin: 0; display: grid; grid-template-columns: 140px minmax(0, 1fr); row-gap: 10px; font-size: 15px;">
+            <dt style="color: #5E6475;">Nome</dt><dd style="margin: 0; font-weight: 600;">Marina Duarte</dd>
+            <dt style="color: #5E6475;">E-mail</dt><dd style="margin: 0; font-weight: 600;">marina@studioaurora.com <span style="font-weight: 500; color: #0B7A44;">· confirmado</span></dd>
+            <dt style="color: #5E6475;">WhatsApp</dt><dd class="num" style="margin: 0; font-weight: 600;">(11) 99654-2210</dd>
+            <dt style="color: #5E6475;">Último acesso</dt><dd class="num" style="margin: 0; font-weight: 600;">Hoje, 09:12</dd>
+          </dl>
+          <a href="#" style="align-self: flex-start; display: flex; align-items: center; gap: 8px; min-height: 40px; font-size: 15px; font-weight: 600; text-decoration: none;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.4A8.4 8.4 0 1 1 21 11.5z"></path></svg>
+            Chamar no WhatsApp
+          </a>
+        </section>
+
+        <section aria-labelledby="t-uso" style="background: #FFFFFF; border: 1px solid #E6E3F0; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px;">
+          <h2 id="t-uso" style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 20px;">Uso</h2>
+          <dl style="margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+            <div style="padding: 12px 14px; border-radius: 12px; background: #F7F6FC; display: flex; flex-direction: column-reverse; gap: 2px;"><dt style="font-size: 13px; color: #5E6475;">Agendamentos em 30 dias</dt><dd class="num" style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 22px;">38</dd></div>
+            <div style="padding: 12px 14px; border-radius: 12px; background: #F7F6FC; display: flex; flex-direction: column-reverse; gap: 2px;"><dt style="font-size: 13px; color: #5E6475;">Clientes</dt><dd class="num" style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 22px;">31</dd></div>
+            <div style="padding: 12px 14px; border-radius: 12px; background: #F7F6FC; display: flex; flex-direction: column-reverse; gap: 2px;"><dt style="font-size: 13px; color: #5E6475;">Profissionais</dt><dd class="num" style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 22px;">3 de 6</dd></div>
+            <div style="padding: 12px 14px; border-radius: 12px; background: #F7F6FC; display: flex; flex-direction: column-reverse; gap: 2px;"><dt style="font-size: 13px; color: #5E6475;">Serviços ativos</dt><dd class="num" style="margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 22px;">9</dd></div>
+          </dl>
+        </section>
+      </div>
+    </div>
+
+    <section aria-labelledby="t-hist" style="background: #FFFFFF; border: 1px solid #E6E3F0; border-radius: 16px; padding: 20px 24px 8px; display: flex; flex-direction: column; gap: 6px;">
+      <h2 id="t-hist" style="margin: 0 0 6px; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 20px;">Histórico</h2>
+      <ul style="margin: 0; padding: 0; list-style: none;">
+        <sc-for list="{{log}}" as="l" hint-placeholder-count="4">
+          <li style="display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 12px 0; border-top: 1px solid #EEEBF6; font-size: 15px;">
+            <span class="num" style="width: 130px; flex: none; color: #5E6475;">{{l.when}}</span>
+            <span style="flex: 1 1 300px;">{{l.what}}</span>
+          </li>
+        </sc-for>
+      </ul>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      log: [
+        { when: '26/10, 14:02', what: 'Ricardo entrou como o estabelecimento (suporte, 12 min)' },
+        { when: '22/10, 10:30', what: 'Ricardo mudou o plano de Essencial para Profissional' },
+        { when: '15/10, 18:47', what: 'Primeiros passos concluídos' },
+        { when: '15/10, 18:20', what: 'Conta criada pelo Google' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

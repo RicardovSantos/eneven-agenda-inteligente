@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { memberships, sessions, tenants, users } from "@/db/schema";
 import { createTestDb } from "../helpers/test-db";
+import { getDefaultPlanId } from "@/server/platform/plans";
 
 const trialEndsAt = () => new Date(Date.now() + 86_400_000);
 
@@ -24,7 +25,7 @@ describe("schema", () => {
 
   it("rejeita dois estabelecimentos com o mesmo slug", async () => {
     const db = await createTestDb();
-    const row = { slug: "loja", name: "Loja", trialEndsAt: trialEndsAt() };
+    const row = { slug: "loja", name: "Loja", trialEndsAt: trialEndsAt(), planId: await getDefaultPlanId(db) };
     await db.insert(tenants).values(row);
     await expectUniqueViolation(db.insert(tenants).values(row));
   });
@@ -42,7 +43,7 @@ describe("schema", () => {
     const db = await createTestDb();
     const [tenant] = await db
       .insert(tenants)
-      .values({ slug: "loja", name: "Loja", trialEndsAt: trialEndsAt() })
+      .values({ slug: "loja", name: "Loja", trialEndsAt: trialEndsAt(), planId: await getDefaultPlanId(db) })
       .returning();
     expect(tenant.status).toBe("trial");
     expect(tenant.timezone).toBe("America/Sao_Paulo");
@@ -54,7 +55,7 @@ describe("schema", () => {
     const db = await createTestDb();
     const [tenant] = await db
       .insert(tenants)
-      .values({ slug: "loja", name: "Loja", trialEndsAt: trialEndsAt() })
+      .values({ slug: "loja", name: "Loja", trialEndsAt: trialEndsAt(), planId: await getDefaultPlanId(db) })
       .returning();
     const [user] = await db
       .insert(users)

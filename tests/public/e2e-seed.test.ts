@@ -1,6 +1,10 @@
+import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { SESSION_COOKIE, getSession } from "@/server/auth/session";
 import { getPublicTenant } from "@/server/public/tenant";
+import { getInvitation } from "@/server/team/accept";
 import { createTestDb } from "../helpers/test-db";
 
 const state = vi.hoisted(() => ({ db: undefined as unknown }));
@@ -78,5 +82,70 @@ describe("rota de apoio do e2e", () => {
 
     expect((await call({ action: "verify-email", slug }, "segredo")).status).toBe(200);
     expect(await getPublicTenant(slug, { db })).toMatchObject({ canBook: true });
+  });
+  it("member: cria usuário com o papel pedido no estabelecimento e devolve uma sessão desse usuário", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("E2E_SEED", "segredo");
+    const { slug } = (await (await call({ action: "tenant" }, "segredo")).json()) as { slug: string };
+
+    expect((await call({ action: "member", slug, role: "reception" })).status).toBe(404);
+    expect((await call({ action: "member", slug, role: "admin" }, "segredo")).status).toBe(400);
+
+    const res = await call({ action: "member", slug, role: "reception" }, "segredo");
+    expect(res.status).toBe(200);
+    const { token, cookieName } = (await res.json()) as { token: string; cookieName: string };
+    const session = await getSession(db, token);
+    expect(cookieName).toBe(SESSION_COOKIE);
+    expect(session).toMatchObject({ role: "reception", isSuperAdmin: false });
+    const [tenant] = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug));
+    expect(session?.tenantId).toBe(tenant.id);
+  });
+  it("invite: emite um convite de equipe e devolve token e id (só com autorização)", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("E2E_SEED", "segredo");
+    const { slug } = (await (await call({ action: "tenant", extraProfessionals: ["Léo"] }, "segredo")).json()) as {
+      slug: string;
+    };
+    const body = { action: "invite", slug, name: "Léo", email: "leo@exemplo.com", role: "staff", professionalIndex: 1 };
+
+    expect((await call(body)).status).toBe(404);
+    expect((await call({ ...body, role: "owner" }, "segredo")).status).toBe(400);
+
+    const res = await call(body, "segredo");
+    expect(res.status).toBe(200);
+    const { token, invitationId } = (await res.json()) as { token: string; invitationId: string };
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(invitationId).toMatch(/^[0-9a-f-]{36}$/);
+
+    const view = await getInvitation(db, token);
+    expect(view).toMatchObject({ status: "valid", email: "leo@exemplo.com", role: "staff", name: "Léo" });
+  });
+  it("super-admin: cria o dono da plataforma com sessão, só com autorização", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("E2E_SEED", "segredo");
+
+    expect((await call({ action: "super-admin" })).status).toBe(404);
+    expect((await call({ action: "super-admin" }, "errado")).status).toBe(404);
+
+    const res = await call({ action: "super-admin" }, "segredo");
+    expect(res.status).toBe(200);
+    const { token, cookieName } = (await res.json()) as { token: string; cookieName: string };
+    expect(cookieName).toBe(SESSION_COOKIE);
+    expect(await getSession(db, token)).toMatchObject({ isSuperAdmin: true, tenantId: null, role: null, support: false });
+  });
+  it("tenant: aceita as situações da plataforma (bloqueado, teste vencido, cancelado)", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("E2E_SEED", "segredo");
+
+    const blocked = (await (await call({ action: "tenant", status: "read_only" }, "segredo")).json()) as { slug: string };
+    expect(await getPublicTenant(blocked.slug, { db })).toMatchObject({ canBook: false });
+
+    const expired = (await (
+      await call({ action: "tenant", status: "trial", trialEndsAt: "2020-01-01T00:00:00Z" }, "segredo")
+    ).json()) as { slug: string };
+    const [row] = await db.select().from(tenants).where(eq(tenants.slug, expired.slug));
+    expect(row.status).toBe("trial");
+    expect(row.trialEndsAt.toISOString()).toBe("2020-01-01T00:00:00.000Z");
+    expect(await getPublicTenant(expired.slug, { db })).toMatchObject({ canBook: false });
   });
 });

@@ -39,7 +39,7 @@ const form = (values: Record<string, string | File>) => {
 };
 
 const asRole = (role: "owner" | "reception" | "staff") => {
-  state.session = { userId: "u1", tenantId, role, isSuperAdmin: false, emailVerified: true };
+  state.session = { userId: "u1", tenantId, role, isSuperAdmin: false, emailVerified: true, support: false };
 };
 
 beforeEach(async () => {

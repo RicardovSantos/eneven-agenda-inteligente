@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { bookings, customers, professionals, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { getDefaultPlanId } from "@/server/platform/plans";
 
 /** Instante de teste: `at("10:00")` = 2030-01-07 10:00 UTC (segunda-feira). */
 export function at(hhmm: string): Date {
@@ -13,7 +14,12 @@ export async function seedTenant(
 ) {
   const [tenant] = await db
     .insert(tenants)
-    .values({ slug, name: slug, trialEndsAt: new Date(Date.now() + 86_400_000) })
+    .values({
+      slug,
+      name: slug,
+      trialEndsAt: new Date(Date.now() + 86_400_000),
+      planId: await getDefaultPlanId(db),
+    })
     .returning();
   return tenant;
 }

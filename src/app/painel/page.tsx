@@ -5,9 +5,10 @@ import { ResendVerification } from "@/components/panel/resend-verification";
 import { PUBLIC_HOST } from "@/lib/brand";
 import { formatDayMonth, trialDaysLeft } from "@/lib/trial";
 import { findStaffProfessional, getDayAgenda, getMonthOverview, listPanelProfessionals } from "@/server/agenda/panel-queries";
+import { panelBookingOptions } from "@/server/agenda/booking-options";
 import { addDaysToDate, localDateOf, weekdayOf } from "@/server/agenda/time";
 import { requireOnboarded } from "@/server/panel/onboarding-gate";
-import { isTenantReleased } from "@/server/tenants/release";
+import { isTenantActive, isTenantReleased } from "@/server/tenants/release";
 import { isRealDate } from "@/server/public/schemas";
 import { listServices } from "@/server/catalog";
 
@@ -69,21 +70,12 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
     listServices(db, session.tenantId),
   ]);
 
-  const professionals = (own ? [own] : allPros).map((p) => ({ id: p.id, name: p.name, color: p.color }));
-  const services = catalog
-    .filter((s) => (own ? s.professionalIds.includes(own.id) : s.professionalIds.length > 0))
-    .map((s) => ({
-      id: s.id,
-      name: s.name,
-      durationMin: s.durationMin,
-      priceCents: s.priceCents,
-      professionalIds: s.professionalIds,
-    }));
+  const { professionals, services } = panelBookingOptions(allPros, catalog, own);
 
   const released = isTenantReleased({
     status: data.tenantStatus,
     trialEndsAt: data.trialEndsAt,
-    emailVerified: session.emailVerified,
+    emailVerified: data.linkEmailVerified,
   });
 
   return (
@@ -100,6 +92,7 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
       lockedProfessionalId={own?.id ?? null}
       publicUrl={released ? `https://${PUBLIC_HOST}/${data.tenantSlug}` : null}
       nowMs={now.getTime()}
+      readOnly={!isTenantActive({ status: data.tenantStatus, trialEndsAt: data.trialEndsAt }, now)}
       banners={banners}
     />
   );
@@ -108,10 +101,21 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
 function Banners({ data }: { data: Awaited<ReturnType<typeof requireOnboarded>> }) {
   const isTrial = data.tenantStatus === "trial";
   const daysLeft = trialDaysLeft(data.trialEndsAt);
-  if (data.session.emailVerified && !isTrial) return null;
+  if (data.linkEmailVerified && !isTrial) return null;
   return (
     <div className="flex flex-col gap-3">
-      {!data.session.emailVerified ? <ResendVerification email={data.userEmail} /> : null}
+      {!data.linkEmailVerified ? (
+        data.session.support || data.session.role !== "owner" ? (
+          // Suporte e equipe não disparam e-mail em nome do dono: só informam.
+          <p className="rounded-field border-l-[3px] border-danger bg-danger-soft px-4 py-3 text-sm leading-snug">
+            O dono ainda não confirmou o e-mail (
+            <strong className="break-all font-semibold">{data.verificationEmail}</strong>): o link de agendamento só é
+            liberado depois disso.
+          </p>
+        ) : (
+          <ResendVerification email={data.verificationEmail} />
+        )
+      ) : null}
       {isTrial ? (
         <p className="rounded-field bg-primary-soft px-4 py-3 text-sm leading-snug text-primary">
           {daysLeft > 0 ? (

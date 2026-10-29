@@ -50,7 +50,14 @@ export function useToastOnResult(state: {
   }, [state, show]);
 }
 
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({
+  children,
+  sidebar = true,
+}: {
+  children: ReactNode;
+  /** `false` fora do painel (sem barra lateral de 232px): centraliza na tela toda. */
+  sidebar?: boolean;
+}) {
   const [items, setItems] = useState<ToastItem[]>([]);
   const nextId = useRef(1);
 
@@ -76,7 +83,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Acima da navegação inferior no celular; no rodapé em telas largas. */}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-center gap-2 px-4 lg:bottom-6 lg:pl-[calc(232px+1rem)]"
+        className={`pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 ${
+          sidebar
+            ? "bottom-[calc(5rem+env(safe-area-inset-bottom))] lg:bottom-6 lg:pl-[calc(232px+1rem)]"
+            : "bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"
+        }`}
       >
         {items.map((item) => (
           <div

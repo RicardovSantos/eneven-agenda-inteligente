@@ -65,8 +65,8 @@ export default async function ComecarPage() {
     <OnboardingWizard
       initialStep={state.step}
       slug={tenant.slug}
-      emailVerified={data.session.emailVerified}
-      userEmail={data.userEmail}
+      emailVerified={data.linkEmailVerified || data.session.support}
+      userEmail={data.verificationEmail}
       tenant={{
         name: tenant.name,
         whatsapp: tenant.whatsapp ?? "",

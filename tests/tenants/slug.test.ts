@@ -8,6 +8,7 @@ import {
   slugify,
 } from "@/server/tenants/slug";
 import { createTestDb } from "../helpers/test-db";
+import { getDefaultPlanId } from "@/server/platform/plans";
 
 describe("slugify", () => {
   it("remove apóstrofos, acentos e símbolos", () => {
@@ -53,6 +54,7 @@ describe("generateUniqueSlug", () => {
       slug: "defendi",
       name: "Defendi",
       trialEndsAt: new Date(Date.now() + 86_400_000),
+      planId: await getDefaultPlanId(db),
     });
   });
 
@@ -69,6 +71,7 @@ describe("generateUniqueSlug", () => {
       slug: "defendi-2",
       name: "Defendi 2",
       trialEndsAt: new Date(Date.now() + 86_400_000),
+      planId: await getDefaultPlanId(db),
     });
     expect(await generateUniqueSlug(db, "Defendi")).toBe("defendi-3");
   });
@@ -93,6 +96,7 @@ describe("generateUniqueSlug", () => {
       slug: first,
       name: "Longo",
       trialEndsAt: new Date(Date.now() + 86_400_000),
+      planId: await getDefaultPlanId(db),
     });
     const second = await generateUniqueSlug(db, longName);
     expect(second.length).toBeLessThanOrEqual(MAX_SLUG_LENGTH);

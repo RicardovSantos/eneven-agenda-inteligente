@@ -111,6 +111,27 @@ export function isIdTokenForUs(claims: object, clientId: string): boolean {
 // --- usuário ---
 
 /**
+ * Proteção contra pré-sequestro: quando algo prova a posse do e-mail (Google ou
+ * convite) de uma conta cujo e-mail nunca foi confirmado, a senha (que pode ter
+ * sido definida por outra pessoa), as sessões e os links pendentes são
+ * descartados e o e-mail passa a confirmado. Deve rodar numa transação, com o
+ * usuário já travado.
+ */
+export async function discardUnverifiedCredentials(
+  tx: Db,
+  userId: string,
+  now: Date,
+): Promise<void> {
+  await tx
+    .update(users)
+    .set({ passwordHash: null, emailVerifiedAt: now })
+    .where(eq(users.id, userId));
+  await tx.delete(sessions).where(eq(sessions.userId, userId));
+  await revokeUnusedEmailTokens(tx, userId, "verify");
+  await revokeUnusedEmailTokens(tx, userId, "reset");
+}
+
+/**
  * Decide o que fazer com um perfil do Google:
  * 1. conta Google já vinculada (`sub`) -> `existing`;
  * 2. e-mail não verificado no Google -> `error` (nunca vincula a ninguém);
@@ -172,15 +193,7 @@ export async function resolveGoogleUser(
     // ser o dono do e-mail (pré-sequestro). O Google prova a posse: a senha
     // antiga, as sessões e os links pendentes deixam de valer.
     const clearedPassword = locked.emailVerifiedAt === null;
-    if (clearedPassword) {
-      await tx
-        .update(users)
-        .set({ passwordHash: null, emailVerifiedAt: now })
-        .where(eq(users.id, user.id));
-      await tx.delete(sessions).where(eq(sessions.userId, user.id));
-      await revokeUnusedEmailTokens(tx, user.id, "verify");
-      await revokeUnusedEmailTokens(tx, user.id, "reset");
-    }
+    if (clearedPassword) await discardUnverifiedCredentials(tx, user.id, now);
     await tx.insert(auditLog).values({
       actorUserId: user.id,
       action: "google_link",

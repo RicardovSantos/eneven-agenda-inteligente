@@ -45,7 +45,17 @@ const LABELS = {
  * escuro). É um link para `/api/auth/google`, que redireciona ao Google; ao
  * clicar fica desabilitado com spinner até a página sair.
  */
-export function GoogleButton({ intent }: { intent: "login" | "signup" }) {
+export function GoogleButton({
+  intent,
+  href,
+  label,
+}: {
+  intent: "login" | "signup";
+  /** Outro início do fluxo (ex.: o do convite, que guarda o token antes de ir ao Google). */
+  href?: string;
+  /** Outro texto do botão (ex.: "Continuar com Google"). */
+  label?: string;
+}) {
   const [pending, setPending] = useState(false);
 
   // Voltar com o botão do navegador restaura a página (cache) ainda "enviando".
@@ -57,7 +67,7 @@ export function GoogleButton({ intent }: { intent: "login" | "signup" }) {
 
   return (
     <a
-      href={`/api/auth/google?intent=${intent}`}
+      href={href ?? `/api/auth/google?intent=${intent}`}
       aria-disabled={pending || undefined}
       onClick={(event) => {
         if (pending) event.preventDefault();
@@ -73,7 +83,7 @@ export function GoogleButton({ intent }: { intent: "login" | "signup" }) {
       ) : (
         <>
           <GoogleLogo />
-          {LABELS[intent]}
+          {label ?? LABELS[intent]}
         </>
       )}
     </a>
@@ -86,9 +96,13 @@ export function GoogleButton({ intent }: { intent: "login" | "signup" }) {
  */
 export function GoogleSection({
   intent,
+  href,
+  label,
   className,
 }: {
   intent: "login" | "signup";
+  href?: string;
+  label?: string;
   className?: string;
 }) {
   return (
@@ -101,7 +115,7 @@ export function GoogleSection({
         ou
         <span className="h-px flex-1 bg-line" aria-hidden="true" />
       </div>
-      <GoogleButton intent={intent} />
+      <GoogleButton intent={intent} href={href} label={label} />
     </div>
   );
 }

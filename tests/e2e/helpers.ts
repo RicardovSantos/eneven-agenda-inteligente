@@ -119,3 +119,26 @@ export function uniquePhone(): string {
 /** Marca o e-mail do proprietário como confirmado (no lugar de abrir o link enviado por e-mail). */
 export const verifyOwnerEmail = (request: APIRequestContext, slug: string) =>
   seed<{ ok: true }>(request, { action: "verify-email", slug });
+
+/** Entra no painel como um usuário novo da equipe (recepção ou profissional) do estabelecimento. */
+export async function loginAsMember(
+  page: Page,
+  request: APIRequestContext,
+  slug: string,
+  role: "reception" | "staff",
+) {
+  const { token, cookieName } = await seed<{ token: string; cookieName: string }>(request, {
+    action: "member",
+    slug,
+    role,
+  });
+  await page.context().addCookies([{ name: cookieName, value: token, url: baseUrl() }]);
+}
+
+/** Entra como dono da plataforma (super-admin sem estabelecimento), com sessão criada direto no banco. */
+export async function loginAsSuperAdmin(page: Page, request: APIRequestContext) {
+  const { token, cookieName } = await seed<{ token: string; cookieName: string }>(request, {
+    action: "super-admin",
+  });
+  await page.context().addCookies([{ name: cookieName, value: token, url: baseUrl() }]);
+}

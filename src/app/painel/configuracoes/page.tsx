@@ -8,26 +8,15 @@ import { BusinessInfoForm } from "@/components/settings/business-info-form";
 import { HoursForm } from "@/components/settings/hours-form";
 import { RulesForm } from "@/components/settings/rules-form";
 import { SlugForm } from "@/components/settings/slug-form";
-import { requireOnboarded } from "@/server/panel/onboarding-gate";
+import { TeamAccessCard } from "@/components/settings/team-access-card";
+import { requirePanelRole } from "@/server/panel/roles";
 import { defaultApplyToTeam, getBusinessHours } from "@/server/settings";
+import { listInvitableProfessionals, listTeamAccess } from "@/server/team/members";
 
 export const metadata: Metadata = { title: "Configurações" };
 
 export default async function ConfiguracoesPage() {
-  const { session } = await requireOnboarded();
-
-  // Só o proprietário altera as configurações: os demais papéis veem o aviso.
-  if (session.role !== "owner") {
-    return (
-      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
-        <h1 className="text-[1.75rem] font-semibold">Configurações</h1>
-        <p className="rounded-panel border border-line bg-surface p-5 leading-snug text-ink-muted sm:p-6">
-          Só o proprietário pode alterar as configurações do estabelecimento.
-          Fale com ele se algo precisar mudar.
-        </p>
-      </div>
-    );
-  }
+  const { session } = await requirePanelRole(["owner"]);
 
   const db = await getDb();
   const [tenant] = await db
@@ -38,6 +27,10 @@ export default async function ConfiguracoesPage() {
   if (!tenant) redirect("/entrar");
   const hours = await getBusinessHours(db, session.tenantId);
   const applyToTeamDefault = await defaultApplyToTeam(db, session.tenantId);
+  const [team, invitable] = await Promise.all([
+    listTeamAccess(db, session.tenantId),
+    listInvitableProfessionals(db, session.tenantId),
+  ]);
 
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
@@ -74,6 +67,22 @@ export default async function ConfiguracoesPage() {
         }}
       />
       <SlugForm currentSlug={tenant.slug} />
+      <TeamAccessCard
+        members={team.map((row) =>
+          row.kind === "member"
+            ? row
+            : {
+                kind: "invite" as const,
+                invitationId: row.invitationId,
+                name: row.name,
+                email: row.email,
+                role: row.role,
+                professionalName: row.professionalName,
+                expired: row.expired,
+              },
+        )}
+        professionals={invitable}
+      />
     </div>
   );
 }
