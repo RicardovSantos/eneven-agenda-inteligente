@@ -43,6 +43,13 @@
       "when": 1793104227810,
       "tag": "0005_plano3",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793286809746,
+      "tag": "0006_wonderful_pepper_potts",
+      "breakpoints": true
     }
   ]
 }
