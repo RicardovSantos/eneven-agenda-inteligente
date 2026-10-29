@@ -105,8 +105,8 @@ function Banners({ data }: { data: Awaited<ReturnType<typeof requireOnboarded>> 
   return (
     <div className="flex flex-col gap-3">
       {!data.linkEmailVerified ? (
-        data.session.support ? (
-          // Suporte não dispara e-mail para o dono: só informa.
+        data.session.support || data.session.role !== "owner" ? (
+          // Suporte e equipe não disparam e-mail em nome do dono: só informam.
           <p className="rounded-field border-l-[3px] border-danger bg-danger-soft px-4 py-3 text-sm leading-snug">
             O dono ainda não confirmou o e-mail (
             <strong className="break-all font-semibold">{data.verificationEmail}</strong>): o link de agendamento só é

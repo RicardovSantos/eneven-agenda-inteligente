@@ -116,4 +116,18 @@ describe("dados do painel em modo suporte", () => {
     const { getPanelData } = await import("@/server/panel/data");
     await expect(getPanelData()).rejects.toThrow("NEXT_REDIRECT:/entrar");
   });
+
+  it.each(["reception", "staff"] as const)("usa a verificação do dono para %s", async (role) => {
+    const { tenant, owner } = await seedPlatformTenant(db);
+    const { users, memberships } = await import("@/db/schema");
+    const [member] = await db.insert(users).values({
+      email: `${role}@exemplo.com`, name: "Membro", emailVerifiedAt: new Date(),
+    }).returning();
+    await db.insert(memberships).values({ userId: member.id, tenantId: tenant.id, role });
+    state.token = await createSession(db, member.id, tenant.id);
+    const data = await (await import("@/server/panel/data")).getPanelData();
+    expect(data.session.emailVerified).toBe(true);
+    expect(data.linkEmailVerified).toBe(false);
+    expect(data.verificationEmail).toBe(owner.email);
+  });
 });

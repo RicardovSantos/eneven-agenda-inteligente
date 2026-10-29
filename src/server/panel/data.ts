@@ -33,11 +33,10 @@ export const getPanelData = cache(async () => {
 
   if (!row) redirect("/entrar");
 
-  // A confirmação de e-mail que libera o link é a do DONO do estabelecimento.
-  // No modo suporte a sessão é do super-admin: vale o dono, não ele.
+  // A confirmação que libera o link é a do dono, inclusive para equipe e suporte.
   let linkEmailVerified = session.emailVerified;
   let verificationEmail = row.userEmail;
-  if (session.support) {
+  if (session.support || session.role !== "owner") {
     const [owner] = await db
       .select({ email: users.email, emailVerifiedAt: users.emailVerifiedAt })
       .from(memberships)
