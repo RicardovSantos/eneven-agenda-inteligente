@@ -13,6 +13,7 @@ import { localDateOf } from "@/server/agenda/time";
 import { getDashboard, listPendingOutcomes } from "@/server/dashboard";
 import { requirePanelRole } from "@/server/panel/roles";
 import { isTenantReleased } from "@/server/tenants/release";
+import { checkTenantQuota } from "@/server/whatsapp/quota";
 
 export const metadata: Metadata = { title: "Visão geral" };
 
@@ -24,9 +25,10 @@ export default async function VisaoGeralPage({ searchParams }: PageProps<"/paine
   const month = parseMonthParam((await searchParams).mes, today.slice(0, 7));
 
   const db = await getDb();
-  const [dashboard, pending] = await Promise.all([
+  const [dashboard, pending, quota] = await Promise.all([
     getDashboard(db, { tenantId: session.tenantId, month, timezone, now }),
     listPendingOutcomes(db, session.tenantId, now),
+    checkTenantQuota(db, session.tenantId, now),
   ]);
 
   const released = isTenantReleased({
@@ -56,6 +58,7 @@ export default async function VisaoGeralPage({ searchParams }: PageProps<"/paine
 
       <PendingReview items={items} />
       <StatTiles data={dashboard} />
+      <section className="rounded-card border border-line bg-surface p-5"><h2 className="font-semibold">Mensagens WhatsApp</h2><p>{quota.used} de {quota.total} mensagens usadas neste mês.</p>{!quota.allowed ? <p className="text-danger">Franquia esgotada. Use o WhatsApp manual para lembrar seus clientes.</p> : null}</section>
       <DayBars
         days={dashboard.perDay}
         month={month}

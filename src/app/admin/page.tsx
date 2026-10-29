@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { requireSuperAdminSession } from "@/server/auth/guard";
 import { getPlatformMetrics } from "@/server/platform/metrics";
 import { listPlatformTenants } from "@/server/platform/tenants";
+import { getWhatsAppMetrics } from "@/server/platform/whatsapp-metrics";
 
 export const metadata: Metadata = { title: "Estabelecimentos" };
 
@@ -25,9 +26,10 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
 
   const db = await getDb();
   const now = new Date();
-  const [metrics, list] = await Promise.all([
+  const [metrics, list, whatsapp] = await Promise.all([
     getPlatformMetrics(db, now),
     listPlatformTenants(db, { ...state, now }),
+    getWhatsAppMetrics(db, now),
   ]);
   const filtered = state.situation !== undefined || state.query !== "";
 
@@ -48,6 +50,13 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       </div>
 
       <MetricsCards metrics={metrics} />
+
+      <section className="rounded-panel border border-line bg-surface p-5">
+        <h2 className="font-semibold">WhatsApp da plataforma</h2>
+        <p>{whatsapp.daily.count} de 250 destinatários nas últimas 24 horas.</p>
+        {whatsapp.daily.warnSuperAdmin ? <p>70% do limite diário atingido.</p> : null}
+        <p>{whatsapp.monthlySent} mensagens enviadas no mês · custo estimado {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(whatsapp.estimatedCents / 100)}.</p>
+      </section>
 
       <TenantFilters state={state} counts={list.counts} />
 

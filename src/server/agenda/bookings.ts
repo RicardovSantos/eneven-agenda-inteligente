@@ -17,6 +17,7 @@ import { upsertCustomer, type CustomerInput } from "./customers";
 import { BookingError } from "./errors";
 import { loadAvailabilityContext } from "./load";
 import { localDateOf } from "./time";
+import { tryEnqueueBookingEvent } from "@/server/whatsapp/booking-events";
 
 export { BookingError, SLOT_TAKEN_MESSAGE } from "./errors";
 export type { BookingErrorCode } from "./errors";
@@ -114,7 +115,7 @@ export async function createBooking(
   if (serviceIds.length === 0) throw new BookingError("invalid_selection");
 
   try {
-    return await withTenant(db, tenantId, async (tx) => {
+    const result = await withTenant(db, tenantId, async (tx) => {
       const rows = await tx
         .select()
         .from(services)
@@ -198,6 +199,8 @@ export async function createBooking(
 
       return { bookingId: booking.id, manageToken: token };
     });
+    await tryEnqueueBookingEvent(db, tenantId, result.bookingId, "booking_created", "created", now);
+    return result;
   } catch (error) {
     // Corrida: outra transação reservou entre a checagem e o INSERT.
     if (isExclusionViolation(error)) throw new BookingError("slot_taken");
@@ -323,6 +326,7 @@ export async function rescheduleBooking(
         })
         .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)));
     });
+    await tryEnqueueBookingEvent(db, tenantId, bookingId, "rescheduled", `${now.toISOString()}:${newStartsAt.toISOString()}`, now);
   } catch (error) {
     if (isExclusionViolation(error)) throw new BookingError("slot_taken");
     throw error;
@@ -347,6 +351,7 @@ export async function cancelBooking(
       .set({ status: "canceled", canceledAt: now, canceledBy: actor, updatedAt: now })
       .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)));
   });
+  await tryEnqueueBookingEvent(db, tenantId, bookingId, "canceled", "canceled", now);
 }
 
 export async function setBookingStatus(
