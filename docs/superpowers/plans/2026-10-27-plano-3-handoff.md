@@ -1,5 +1,7 @@
 # Plano 3 — handoff para continuidade dos testes
 
+**Continuidade do trabalho atual:** para o Plano 4 e suas alterações locais em andamento, leia primeiro [o handoff do Plano 4](2026-10-29-plano-4-handoff.md). O histórico abaixo permanece como referência do Plano 3.
+
 Atualizado em 29/10/2026. Leia este arquivo primeiro. O Plano 3 já está na `main` e em produção; o objetivo agora é concluir as verificações abaixo e relatar os resultados ao Ricardo. Não repita merge, deploy, backup ou promoção sem motivo e autorização.
 
 ## Estado atual
