@@ -151,10 +151,10 @@
     3. **Mensagem livre de texto:** Responde educadamente com mensagem de utilidade contendo o link do WhatsApp direto do salão (`wa.me/{phone}`).
 
 **Checklist:**
-- [ ] **Step 1:** Testes que simulam payloads oficiais da Meta (GET challenge, POST status delivery, POST button reply).
-- [ ] **Step 2:** Testes de segurança garantindo rejeição de assinaturas HMAC forjadas ou sem segredo.
-- [ ] **Step 3:** Implementar a rota do webhook e processador de ações interativas.
-- [ ] **Step 4:** `pnpm test tests/whatsapp/webhook.test.ts` → PASS. Commit `feat(whatsapp): rota de webhook oficial com assinatura HMAC e ações interativas`.
+- [x] **Step 1:** Testes que simulam payloads oficiais da Meta (GET challenge, POST status delivery, POST button reply).
+- [x] **Step 2:** Testes de segurança garantindo rejeição de assinaturas HMAC forjadas ou sem segredo.
+- [x] **Step 3:** Implementar a rota do webhook e processador de ações interativas.
+- [x] **Step 4:** `pnpm test tests/whatsapp/webhook.test.ts` → PASS. Commit `feat(whatsapp): rota de webhook oficial com assinatura HMAC e ações interativas`.
 
 ---
 
