@@ -121,10 +121,10 @@
 - Modo de simulação (`FakeWhatsAppChannel`) quando `WHATSAPP_API_TOKEN` não estiver configurado ou em ambiente de teste/desenvolvimento.
 
 **Checklist:**
-- [ ] **Step 1:** Testes unitários para renderização de parâmetros de cada template e normalização de números para a API Graph.
-- [ ] **Step 2:** Testes para o cliente HTTP Meta tratando sucesso (200 com `messages[0].id`) e erros da Meta (400, 401, 429, limites de rate limit).
-- [ ] **Step 3:** Implementar `MetaCloudApiClient` e `FakeWhatsAppChannel`.
-- [ ] **Step 4:** `pnpm test tests/whatsapp` → PASS. Commit `feat(whatsapp): cliente Meta Cloud API e engine de templates`.
+- [x] **Step 1:** Testes unitários para renderização de parâmetros de cada template e normalização de números para a API Graph.
+- [x] **Step 2:** Testes para o cliente HTTP Meta tratando sucesso (200 com `messages[0].id`) e erros da Meta (400, 401, 429, limites de rate limit).
+- [x] **Step 3:** Implementar `MetaCloudApiClient` e `FakeWhatsAppChannel`.
+- [x] **Step 4:** `pnpm test tests/whatsapp` → PASS. Commit `feat(whatsapp): cliente Meta Cloud API e engine de templates`.
 
 ---
 
