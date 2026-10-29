@@ -14,7 +14,7 @@ import {
 
 /**
  * Capturas de tela da página pública (revisão visual). Só roda com `SHOTS_DIR`:
- *   SHOTS_DIR=capturas pnpm test:e2e tests/e2e/shots.spec.ts
+ *   SHOTS_DIR=capturas pnpm exec playwright test -c playwright.capturas.config.ts tests/e2e/shots.spec.ts
  */
 const DIR = process.env.SHOTS_DIR;
 test.skip(!DIR, "defina SHOTS_DIR para gerar as capturas");

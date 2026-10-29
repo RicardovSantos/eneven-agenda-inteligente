@@ -3,7 +3,7 @@ import { defineConfig } from "@playwright/test";
 /**
  * Testes de ponta a ponta (`pnpm test:e2e`): sobem `pnpm dev` com um PGlite só
  * deles e a rota de apoio `/api/e2e/seed` ligada (segredo local). Não fazem
- * parte do `pnpm test` nem do CI. Pare o `pnpm dev` antes de rodar (o Next
+ * parte do `pnpm test`. Pare o `pnpm dev` antes de rodar (o Next
  * permite um servidor de desenvolvimento por pasta).
  */
 const port = Number(process.env.E2E_PORT ?? 3100);
@@ -11,6 +11,7 @@ const port = Number(process.env.E2E_PORT ?? 3100);
 export default defineConfig({
   testDir: "tests/e2e",
   testMatch: "**/*.spec.ts",
+  testIgnore: "**/*shots.spec.ts",
   fullyParallel: false,
   workers: 1,
   retries: 0,
