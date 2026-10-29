@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { getWhatsAppChannel, setWhatsAppChannelForTests } from "@/server/whatsapp/channel";
 import { MetaCloudApiChannel } from "@/server/whatsapp/client";
 import { FakeWhatsAppChannel } from "@/server/whatsapp/fake-client";
 import type { WhatsAppTemplatePayload } from "@/server/whatsapp/types";
@@ -14,6 +15,18 @@ describe("WhatsApp Channels", () => {
       },
     ],
   };
+
+  it("em produção, credenciais ausentes não simulam sucesso", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("WHATSAPP_API_TOKEN", "");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "");
+    setWhatsAppChannelForTests(null);
+    try {
+      expect((await getWhatsAppChannel().sendTemplate("5511999998888", sampleTemplate)).ok).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 
   describe("FakeWhatsAppChannel", () => {
     it("registra envios em memória com wamId determinístico", async () => {
@@ -126,6 +139,13 @@ describe("WhatsApp Channels", () => {
 
       const calledBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(calledBody.to).toBe("5511999998888");
+    });
+
+    it("recusa telefone inválido sem chamar a Meta", async () => {
+      const mockFetch = vi.fn();
+      const client = new MetaCloudApiChannel(config, mockFetch as unknown as typeof fetch);
+      expect((await client.sendTemplate("123", sampleTemplate)).ok).toBe(false);
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 });

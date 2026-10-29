@@ -16,7 +16,7 @@ export function setWhatsAppChannelForTests(channel: WhatsAppChannel | null) {
  * Retorna o canal ativo de WhatsApp.
  * - Em testes: canal falso (`FakeWhatsAppChannel`).
  * - Em produção com credenciais: `MetaCloudApiChannel`.
- * - Sem credenciais: fallback silencioso para `FakeWhatsAppChannel`.
+ * - Sem credenciais em produção: retorna erro em vez de simular envio.
  */
 export function getWhatsAppChannel(): WhatsAppChannel {
   if (customChannel) return customChannel;
@@ -24,8 +24,16 @@ export function getWhatsAppChannel(): WhatsAppChannel {
   const token = process.env.WHATSAPP_API_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-  if (process.env.NODE_ENV === "test" || !token || !phoneNumberId) {
+  if (process.env.NODE_ENV === "test" || (process.env.NODE_ENV !== "production" && (!token || !phoneNumberId))) {
     return defaultFake;
+  }
+
+  if (!token || !phoneNumberId) {
+    const error = "WhatsApp não configurado: faltam credenciais da Meta.";
+    return {
+      sendTemplate: async () => ({ ok: false, error }),
+      sendTextMessage: async () => ({ ok: false, error }),
+    };
   }
 
   return new MetaCloudApiChannel({

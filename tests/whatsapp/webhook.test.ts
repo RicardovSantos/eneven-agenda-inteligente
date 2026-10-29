@@ -1,10 +1,11 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { bookings, whatsappMessages } from "@/db/schema";
+import { bookings, tenants, whatsappMessages } from "@/db/schema";
 import { setWhatsAppChannelForTests } from "@/server/whatsapp/channel";
 import { FakeWhatsAppChannel } from "@/server/whatsapp/fake-client";
 import { handleMetaWebhookPost } from "@/server/whatsapp/webhook";
+import { processInteractiveButtonReply } from "@/server/whatsapp/interactive-actions";
 import { hashToken } from "@/server/auth/session";
 import { withTenant } from "@/server/tenant-db";
 import { seedBooking, seedTenant } from "../helpers/agenda-fixtures";
@@ -108,6 +109,14 @@ describe("Meta WhatsApp Webhook Handling", () => {
       );
       expect(msg2.status).toBe("read");
       expect(msg2.readAt).toBeDefined();
+
+      // Uma notificação antiga de envio não pode regredir um status já lido.
+      const lateSent = readPayload.replace('"status":"read"', '"status":"sent"');
+      await handleMetaWebhookPost(db, lateSent, sign(lateSent), secret);
+      const [afterLate] = await withTenant(db, tenant.id, (tx) =>
+        tx.select().from(whatsappMessages).where(eq(whatsappMessages.wamId, wamId)),
+      );
+      expect(afterLate.status).toBe("read");
     });
 
     it("registra falha com código e motivo retornado pela Meta", async () => {
@@ -166,6 +175,19 @@ describe("Meta WhatsApp Webhook Handling", () => {
   });
 
   describe("Respostas Interativas de Botão (Quick Replies)", () => {
+    it("não cancela atendimento concluído nem atendimento fora do prazo", async () => {
+      const db = await createTestDb();
+      const tenant = await seedTenant(db, "webhook-cancel-restrictions");
+      const token = "cancel-restriction-token";
+      const start = new Date(Date.now() + 60_000);
+      const booking = await seedBooking(db, tenant.id, {
+        status: "scheduled", manageTokenHash: hashToken(token), startsAt: start,
+        endsAt: new Date(start.getTime() + 1_800_000), blockedUntil: new Date(start.getTime() + 1_800_000),
+      });
+      expect((await processInteractiveButtonReply(db, `CANCEL:${booking.id}:${token}`, "5511999998888")).ok).toBe(false);
+      await withTenant(db, tenant.id, (tx) => tx.update(bookings).set({ status: "completed" }).where(eq(bookings.id, booking.id)));
+      expect((await processInteractiveButtonReply(db, `CANCEL:${booking.id}:${token}`, "5511999998888")).ok).toBe(false);
+    });
     it("atualiza agendamento para confirmed ao receber clique em CONFIRM", async () => {
       const db = await createTestDb();
       const tenant = await seedTenant(db, "webhook-btn-confirm");
@@ -187,14 +209,8 @@ describe("Meta WhatsApp Webhook Handling", () => {
                     {
                       from: "5511999998888",
                       id: "wamid.reply1",
-                      type: "interactive",
-                      interactive: {
-                        type: "button_reply",
-                        button_reply: {
-                          id: `CONFIRM:${booking.id}:${rawToken}`,
-                          title: "Confirmar",
-                        },
-                      },
+                      type: "button",
+                      button: { payload: `CONFIRM:${booking.id}:${rawToken}`, text: "Confirmar" },
                     },
                   ],
                 },
@@ -265,6 +281,7 @@ describe("Meta WhatsApp Webhook Handling", () => {
     it("responde com link de redirecionamento para o WhatsApp do salão", async () => {
       const db = await createTestDb();
       const tenant = await seedTenant(db, "webhook-free-text");
+      await db.update(tenants).set({ whatsapp: "5511988887777" }).where(eq(tenants.id, tenant.id));
       // Simula mensagem anterior enviada a este telefone para saber de qual estabelecimento ele é cliente
       await withTenant(db, tenant.id, async (tx) => {
         await tx.insert(whatsappMessages).values({
@@ -308,6 +325,7 @@ describe("Meta WhatsApp Webhook Handling", () => {
       expect(reply.to).toBe("5511999997777");
       expect(reply.type).toBe("text");
       expect(typeof reply.payload === "string" && reply.payload).toContain(tenant.name);
+      expect(reply.payload).toContain("https://wa.me/5511988887777");
     });
   });
 });

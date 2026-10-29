@@ -30,4 +30,8 @@ describe("Meta Webhook Signature Verification", () => {
     expect(verifyMetaSignature(body, sign(body, secret), undefined)).toBe(false);
     expect(verifyMetaSignature(body, "invalido", secret)).toBe(false);
   });
+
+  it("rejeita assinatura com sufixo inválido mesmo quando o hash inicial é válido", () => {
+    expect(verifyMetaSignature(body, `${sign(body, secret)}zz`, secret)).toBe(false);
+  });
 });

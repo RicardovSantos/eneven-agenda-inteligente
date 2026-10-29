@@ -28,14 +28,13 @@ export class MetaCloudApiChannel implements WhatsAppChannel {
     return `https://graph.facebook.com/${this.apiVersion}/${this.phoneNumberId}/messages`;
   }
 
-  private cleanPhone(phone: string): string {
-    const normalized = normalizeBrazilPhone(phone);
-    if (normalized) return normalized;
-    return phone.replace(/\D/g, "");
+  private cleanPhone(phone: string): string | null {
+    return normalizeBrazilPhone(phone);
   }
 
   async sendTemplate(to: string, template: WhatsAppTemplatePayload): Promise<SendResult> {
     const recipient = this.cleanPhone(to);
+    if (!recipient) return { ok: false, error: "Telefone inválido." };
     const body = {
       messaging_product: "whatsapp",
       recipient_type: "individual",
@@ -49,6 +48,7 @@ export class MetaCloudApiChannel implements WhatsAppChannel {
 
   async sendTextMessage(to: string, text: string): Promise<SendResult> {
     const recipient = this.cleanPhone(to);
+    if (!recipient) return { ok: false, error: "Telefone inválido." };
     const body = {
       messaging_product: "whatsapp",
       recipient_type: "individual",
@@ -72,6 +72,7 @@ export class MetaCloudApiChannel implements WhatsAppChannel {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10_000),
       });
 
       const json = (await response.json()) as {

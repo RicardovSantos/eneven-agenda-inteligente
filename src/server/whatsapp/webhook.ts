@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { whatsappMessages } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { withTenant } from "@/server/tenant-db";
 import {
   processFreeTextMessage,
   processInteractiveButtonReply,
@@ -15,7 +16,7 @@ export function verifyMetaSignature(
   signatureHeader: string | null,
   secret: string | undefined,
 ): boolean {
-  if (!signatureHeader || !secret) return false;
+  if (!signatureHeader || !secret || !/^sha256=[0-9a-f]{64}$/i.test(signatureHeader)) return false;
   const prefix = "sha256=";
   if (!signatureHeader.startsWith(prefix)) return false;
 
@@ -41,6 +42,7 @@ type MetaIncomingMessage = {
   from: string;
   id: string;
   type: string;
+  button?: { payload?: string; text?: string };
   interactive?: {
     type: string;
     button_reply?: {
@@ -102,32 +104,34 @@ export async function handleMetaWebhookPost(
         for (const s of value.statuses) {
           const wamId = s.id;
           const statusDate = new Date(Number(s.timestamp) * 1000);
+          const [message] = await db.select({ tenantId: whatsappMessages.tenantId }).from(whatsappMessages).where(eq(whatsappMessages.wamId, wamId)).limit(1);
+          if (!message || Number.isNaN(statusDate.getTime())) continue;
 
           if (s.status === "delivered") {
-            await db
+            await withTenant(db, message.tenantId, (tx) => tx
               .update(whatsappMessages)
               .set({ status: "delivered", deliveredAt: statusDate })
-              .where(eq(whatsappMessages.wamId, wamId));
+              .where(and(eq(whatsappMessages.wamId, wamId), inArray(whatsappMessages.status, ["queued", "sending", "sent", "delivered"]))));
           } else if (s.status === "read") {
-            await db
+            await withTenant(db, message.tenantId, (tx) => tx
               .update(whatsappMessages)
               .set({ status: "read", readAt: statusDate })
-              .where(eq(whatsappMessages.wamId, wamId));
+              .where(and(eq(whatsappMessages.wamId, wamId), inArray(whatsappMessages.status, ["queued", "sending", "sent", "delivered", "read"]))));
           } else if (s.status === "sent") {
-            await db
+            await withTenant(db, message.tenantId, (tx) => tx
               .update(whatsappMessages)
               .set({ status: "sent", sentAt: statusDate })
-              .where(eq(whatsappMessages.wamId, wamId));
+              .where(and(eq(whatsappMessages.wamId, wamId), inArray(whatsappMessages.status, ["queued", "sending", "sent"]))));
           } else if (s.status === "failed") {
             const err = s.errors?.[0];
-            await db
+            await withTenant(db, message.tenantId, (tx) => tx
               .update(whatsappMessages)
               .set({
                 status: "failed",
                 failureCode: err?.code ? String(err.code) : null,
                 failureReason: err?.title ?? "Falha de entrega",
               })
-              .where(eq(whatsappMessages.wamId, wamId));
+              .where(and(eq(whatsappMessages.wamId, wamId), inArray(whatsappMessages.status, ["queued", "sending", "sent", "failed"]))));
           }
         }
       }
@@ -138,7 +142,9 @@ export async function handleMetaWebhookPost(
           const fromPhone = m.from;
 
           // Clique em botão interativo
-          if (m.type === "interactive" && m.interactive?.button_reply) {
+          if (m.type === "button" && m.button?.payload) {
+            await processInteractiveButtonReply(db, m.button.payload, fromPhone);
+          } else if (m.type === "interactive" && m.interactive?.button_reply) {
             await processInteractiveButtonReply(
               db,
               m.interactive.button_reply.id,

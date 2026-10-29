@@ -620,6 +620,8 @@ export const whatsappQueue = pgTable(
     tenantId: tenantIdColumn(),
     bookingId: uuid("booking_id").notNull(),
     templateType: whatsappTemplateType("template_type").notNull(),
+    /** Identifica o evento de negócio; reenvios do mesmo evento usam a mesma chave. */
+    eventKey: text("event_key").notNull(),
     scheduledFor: timestamptz("scheduled_for").notNull(),
     attempts: integer("attempts").notNull().default(0),
     lockedUntil: timestamptz("locked_until"),
@@ -633,10 +635,11 @@ export const whatsappQueue = pgTable(
       columns: [t.tenantId, t.bookingId],
       foreignColumns: [bookings.tenantId, bookings.id],
     }).onDelete("cascade"),
-    unique("whatsapp_queue_tenant_booking_template_unique").on(
+    unique("whatsapp_queue_tenant_booking_template_event_unique").on(
       t.tenantId,
       t.bookingId,
       t.templateType,
+      t.eventKey,
     ),
     index("whatsapp_queue_due_idx").on(t.scheduledFor, t.processedAt, t.lockedUntil),
   ],
@@ -648,4 +651,5 @@ export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
 export type NewWhatsappMessage = typeof whatsappMessages.$inferInsert;
 export type WhatsappQueueItem = typeof whatsappQueue.$inferSelect;
 export type NewWhatsappQueueItem = typeof whatsappQueue.$inferInsert;
+
 

@@ -145,22 +145,28 @@ describe("Plano 4 - Esquema do WhatsApp e Notificações", () => {
           tenantId: tenant.id,
           bookingId: booking.id,
           templateType: "reminder_eve",
+          eventKey: "booking-v1",
           scheduledFor,
         });
       });
 
-      // Segunda inserção com mesmo (tenantId, bookingId, templateType) deve falhar (idempotência)
+      // Repetição do mesmo evento falha; um evento novo pode usar o mesmo template.
       const err = await failure(
         withTenant(db, tenant.id, (tx) =>
           tx.insert(whatsappQueue).values({
             tenantId: tenant.id,
             bookingId: booking.id,
             templateType: "reminder_eve",
+            eventKey: "booking-v1",
             scheduledFor,
           }),
         ),
       );
       expect(err).not.toBeNull();
+      await withTenant(db, tenant.id, (tx) => tx.insert(whatsappQueue).values({
+        tenantId: tenant.id, bookingId: booking.id, templateType: "reminder_eve",
+        eventKey: "booking-v2", scheduledFor,
+      }));
     });
 
     it("exclui itens da fila em cascata quando o agendamento é excluído", async () => {
@@ -173,6 +179,7 @@ describe("Plano 4 - Esquema do WhatsApp e Notificações", () => {
           tenantId: tenant.id,
           bookingId: booking.id,
           templateType: "reminder_eve",
+          eventKey: "booking-v1",
           scheduledFor: new Date(),
         });
       });
