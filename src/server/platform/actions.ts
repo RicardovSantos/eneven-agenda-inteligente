@@ -87,7 +87,7 @@ export async function extendTrial(
     }
     const base = Math.max(now.getTime(), tenant.trialEndsAt.getTime());
     const trialEndsAt = new Date(base + days * DAY_MS);
-    await tx.update(tenants).set({ trialEndsAt, status: "trial" }).where(eq(tenants.id, tenantId));
+    await tx.update(tenants).set({ trialEndsAt, status: "trial", pastDueAt: null }).where(eq(tenants.id, tenantId));
     await audit(tx, actor, tenantId, "tenant.trial_extended", {
       days,
       fromStatus: tenant.status,
@@ -112,6 +112,7 @@ async function setStatus(
       .update(tenants)
       .set({
         status,
+        pastDueAt: null,
         ...(status === "active" ? { activatedAt: tenant.activatedAt ?? now ?? new Date() } : {}),
       })
       .where(eq(tenants.id, tenantId));

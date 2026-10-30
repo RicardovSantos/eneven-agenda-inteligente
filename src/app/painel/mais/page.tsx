@@ -28,6 +28,7 @@ export default async function MaisPage() {
   const released = isTenantReleased({
     status: data.tenantStatus,
     trialEndsAt: data.trialEndsAt,
+    pastDueAt: data.pastDueAt,
     emailVerified: data.linkEmailVerified,
   });
   const link = `${PUBLIC_HOST}/${data.tenantSlug}`;

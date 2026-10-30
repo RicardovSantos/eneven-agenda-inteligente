@@ -41,6 +41,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<"/
   const released = isTenantReleased({
     status: data.tenantStatus,
     trialEndsAt: data.trialEndsAt,
+    pastDueAt: data.pastDueAt,
     emailVerified: data.linkEmailVerified,
   });
   const [list, booking] = await Promise.all([
@@ -68,7 +69,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<"/
             view.historyTotal > view.history.length ? clientsHref({ id, ...keep, historico: true }) : null
           }
           booking={booking}
-          readOnly={!isTenantActive({ status: data.tenantStatus, trialEndsAt: data.trialEndsAt })}
+          readOnly={!isTenantActive({ status: data.tenantStatus, trialEndsAt: data.trialEndsAt, pastDueAt: data.pastDueAt })}
         />
       }
     />

@@ -1,6 +1,7 @@
 type TenantTiming = {
   status: "trial" | "active" | "past_due" | "read_only" | "canceled";
   trialEndsAt: Date;
+  pastDueAt?: Date | null;
 };
 
 /**
@@ -11,7 +12,8 @@ type TenantTiming = {
 export function isTenantActive(tenant: TenantTiming, now: Date = new Date()): boolean {
   return (
     tenant.status === "active" ||
-    (tenant.status === "trial" && tenant.trialEndsAt.getTime() > now.getTime())
+    (tenant.status === "trial" && tenant.trialEndsAt.getTime() > now.getTime()) ||
+    (tenant.status === "past_due" && !!tenant.pastDueAt && Number.isFinite(tenant.pastDueAt.getTime()) && tenant.pastDueAt.getTime() <= now.getTime() && now.getTime() < tenant.pastDueAt.getTime() + 7 * 86_400_000)
   );
 }
 

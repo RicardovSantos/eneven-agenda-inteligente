@@ -16,6 +16,7 @@ export default async function ClientesPage({ searchParams }: PageProps<"/painel/
   const released = isTenantReleased({
     status: data.tenantStatus,
     trialEndsAt: data.trialEndsAt,
+    pastDueAt: data.pastDueAt,
     emailVerified: data.linkEmailVerified,
   });
 

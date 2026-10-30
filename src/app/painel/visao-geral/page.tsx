@@ -46,6 +46,7 @@ export default async function VisaoGeralPage({ searchParams }: PageProps<"/paine
   const released = isTenantReleased({
     status: data.tenantStatus,
     trialEndsAt: data.trialEndsAt,
+    pastDueAt: data.pastDueAt,
     emailVerified: data.linkEmailVerified,
   });
   const items: PendingItem[] = pending.map((p) => ({

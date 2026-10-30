@@ -23,6 +23,7 @@ export const getPanelData = cache(async () => {
       tenantSlug: tenants.slug,
       tenantStatus: tenants.status,
       trialEndsAt: tenants.trialEndsAt,
+      pastDueAt: tenants.pastDueAt,
       timezone: tenants.timezone,
       onboardingCompletedAt: tenants.onboardingCompletedAt,
     })

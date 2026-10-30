@@ -109,6 +109,7 @@ export const tenants = pgTable("tenants", {
   name: text("name").notNull(),
   status: tenantStatus("status").notNull().default("trial"),
   trialEndsAt: timestamptz("trial_ends_at").notNull(),
+  pastDueAt: timestamptz("past_due_at"),
   timezone: text("timezone").notNull().default("America/Sao_Paulo"),
   brandColor: text("brand_color"),
   logoUrl: text("logo_url"),

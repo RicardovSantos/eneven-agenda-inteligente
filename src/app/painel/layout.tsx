@@ -15,7 +15,7 @@ export const metadata = PWA_METADATA;
 export default async function PainelLayout({
   children,
 }: LayoutProps<"/painel">) {
-  const { userName, tenantName, tenantSlug, tenantStatus, trialEndsAt, session, onboardingCompletedAt, linkEmailVerified } =
+  const { userName, tenantName, tenantSlug, tenantStatus, trialEndsAt, pastDueAt, session, onboardingCompletedAt, linkEmailVerified } =
     await getPanelData();
 
   const supportBanner = session.support ? <SupportBanner tenantName={tenantName} /> : null;
@@ -36,10 +36,11 @@ export default async function PainelLayout({
   const released = isTenantReleased({
     status: tenantStatus,
     trialEndsAt,
+    pastDueAt,
     emailVerified: linkEmailVerified,
   });
   const label = `${PUBLIC_HOST}/${tenantSlug}`;
-  const readOnly = !isTenantActive({ status: tenantStatus, trialEndsAt });
+  const readOnly = !isTenantActive({ status: tenantStatus, trialEndsAt, pastDueAt });
   const supportPhone = process.env.SUPPORT_WHATSAPP?.trim();
   const whatsappUrl = supportPhone
     ? buildWhatsAppLink(supportPhone, `Olá! Preciso de ajuda com a agenda do ${tenantName}.`)
@@ -54,7 +55,7 @@ export default async function PainelLayout({
         publicLink={released ? { label, url: `https://${label}` } : null}
         role={session.role!}
         isSuperAdmin={session.isSuperAdmin}
-        notice={readOnly ? <ReadOnlyBanner whatsappUrl={whatsappUrl} /> : null}
+        notice={readOnly ? <ReadOnlyBanner whatsappUrl={whatsappUrl} /> : tenantStatus === "past_due" && session.role === "owner" ? <div role="status" className="bg-amber-100 p-3 text-amber-900">Pagamento pendente. Regularize a assinatura para manter o acesso após a carência.</div> : null}
       >
         {children}
         <InstallHint />

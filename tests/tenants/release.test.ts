@@ -19,6 +19,14 @@ describe("isTenantActive", () => {
       expect(isTenantActive({ status, trialEndsAt: future }, NOW)).toBe(false);
     }
   });
+  it("permite acesso por sete dias completos após o atraso informado", () => {
+    const start = new Date("2030-01-03T12:00:00.000Z");
+    const tenant = { status: "past_due" as const, trialEndsAt: past, pastDueAt: start };
+    expect(isTenantActive(tenant, new Date(NOW.getTime() - 1))).toBe(true);
+    expect(isTenantActive(tenant, NOW)).toBe(false);
+    expect(isTenantActive({ ...tenant, pastDueAt: null }, NOW)).toBe(false);
+    expect(isTenantActive({ ...tenant, pastDueAt: future }, NOW)).toBe(false);
+  });
 });
 
 describe("isTenantReleased (link público liberado)", () => {

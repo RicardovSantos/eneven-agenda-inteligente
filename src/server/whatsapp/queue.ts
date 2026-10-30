@@ -30,7 +30,7 @@ async function reserveNext(db: Db, now: Date) {
       const [settings] = await t.select().from(tenantNotificationSettings).where(eq(tenantNotificationSettings.tenantId, item.tenantId)).limit(1);
       return { booking, services, settings };
     });
-    const [tenant] = await tx.select({ name: tenants.name, timezone: tenants.timezone, status: tenants.status, trialEndsAt: tenants.trialEndsAt, planCode: plans.code, limit: plans.monthlyMessages })
+    const [tenant] = await tx.select({ name: tenants.name, timezone: tenants.timezone, status: tenants.status, trialEndsAt: tenants.trialEndsAt, pastDueAt: tenants.pastDueAt, planCode: plans.code, limit: plans.monthlyMessages })
       .from(tenants).innerJoin(plans, eq(plans.id, tenants.planId)).where(eq(tenants.id, item.tenantId)).limit(1);
     const reminder = item.templateType === "reminder_eve" || item.templateType === "reminder_2h";
     const enabled = item.templateType === "booking_created" ? data.settings?.bookingCreated ?? true : item.templateType === "rescheduled" ? data.settings?.rescheduled ?? true : item.templateType === "canceled" ? data.settings?.canceled ?? true : item.templateType === "reminder_eve" ? data.settings?.reminderEve ?? true : (data.settings?.reminder2h ?? false) && ["profissional", "studio"].includes(tenant?.planCode ?? "");

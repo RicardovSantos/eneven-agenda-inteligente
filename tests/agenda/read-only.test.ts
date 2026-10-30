@@ -83,6 +83,13 @@ describe("modo somente leitura", () => {
     await expectReadOnly(createPanelBooking(db, actor, panelInput("10:00"), NOW));
   });
 
+  it("permite agendar durante a carência e bloqueia ao completar sete dias", async () => {
+    const due = new Date(NOW.getTime() - 7 * 86_400_000 + 1);
+    await db.update(tenants).set({ status: "past_due", pastDueAt: due }).where(eq(tenants.id, seed.tenantId));
+    await createPanelBooking(db, actor, panelInput("10:00"), NOW);
+    await expectReadOnly(createPanelBooking(db, actor, panelInput("11:00"), new Date(NOW.getTime() + 1)));
+  });
+
   it("a reserva online não muda (usa o canBook da página pública)", async () => {
     // createBooking direto (caminho público) continua sem a regra de somente leitura
     await db.update(tenants).set({ status: "read_only" }).where(eq(tenants.id, seed.tenantId));

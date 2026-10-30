@@ -87,7 +87,7 @@ export async function scopedProfessionalId(
 async function assertWritable(db: Db, tenantId: string, now: Date): Promise<void> {
   const [row] = await withTenant(db, tenantId, (tx) =>
     tx
-      .select({ status: tenants.status, trialEndsAt: tenants.trialEndsAt })
+      .select({ status: tenants.status, trialEndsAt: tenants.trialEndsAt, pastDueAt: tenants.pastDueAt })
       .from(tenants)
       .where(eq(tenants.id, tenantId))
       .limit(1),

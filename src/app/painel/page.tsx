@@ -75,6 +75,7 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
   const released = isTenantReleased({
     status: data.tenantStatus,
     trialEndsAt: data.trialEndsAt,
+    pastDueAt: data.pastDueAt,
     emailVerified: data.linkEmailVerified,
   });
 
@@ -92,7 +93,7 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
       lockedProfessionalId={own?.id ?? null}
       publicUrl={released ? `https://${PUBLIC_HOST}/${data.tenantSlug}` : null}
       nowMs={now.getTime()}
-      readOnly={!isTenantActive({ status: data.tenantStatus, trialEndsAt: data.trialEndsAt }, now)}
+      readOnly={!isTenantActive({ status: data.tenantStatus, trialEndsAt: data.trialEndsAt, pastDueAt: data.pastDueAt }, now)}
       banners={banners}
     />
   );

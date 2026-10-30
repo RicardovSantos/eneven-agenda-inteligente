@@ -92,6 +92,14 @@ describe("getPublicTenant", () => {
     expect((await getPublicTenant("pago", { db, now: NOW }))!.canBook).toBe(true);
   });
 
+  it("mantém link público durante a carência e bloqueia ao vencê-la", async () => {
+    const seed = await seedBookable(db, { slug: "carencia" });
+    const due = new Date(NOW.getTime() - 7 * 86_400_000 + 1);
+    await db.update(tenants).set({ status: "past_due", pastDueAt: due }).where(eq(tenants.id, seed.tenantId));
+    expect((await getPublicTenant("carencia", { db, now: NOW }))?.canBook).toBe(true);
+    expect((await getPublicTenant("carencia", { db, now: new Date(NOW.getTime() + 1) }))?.canBook).toBe(false);
+  });
+
   it("motivo no_services: sem serviço visível com profissional ativo", async () => {
     const seed = await seedBookable(db, { slug: "studio" });
     // serviço oculto

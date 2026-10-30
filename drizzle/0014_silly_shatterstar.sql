@@ -1,0 +1,1 @@
+ALTER TABLE "tenants" ADD COLUMN "past_due_at" timestamp with time zone;
