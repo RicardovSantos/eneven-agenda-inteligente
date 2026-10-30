@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, expect, it, vi } from "vitest";
-import { billingNotices, tenants } from "@/db/schema";
+import { billingNotices, tenants, users } from "@/db/schema";
 import { processTestBillingNotices } from "@/server/billing/test-notices";
+import { reviewTestNotice } from "@/server/billing/review-test-notice";
 import { withTenant } from "@/server/tenant-db";
 import { seedTenant } from "../helpers/agenda-fixtures";
 import { connectPg } from "./pg-db";
@@ -19,4 +20,13 @@ it("reserva um aviso em envios simultâneos e protege a tabela", async () => {
   expect(sender).toHaveBeenCalledOnce();
   expect(await pg.db.select().from(billingNotices)).toMatchObject([{ state: "sent" }]);
   await expect(withTenant(pg.db, tenant.id, (tx) => tx.select().from(billingNotices))).rejects.toThrow();
+});
+
+it("aceita uma única revisão simultânea de aviso incerto", async () => {
+  const tenant = await seedTenant(pg.db);
+  const [operator] = await pg.db.insert(users).values({ name: "Operador", email: "admin@example.com", isSuperAdmin: true }).returning();
+  const now = new Date();
+  const [notice] = await pg.db.insert(billingNotices).values({ tenantId: tenant.id, pastDueAt: now, state: "uncertain" }).returning();
+  const results = await Promise.allSettled([reviewTestNotice(pg.db, notice.id, operator.id, "confirmed", now), reviewTestNotice(pg.db, notice.id, operator.id, "confirmed", now)]);
+  expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
 });

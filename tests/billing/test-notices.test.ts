@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { afterEach, expect, it, vi } from "vitest";
-import { billingNotices, tenants } from "@/db/schema";
+import { auditLog, billingNotices, tenants, users } from "@/db/schema";
 import { processTestBillingNotices } from "@/server/billing/test-notices";
+import { reviewTestNotice } from "@/server/billing/review-test-notice";
 import { POST } from "@/app/api/cron/avisos-cobranca/route";
 import { seedTenant } from "../helpers/agenda-fixtures";
 import { createTestDb } from "../helpers/test-db";
@@ -21,6 +22,11 @@ it("reserva um aviso por atraso e nunca repete uma falha incerta", async () => {
   expect(await processTestBillingNotices(db, "teste@example.com", sender, now)).toEqual({ sent: 0, uncertain: 0 });
   expect(sender).toHaveBeenCalledTimes(2);
   expect(sender).toHaveBeenCalledWith("teste@example.com");
+  const [operator] = await db.insert(users).values({ name: "Operador", email: "admin@example.com", isSuperAdmin: true }).returning();
+  const notice = (await db.select().from(billingNotices)).find((item) => item.state === "uncertain")!;
+  await reviewTestNotice(db, notice.id, operator.id, "confirmed", now);
+  await expect(reviewTestNotice(db, notice.id, operator.id, "retry", now)).rejects.toThrow("indisponível");
+  expect(await db.select().from(auditLog)).toMatchObject([{ action: "billing.test_notice_reviewed", actorUserId: operator.id }]);
 });
 
 it("bloqueia o processador e a rota em produção", async () => {

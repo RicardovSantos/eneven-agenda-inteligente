@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/db/client";
 import { requireSuperAdminSession } from "@/server/auth/guard";
 import { abandonTestSubscription, recoverTestSubscription } from "@/server/billing/recover-subscription";
+import { reviewTestNotice } from "@/server/billing/review-test-notice";
 
 export async function recoverSubscriptionAction(_state: string, form: FormData): Promise<string> {
   const actor = await requireSuperAdminSession();
@@ -20,6 +21,15 @@ export async function recoverSubscriptionAction(_state: string, form: FormData):
   }
   revalidatePath("/admin/cobranca");
   return "Assinatura recuperada.";
+}
+
+export async function reviewNoticeAction(form: FormData): Promise<void> {
+  const actor = await requireSuperAdminSession();
+  const id = form.get("noticeId");
+  const decision = form.get("decision");
+  if (typeof id !== "string" || (decision !== "confirmed" && decision !== "retry")) throw new Error("Dados inválidos.");
+  await reviewTestNotice(await getDb(), id, actor.userId, decision);
+  revalidatePath("/admin/cobranca");
 }
 
 export async function abandonSubscriptionAction(form: FormData): Promise<void> {
