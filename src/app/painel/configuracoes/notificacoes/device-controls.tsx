@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { enablePushForDevice } from "@/lib/push-subscription";
 import { registerDevice, removeDevice } from "./actions";
 
 export function DeviceControls({ publicKey, support }: { publicKey: string | null; support: boolean }) {
+  const router = useRouter();
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   async function activate() {
@@ -13,6 +15,7 @@ export function DeviceControls({ publicKey, support }: { publicKey: string | nul
     try {
       const result = await enablePushForDevice(publicKey, registerDevice);
       setMessage(result === "denied" ? "Permissão não concedida. Confira as configurações do navegador." : "Dispositivo cadastrado. O envio de notificações ainda está em preparação.");
+      if (result === "enabled") router.refresh();
     } catch {
       setMessage("Não foi possível cadastrar este dispositivo. Confira a permissão do navegador e tente novamente.");
     } finally { setBusy(false); }
@@ -27,6 +30,7 @@ export function DeviceControls({ publicKey, support }: { publicKey: string | nul
       await removeDevice(subscription.toJSON());
       if (!await subscription.unsubscribe()) throw new Error();
       setMessage("Dispositivo removido das notificações.");
+      router.refresh();
     } catch {
       setMessage("Não foi possível concluir a remoção neste dispositivo. Tente novamente.");
     } finally { setBusy(false); }

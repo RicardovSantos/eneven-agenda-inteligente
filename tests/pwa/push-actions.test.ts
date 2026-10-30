@@ -7,6 +7,7 @@ import { createTestDb } from "../helpers/test-db";
 const state = vi.hoisted(() => ({ db: undefined as unknown, session: undefined as unknown }));
 vi.mock("@/db/client", () => ({ getDb: async () => state.db }));
 vi.mock("@/server/auth/guard", () => ({ requireTenantSession: async () => state.session }));
+vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 import { registerDevice, removeDevice } from "@/app/painel/configuracoes/notificacoes/actions";
 
 afterEach(() => vi.unstubAllEnvs());

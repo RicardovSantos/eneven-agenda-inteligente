@@ -2,7 +2,7 @@ import { createECDH } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { memberships, pushSubscriptions, users } from "@/db/schema";
-import { removePushSubscription, savePushSubscription } from "@/server/push/subscriptions";
+import { listPushDevices, removePushDeviceById, removePushSubscription, savePushSubscription } from "@/server/push/subscriptions";
 import { seedTenant } from "../helpers/agenda-fixtures";
 import { createTestDb } from "../helpers/test-db";
 
@@ -20,6 +20,10 @@ it("isola dispositivos por usuário, impede apropriação e remove inscrição c
   await savePushSubscription(db, actor, subscription);
   await savePushSubscription(db, actor, subscription);
   expect(await db.select().from(pushSubscriptions)).toHaveLength(1);
+  const [device] = await listPushDevices(db, actor);
+  expect(device).not.toHaveProperty("endpoint");
+  expect(await listPushDevices(db, outsider)).toHaveLength(0);
+  await expect(removePushDeviceById(db, outsider, device.id)).rejects.toThrow("indisponível");
   await expect(savePushSubscription(db, outsider, subscription)).rejects.toThrow("indisponível");
   await expect(savePushSubscription(db, { ...actor, support: true }, subscription)).rejects.toThrow("suporte");
   await expect(removePushSubscription(db, outsider, subscription)).rejects.toThrow("indisponível");

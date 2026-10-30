@@ -26,3 +26,18 @@ export async function removePushSubscription(db: Db, actor: Actor, input: unknow
   const removed = await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.tenantId, actor.tenantId), eq(pushSubscriptions.userId, actor.userId), eq(pushSubscriptions.endpointHash, endpointHash(subscription.endpoint)))).returning({ id: pushSubscriptions.id });
   if (!removed.length) throw new Error("Inscrição indisponível.");
 }
+
+/** Lista somente metadados; endpoints e chaves nunca são enviados à interface. */
+export async function listPushDevices(db: Db, actor: Actor) {
+  if (actor.support) throw new Error("Notificações indisponíveis em modo suporte.");
+  return db.select({ id: pushSubscriptions.id, createdAt: pushSubscriptions.createdAt }).from(pushSubscriptions)
+    .where(and(eq(pushSubscriptions.tenantId, actor.tenantId), eq(pushSubscriptions.userId, actor.userId)))
+    .orderBy(pushSubscriptions.createdAt, pushSubscriptions.id);
+}
+
+export async function removePushDeviceById(db: Db, actor: Actor, id: string): Promise<void> {
+  if (actor.support) throw new Error("Notificações indisponíveis em modo suporte.");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new Error("Dispositivo inválido.");
+  const rows = await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.id, id), eq(pushSubscriptions.tenantId, actor.tenantId), eq(pushSubscriptions.userId, actor.userId))).returning({ id: pushSubscriptions.id });
+  if (!rows.length) throw new Error("Dispositivo indisponível.");
+}
