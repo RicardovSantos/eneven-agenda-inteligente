@@ -580,6 +580,22 @@ export const tenantNotificationSettings = pgTable("tenant_notification_settings"
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 });
 
+/** Inscrições de dispositivos, sempre vinculadas a um usuário do estabelecimento. */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  userId: uuid("user_id").notNull(),
+  endpointHash: text("endpoint_hash").notNull().unique(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ name: "push_subscriptions_membership_fk", columns: [t.userId, t.tenantId], foreignColumns: [memberships.userId, memberships.tenantId] }).onDelete("cascade"),
+  index("push_subscriptions_tenant_user_idx").on(t.tenantId, t.userId),
+]);
+
 /** Histórico e auditoria de mensagens e lembretes enviados/recebidos via WhatsApp. */
 export const whatsappMessages = pgTable(
   "whatsapp_messages",

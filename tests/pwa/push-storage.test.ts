@@ -1,0 +1,30 @@
+import { createECDH } from "node:crypto";
+import { eq } from "drizzle-orm";
+import { expect, it } from "vitest";
+import { memberships, pushSubscriptions, users } from "@/db/schema";
+import { removePushSubscription, savePushSubscription } from "@/server/push/subscriptions";
+import { seedTenant } from "../helpers/agenda-fixtures";
+import { createTestDb } from "../helpers/test-db";
+
+it("isola dispositivos por usuário, impede apropriação e remove inscrição com o vínculo", async () => {
+  const db = await createTestDb();
+  const tenant = await seedTenant(db);
+  const other = await seedTenant(db);
+  const [user] = await db.insert(users).values({ name: "A", email: "a@example.com" }).returning();
+  const [otherUser] = await db.insert(users).values({ name: "B", email: "b@example.com" }).returning();
+  await db.insert(memberships).values([{ userId: user.id, tenantId: tenant.id, role: "owner" }, { userId: otherUser.id, tenantId: other.id, role: "owner" }]);
+  const actor = { userId: user.id, tenantId: tenant.id, support: false };
+  const outsider = { userId: otherUser.id, tenantId: other.id, support: false };
+  const key = createECDH("prime256v1"); key.generateKeys();
+  const subscription = { endpoint: "https://push.example/device/1", keys: { p256dh: key.getPublicKey().toString("base64url"), auth: Buffer.alloc(16, 1).toString("base64url") } };
+  await savePushSubscription(db, actor, subscription);
+  await savePushSubscription(db, actor, subscription);
+  expect(await db.select().from(pushSubscriptions)).toHaveLength(1);
+  await expect(savePushSubscription(db, outsider, subscription)).rejects.toThrow("indisponível");
+  await expect(savePushSubscription(db, { ...actor, support: true }, subscription)).rejects.toThrow("suporte");
+  await removePushSubscription(db, outsider, subscription);
+  expect(await db.select().from(pushSubscriptions)).toHaveLength(1);
+  await db.delete(memberships).where(eq(memberships.userId, user.id));
+  expect(await db.select().from(pushSubscriptions)).toHaveLength(0);
+  await expect(savePushSubscription(db, actor, subscription)).rejects.toThrow("Acesso indisponível");
+});
