@@ -6,7 +6,7 @@ Branch `plano-6`, baseada em `main` após o Plano 4. O Plano 5 de cobrança est�
 
 Primeiro passo: `/demo` é uma simulação pública com serviços e horários fictícios mantidos apenas na memória do navegador. `/demo/painel` mostra um painel ilustrativo e pode apresentar a opção escolhida por meio de parâmetros restritos a serviços e horários fictícios; essa seleção expira à meia-noite em São Paulo. Não grava no banco, não solicita dados pessoais e não envia WhatsApp. Recarregar a primeira página reinicia a experiência. É uma prévia isolada, ainda não substitui a demo completa prevista na especificação: um estabelecimento demonstrativo com painel e dados fictícios renovados diariamente.
 
-O painel ilustrativo permite simular confirmação, cancelamento e restauração de atendimentos. Essas ações alteram apenas o estado temporário da página e são desfeitas ao recarregar; não alteram agendas nem enviam mensagens reais.
+O painel ilustrativo permite simular confirmação, cancelamento e restauração de atendimentos. As situações fictícias são guardadas no navegador e reiniciadas no dia seguinte no fuso de São Paulo; não alteram agendas nem enviam mensagens reais. Isso não cria um estabelecimento demonstrativo compartilhado.
 
 Para concluir: definir acesso ao painel de demonstração e suas permissões, isolar os dados dos estabelecimentos reais e impedir mensagens e outras integrações externas em todas as operações. Preparar recriação diária sem apagar ou modificar dados reais. Testar em navegador e revisar concorrência e proteção contra abuso antes de disponibilizar publicamente.
 

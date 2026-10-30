@@ -20,7 +20,19 @@ test("demonstra agendamento fictício e mostra o resultado no painel", async ({ 
   await expect(appointment).toContainText("Agendado");
   await appointment.getByRole("button", { name: /Cancelar/ }).click();
   await page.reload();
-  await expect(page.getByRole("listitem").filter({ hasText: "Sua simulação" })).toContainText("Agendado");
+  await expect(page.getByRole("listitem").filter({ hasText: "Sua simulação" })).toContainText("Cancelado");
   await page.goto("/demo/painel?servico=1&horario=10%3A30&dia=2000-01-01");
   await expect(page.getByText("Sua simulação")).toHaveCount(0);
+});
+
+test("reinicia as alterações fictícias no dia seguinte", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2030-01-01T15:00:00Z"));
+  await page.goto("/demo/painel");
+  const item = page.getByRole("listitem").filter({ hasText: "Ana" });
+  await item.getByRole("button", { name: /Cancelar/ }).click();
+  await page.reload();
+  await expect(item).toContainText("Cancelado");
+  await page.clock.setFixedTime(new Date("2030-01-02T15:00:00Z"));
+  await page.reload();
+  await expect(item).toContainText("Agendado");
 });
