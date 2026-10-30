@@ -622,6 +622,8 @@ export const pushDeliveries = pgTable("push_deliveries", {
   subscriptionId: uuid("subscription_id").notNull(),
   status: text("status").notNull().default("pending"),
   claimedAt: timestamptz("claimed_at"),
+  expirationReason: text("expiration_reason"),
+  subscriptionVersion: text("subscription_version"),
   completedAt: timestamptz("completed_at"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [
@@ -630,6 +632,7 @@ export const pushDeliveries = pgTable("push_deliveries", {
   unique("push_deliveries_event_subscription_unique").on(t.eventId, t.subscriptionId),
   index("push_deliveries_status_created_idx").on(t.status, t.createdAt),
   check("push_deliveries_status_check", sql`${t.status} in ('pending', 'processing', 'sent', 'expired', 'uncertain')`),
+  check("push_deliveries_expiration_reason_check", sql`${t.expirationReason} is null or ${t.expirationReason} in ('event_old', 'subscription_gone')`),
 ]);
 
 /** Histórico e auditoria de mensagens e lembretes enviados/recebidos via WhatsApp. */

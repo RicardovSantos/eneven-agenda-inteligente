@@ -2,6 +2,7 @@ import { and, asc, eq, isNull, lte } from "drizzle-orm";
 import { pushDeliveries, pushEvents, pushSubscriptions } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { sendTestPush } from "./test-transport";
+import { pushSubscriptionVersion } from "./subscription-version";
 
 type PushType = "booking_created" | "booking_canceled" | "booking_rescheduled";
 type Sender = (input: unknown, type: PushType) => Promise<"sent" | "expired">;
@@ -35,16 +36,20 @@ export async function processTestPushQueue(db: Db, sender: Sender, now = new Dat
       const [event] = await tx.select().from(pushEvents).where(and(eq(pushEvents.id, delivery.eventId), eq(pushEvents.tenantId, delivery.tenantId))).limit(1);
       const [subscription] = await tx.select().from(pushSubscriptions).where(and(eq(pushSubscriptions.id, delivery.subscriptionId), eq(pushSubscriptions.tenantId, delivery.tenantId))).limit(1);
       if (!event || !subscription) throw new Error("Entrega indisponível.");
-      await tx.update(pushDeliveries).set({ status: "processing", claimedAt: now }).where(eq(pushDeliveries.id, delivery.id));
+      await tx.update(pushDeliveries).set({ status: "processing", claimedAt: now, subscriptionVersion: pushSubscriptionVersion(subscription), expirationReason: null }).where(eq(pushDeliveries.id, delivery.id));
       return { delivery, event, subscription };
     });
     if (!claimed) break;
     let status: "sent" | "expired" | "uncertain";
+    let expirationReason: "event_old" | "subscription_gone" | null = null;
     try {
-      if (now.getTime() - claimed.event.createdAt.getTime() > 5 * 60_000) status = "expired";
-      else status = await sender({ endpoint: claimed.subscription.endpoint, keys: { p256dh: claimed.subscription.p256dh, auth: claimed.subscription.auth } }, claimed.event.eventType as PushType);
+      if (now.getTime() - claimed.event.createdAt.getTime() > 5 * 60_000) { status = "expired"; expirationReason = "event_old"; }
+      else {
+        status = await sender({ endpoint: claimed.subscription.endpoint, keys: { p256dh: claimed.subscription.p256dh, auth: claimed.subscription.auth } }, claimed.event.eventType as PushType);
+        if (status === "expired") expirationReason = "subscription_gone";
+      }
     } catch { status = "uncertain"; }
-    const updated = await db.update(pushDeliveries).set({ status, completedAt: now }).where(and(eq(pushDeliveries.id, claimed.delivery.id), eq(pushDeliveries.status, "processing"), eq(pushDeliveries.claimedAt, now))).returning({ id: pushDeliveries.id });
+    const updated = await db.update(pushDeliveries).set({ status, expirationReason, completedAt: now }).where(and(eq(pushDeliveries.id, claimed.delivery.id), eq(pushDeliveries.status, "processing"), eq(pushDeliveries.claimedAt, now))).returning({ id: pushDeliveries.id });
     if (updated.length) result[status]++;
   }
   return result;

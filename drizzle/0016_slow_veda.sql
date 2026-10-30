@@ -1,0 +1,3 @@
+ALTER TABLE "push_deliveries" ADD COLUMN "expiration_reason" text;--> statement-breakpoint
+ALTER TABLE "push_deliveries" ADD COLUMN "subscription_version" text;--> statement-breakpoint
+ALTER TABLE "push_deliveries" ADD CONSTRAINT "push_deliveries_expiration_reason_check" CHECK ("push_deliveries"."expiration_reason" is null or "push_deliveries"."expiration_reason" in ('event_old', 'subscription_gone'));
