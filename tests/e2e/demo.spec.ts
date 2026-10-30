@@ -10,6 +10,7 @@ test("demonstra agendamento fictício e mostra o resultado no painel", async ({ 
   await page.getByRole("link", { name: "Ver no painel de exemplo" }).click();
   await expect(page.getByText("Sua simulação")).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: "Sua simulação" })).toContainText("Manicure");
+  await expect(page.getByRole("listitem").nth(1)).toContainText("Sua simulação");
   await page.goto("/demo/painel?servico=1&horario=10%3A30&dia=2000-01-01");
   await expect(page.getByText("Sua simulação")).toHaveCount(0);
 });

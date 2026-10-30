@@ -7,6 +7,12 @@ export const metadata: Metadata = { title: "Painel de demonstração | Eneven", 
 export default async function DemoPanel({ searchParams }: { searchParams: Promise<{ servico?: string | string[]; horario?: string | string[]; dia?: string | string[] }> }) {
   const params = await searchParams;
   const selection = getDemoSelection(params.servico, params.horario, params.dia);
+  const appointments = [
+    { time: "08:00", name: "Ana", service: "Corte e finalização", simulated: false },
+    { time: "11:00", name: "Beatriz", service: "Manicure", simulated: false },
+    { time: "16:30", name: "Carla", service: "Escova", simulated: false },
+    ...(selection ? [{ time: selection.time, name: "Sua simulação", service: selection.service.name, simulated: true }] : []),
+  ].sort((a, b) => a.time.localeCompare(b.time));
   return (
     <main className="min-h-screen bg-canvas px-4 py-8 text-ink sm:py-14">
       <div className="mx-auto max-w-4xl">
@@ -24,8 +30,7 @@ export default async function DemoPanel({ searchParams }: { searchParams: Promis
           <h2 className="font-heading text-xl font-semibold">Agenda de exemplo</h2>
           <p className="mt-1 text-sm text-ink-muted">Horários ilustrativos para conhecer o painel.</p>
           <ul className="mt-4 divide-y divide-line">
-            {selection && <li className="flex flex-wrap items-center gap-x-4 gap-y-1 py-4"><span className="font-semibold text-primary">{selection.time}</span><span className="font-semibold">Sua simulação</span><span className="text-ink-muted">{selection.service.name}</span><span className="ml-auto text-sm text-primary">Fictício</span></li>}
-            {[{ time: "09:00", name: "Ana", service: "Corte e finalização" }, { time: "11:00", name: "Beatriz", service: "Manicure" }, { time: "15:00", name: "Carla", service: "Escova" }].map((item) => <li key={item.time} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-4"><span className="font-semibold">{item.time}</span><span className="font-semibold">{item.name}</span><span className="text-ink-muted">{item.service}</span></li>)}
+            {appointments.map((item) => <li key={item.time} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-4"><span className={`font-semibold ${item.simulated ? "text-primary" : ""}`}>{item.time}</span><span className="font-semibold">{item.name}</span><span className="text-ink-muted">{item.service}</span>{item.simulated && <span className="ml-auto text-sm text-primary">Fictício</span>}</li>)}
           </ul>
         </section>
       </div>

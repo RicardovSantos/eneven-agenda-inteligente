@@ -8,7 +8,7 @@ Primeiro passo: `/demo` é uma simulação pública com serviços e horários fi
 
 Para concluir: definir acesso ao painel de demonstração e suas permissões, isolar os dados dos estabelecimentos reais e impedir mensagens e outras integrações externas em todas as operações. Preparar recriação diária sem apagar ou modificar dados reais. Testar em navegador e revisar concorrência e proteção contra abuso antes de disponibilizar publicamente.
 
-O teste direcionado de navegador `tests/e2e/demo.spec.ts` passou em viewport de celular, cobrindo a simulação, o painel e a expiração da seleção. A suíte completa e a inspeção visual em outros tamanhos permanecem pendentes.
+O teste direcionado de navegador `tests/e2e/demo.spec.ts` passou em viewport de celular, cobrindo a simulação, o painel e a expiração da seleção. As duas páginas também foram inspecionadas visualmente em celular (390 px) e computador (1280 px). A suíte completa permanece pendente.
 
 ## Dados e notificações
 
