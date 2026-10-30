@@ -120,6 +120,20 @@
       "when": 1793359855341,
       "tag": "0016_flaky_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793359985820,
+      "tag": "0017_minor_maestro",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793360015275,
+      "tag": "0018_whole_maestro",
+      "breakpoints": true
     }
   ]
 }

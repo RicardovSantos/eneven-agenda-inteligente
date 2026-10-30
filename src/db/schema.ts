@@ -686,6 +686,8 @@ export const billingWebhookEvents = pgTable("billing_webhook_events", {
   resourceId: text("resource_id").notNull(),
   topic: text("topic").notNull(),
   receivedAt: timestamptz("received_at").notNull().defaultNow(),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamptz("next_attempt_at"),
   processedAt: timestamptz("processed_at"),
 }, (t) => [
   index("billing_webhook_events_pending_idx").on(t.processedAt, t.receivedAt),
@@ -721,8 +723,22 @@ export const billingInvoices = pgTable("billing_invoices", {
   createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [
   foreignKey({ name: "billing_invoices_subscription_fk", columns: [t.tenantId, t.subscriptionId], foreignColumns: [billingSubscriptions.tenantId, billingSubscriptions.id] }).onDelete("restrict"),
+  unique("billing_invoices_tenant_id_id_unique").on(t.tenantId, t.id),
   index("billing_invoices_tenant_idx").on(t.tenantId, t.createdAt),
   check("billing_invoices_amount_check", sql`${t.amountCents} >= 0`),
+]);
+
+/** Uma fatura pode ter várias tentativas, identificadas de forma única pelo provedor. */
+export const billingPaymentAttempts = pgTable("billing_payment_attempts", {
+  paymentId: text("payment_id").primaryKey(),
+  tenantId: tenantIdColumn(),
+  invoiceId: uuid("invoice_id").notNull(),
+  status: text("status").notNull(),
+  providerUpdatedAt: timestamptz("provider_updated_at").notNull(),
+  paidAt: timestamptz("paid_at"),
+}, (t) => [
+  foreignKey({ name: "billing_payment_attempts_invoice_fk", columns: [t.tenantId, t.invoiceId], foreignColumns: [billingInvoices.tenantId, billingInvoices.id] }).onDelete("cascade"),
+  index("billing_payment_attempts_invoice_idx").on(t.tenantId, t.invoiceId),
 ]);
 
 

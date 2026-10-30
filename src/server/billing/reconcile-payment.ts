@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import { billingInvoices } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { billingInvoices, billingPaymentAttempts } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { fetchMercadoPagoResource } from "./mercado-pago-client";
 import { verifyPaymentOwnership } from "./verify-payment";
@@ -26,11 +26,20 @@ export async function reconcilePayment(db: Db, paymentId: string, config: {
   }
   return db.transaction(async (tx) => {
     const [invoice] = await tx.select().from(billingInvoices).where(eq(billingInvoices.id, reference)).limit(1).for("update");
-    if (!invoice || (invoice.paymentId && invoice.paymentId !== paymentId) || !verifyPaymentOwnership(payment, {
+    if (!invoice || !verifyPaymentOwnership(payment, {
       paymentId, externalReference: invoice.id, collectorId: config.collectorId, amountCents: invoice.amountCents, liveMode: config.liveMode,
     })) throw new Error("Pagamento não corresponde à fatura.");
-    if (invoice.providerUpdatedAt && invoice.providerUpdatedAt >= updatedAt) return "unchanged";
-    await tx.update(billingInvoices).set({ paymentId, providerStatus: payment.status as string, providerUpdatedAt: updatedAt, paidAt }).where(eq(billingInvoices.id, invoice.id));
+    const [prior] = await tx.select().from(billingPaymentAttempts).where(eq(billingPaymentAttempts.paymentId, paymentId)).limit(1);
+    if (prior && (prior.tenantId !== invoice.tenantId || prior.invoiceId !== invoice.id)) throw new Error("Pagamento vinculado a outra fatura.");
+    if (prior && prior.providerUpdatedAt >= updatedAt) return "unchanged";
+    const values = { status: payment.status as string, providerUpdatedAt: updatedAt, paidAt };
+    if (prior) await tx.update(billingPaymentAttempts).set(values).where(eq(billingPaymentAttempts.paymentId, paymentId));
+    else await tx.insert(billingPaymentAttempts).values({ paymentId, tenantId: invoice.tenantId, invoiceId: invoice.id, ...values });
+    const attempts = await tx.select().from(billingPaymentAttempts).where(and(eq(billingPaymentAttempts.tenantId, invoice.tenantId), eq(billingPaymentAttempts.invoiceId, invoice.id)));
+    // Uma tentativa aprovada mantém a fatura paga mesmo se outra for recusada.
+    attempts.sort((a, b) => Number(b.status === "approved") - Number(a.status === "approved") || b.providerUpdatedAt.getTime() - a.providerUpdatedAt.getTime() || a.paymentId.localeCompare(b.paymentId));
+    const selected = attempts[0];
+    await tx.update(billingInvoices).set({ paymentId: selected.paymentId, providerStatus: selected.status, providerUpdatedAt: selected.providerUpdatedAt, paidAt: selected.paidAt }).where(eq(billingInvoices.id, invoice.id));
     return "updated";
   });
 }
