@@ -4,9 +4,9 @@ import { getDemoSelection } from "../dados";
 
 export const metadata: Metadata = { title: "Painel de demonstração | Eneven", robots: { index: false, follow: false } };
 
-export default async function DemoPanel({ searchParams }: { searchParams: Promise<{ servico?: string | string[]; horario?: string | string[] }> }) {
+export default async function DemoPanel({ searchParams }: { searchParams: Promise<{ servico?: string | string[]; horario?: string | string[]; dia?: string | string[] }> }) {
   const params = await searchParams;
-  const selection = getDemoSelection(params.servico, params.horario);
+  const selection = getDemoSelection(params.servico, params.horario, params.dia);
   return (
     <main className="min-h-screen bg-canvas px-4 py-8 text-ink sm:py-14">
       <div className="mx-auto max-w-4xl">

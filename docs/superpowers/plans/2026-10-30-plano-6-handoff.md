@@ -4,9 +4,11 @@ Branch `plano-6`, baseada em `main` após o Plano 4. O Plano 5 de cobrança est�
 
 ## Demonstração
 
-Primeiro passo: `/demo` é uma simulação pública com serviços e horários fictícios mantidos apenas na memória do navegador. `/demo/painel` mostra um painel ilustrativo e pode apresentar a opção escolhida por meio de parâmetros restritos a serviços e horários fictícios. Não grava no banco, não solicita dados pessoais e não envia WhatsApp. Recarregar a primeira página reinicia a experiência; o link do painel pode manter a seleção fictícia. É uma prévia isolada, ainda não substitui a demo completa prevista na especificação: um estabelecimento demonstrativo com painel e dados fictícios renovados diariamente.
+Primeiro passo: `/demo` é uma simulação pública com serviços e horários fictícios mantidos apenas na memória do navegador. `/demo/painel` mostra um painel ilustrativo e pode apresentar a opção escolhida por meio de parâmetros restritos a serviços e horários fictícios; essa seleção expira à meia-noite em São Paulo. Não grava no banco, não solicita dados pessoais e não envia WhatsApp. Recarregar a primeira página reinicia a experiência. É uma prévia isolada, ainda não substitui a demo completa prevista na especificação: um estabelecimento demonstrativo com painel e dados fictícios renovados diariamente.
 
 Para concluir: definir acesso ao painel de demonstração e suas permissões, isolar os dados dos estabelecimentos reais e impedir mensagens e outras integrações externas em todas as operações. Preparar recriação diária sem apagar ou modificar dados reais. Testar em navegador e revisar concorrência e proteção contra abuso antes de disponibilizar publicamente.
+
+O teste direcionado de navegador `tests/e2e/demo.spec.ts` passou em viewport de celular, cobrindo a simulação, o painel e a expiração da seleção. A suíte completa e a inspeção visual em outros tamanhos permanecem pendentes.
 
 ## Dados e notificações
 

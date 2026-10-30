@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { demoServices as services, demoTimes as times } from "./dados";
+import { demoDay, demoServices as services, demoTimes as times } from "./dados";
 
 
 export function DemoBooking() {
   const [service, setService] = useState<number | null>(null);
   const [time, setTime] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
+  const [day, setDay] = useState("");
   return (
     <main className="min-h-screen bg-canvas px-4 py-8 text-ink sm:py-14">
       <div className="mx-auto max-w-xl">
@@ -20,7 +21,7 @@ export function DemoBooking() {
           <section className="mt-6 rounded-2xl border border-line bg-surface p-6" aria-live="polite">
             <h2 className="font-heading text-xl font-semibold">Simulação concluída</h2>
             <p className="mt-2 text-ink-muted">{services[service!].name} às {time}. Este agendamento é fictício.</p>
-            <Link href={`/demo/painel?servico=${service}&horario=${encodeURIComponent(time ?? "")}`} className="mt-5 block font-semibold text-primary underline">Ver no painel de exemplo</Link>
+            <Link href={`/demo/painel?servico=${service}&horario=${encodeURIComponent(time ?? "")}&dia=${day}`} className="mt-5 block font-semibold text-primary underline">Ver no painel de exemplo</Link>
             <button className="mt-6 rounded-xl bg-primary px-5 py-3 font-semibold text-white" onClick={() => { setService(null); setTime(null); setFinished(false); }}>Simular novamente</button>
           </section>
         ) : (
@@ -37,7 +38,7 @@ export function DemoBooking() {
               <h2 className="font-heading text-xl font-semibold">2. Escolha um horário</h2>
               <p className="mt-1 text-sm text-ink-muted">Horários ilustrativos</p>
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{times.map((item) => <button key={item} type="button" aria-pressed={time === item} onClick={() => setTime(item)} className={`rounded-xl border px-3 py-3 font-semibold ${time === item ? "border-primary bg-primary-soft" : "border-line"}`}>{item}</button>)}</div>
-              <button type="button" disabled={!time} onClick={() => setFinished(true)} className="mt-5 w-full rounded-xl bg-primary px-5 py-3 font-semibold text-white disabled:opacity-40">Concluir simulação</button>
+              <button type="button" disabled={!time} onClick={() => { setDay(demoDay()); setFinished(true); }} className="mt-5 w-full rounded-xl bg-primary px-5 py-3 font-semibold text-white disabled:opacity-40">Concluir simulação</button>
             </section>}
           </div>
         )}
