@@ -1,11 +1,12 @@
 import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
-import { billingWebhookEvents } from "@/db/schema";
+import { billingInvoices, billingPaymentAttempts, billingSubscriptions, billingWebhookEvents } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { reconcilePayment } from "./reconcile-payment";
 import { reconcileSubscription } from "./reconcile-subscription";
 import { reconcileAuthorizedInvoice } from "./reconcile-invoice";
+import { reconcileTestBillingAccess } from "./reconcile-access";
 
-/** Processa sinais de pagamento, assinatura e fatura sem alterar acesso. */
+/** Processa sinais; altera acesso somente em ambiente de teste com credencial TEST. */
 export async function processPaymentEvents(db: Db, config: {
   accessToken: string; collectorId: string; liveMode: boolean; fetcher?: typeof fetch;
 }, limit = 20): Promise<{ processed: number; failed: number }> {
@@ -24,6 +25,20 @@ export async function processPaymentEvents(db: Db, config: {
       else {
         const { paymentId } = await reconcileAuthorizedInvoice(db, event.resourceId, config);
         if (paymentId) await reconcilePayment(db, paymentId, config);
+      }
+      if (process.env.NODE_ENV !== "production" && !config.liveMode && config.accessToken.startsWith("TEST-")) {
+        let tenantId: string | undefined;
+        if (event.topic === "payment") {
+          const [attempt] = await db.select({ tenantId: billingPaymentAttempts.tenantId }).from(billingPaymentAttempts).where(eq(billingPaymentAttempts.paymentId, event.resourceId)).limit(1);
+          tenantId = attempt?.tenantId;
+        } else if (event.topic === "subscription_preapproval") {
+          const [subscription] = await db.select({ tenantId: billingSubscriptions.tenantId }).from(billingSubscriptions).where(eq(billingSubscriptions.providerId, event.resourceId)).limit(1);
+          tenantId = subscription?.tenantId;
+        } else {
+          const [invoice] = await db.select({ tenantId: billingInvoices.tenantId }).from(billingInvoices).where(eq(billingInvoices.providerId, event.resourceId)).limit(1);
+          tenantId = invoice?.tenantId;
+        }
+        if (!tenantId || await reconcileTestBillingAccess(db, tenantId) === "review") throw new Error("Acesso requer revisão.");
       }
       const updated = await db.update(billingWebhookEvents).set({ processedAt: new Date() })
         .where(and(eq(billingWebhookEvents.requestId, event.requestId), isNull(billingWebhookEvents.processedAt)))
