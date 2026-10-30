@@ -22,7 +22,7 @@ it("isola dispositivos por usuário, impede apropriação e remove inscrição c
   expect(await db.select().from(pushSubscriptions)).toHaveLength(1);
   await expect(savePushSubscription(db, outsider, subscription)).rejects.toThrow("indisponível");
   await expect(savePushSubscription(db, { ...actor, support: true }, subscription)).rejects.toThrow("suporte");
-  await removePushSubscription(db, outsider, subscription);
+  await expect(removePushSubscription(db, outsider, subscription)).rejects.toThrow("indisponível");
   expect(await db.select().from(pushSubscriptions)).toHaveLength(1);
   await db.delete(memberships).where(eq(memberships.userId, user.id));
   expect(await db.select().from(pushSubscriptions)).toHaveLength(0);

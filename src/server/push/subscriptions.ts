@@ -23,5 +23,6 @@ export async function savePushSubscription(db: Db, actor: Actor, input: unknown)
 export async function removePushSubscription(db: Db, actor: Actor, input: unknown): Promise<void> {
   if (actor.support) throw new Error("Notificações indisponíveis em modo suporte.");
   const subscription = validatePushSubscription(input);
-  await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.tenantId, actor.tenantId), eq(pushSubscriptions.userId, actor.userId), eq(pushSubscriptions.endpointHash, endpointHash(subscription.endpoint))));
+  const removed = await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.tenantId, actor.tenantId), eq(pushSubscriptions.userId, actor.userId), eq(pushSubscriptions.endpointHash, endpointHash(subscription.endpoint)))).returning({ id: pushSubscriptions.id });
+  if (!removed.length) throw new Error("Inscrição indisponível.");
 }
