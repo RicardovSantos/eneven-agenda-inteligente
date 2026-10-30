@@ -11,7 +11,7 @@ export async function listRetentionReview(db: Db, now = new Date(), page = 1) {
     .from(auditLog).where(eq(auditLog.action, "tenant.canceled")).groupBy(auditLog.tenantId).as("canceled");
   const rows = await db.select({ id: tenants.id, name: tenants.name, slug: tenants.slug, status: tenants.status, trialEndsAt: tenants.trialEndsAt, lastCanceled: canceled.lastCanceled })
     .from(tenants).leftJoin(canceled, eq(canceled.tenantId, tenants.id))
-    .where(or(and(eq(tenants.status, "trial"), lte(tenants.trialEndsAt, cutoff)), and(eq(tenants.status, "canceled"), lte(canceled.lastCanceled, cutoff))))
+    .where(or(and(eq(tenants.status, "trial"), lte(tenants.trialEndsAt, cutoff)), and(eq(tenants.status, "canceled"), sql`${canceled.lastCanceled} <= ${cutoff.toISOString()}::timestamptz`)))
     .orderBy(asc(tenants.name), asc(tenants.id)).limit(51).offset((page - 1) * 50);
   return { items: rows.slice(0, 50), hasMore: rows.length > 50, page };
 }
