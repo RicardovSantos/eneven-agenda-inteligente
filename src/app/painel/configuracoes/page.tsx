@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
@@ -67,6 +68,7 @@ export default async function ConfiguracoesPage() {
         }}
       />
       <SlugForm currentSlug={tenant.slug} />
+      <Link href="/painel/configuracoes/mensagens" className="rounded-card border border-line bg-surface p-5 font-semibold text-primary">Configurar mensagens WhatsApp →</Link>
       <TeamAccessCard
         members={team.map((row) =>
           row.kind === "member"

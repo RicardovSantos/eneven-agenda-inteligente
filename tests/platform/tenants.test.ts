@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { auditLog, invitations, users } from "@/db/schema";
+import { auditLog, invitations, users, whatsappMessages } from "@/db/schema";
+import { withTenant } from "@/server/tenant-db";
 import type { Db } from "@/db/types";
 import { listPlatformTenants, getPlatformTenant } from "@/server/platform/tenants";
 import { tenantSituation } from "@/server/tenants/release";
@@ -62,6 +63,16 @@ describe("listPlatformTenants", () => {
     await seedPlatformTenant(db, { name: "Loja A" });
     const r = await listPlatformTenants(db, { page: 1, query: "%", now: NOW });
     expect(r.items).toHaveLength(0);
+  });
+
+  it("filtra estabelecimentos com franquia esgotada antes da paginação", async () => {
+    const { tenant } = await seedPlatformTenant(db, { name: "Franquia esgotada" });
+    await seedPlatformTenant(db, { name: "Franquia disponível" });
+    await withTenant(db, tenant.id, (tx) => tx.insert(whatsappMessages).values(Array.from({ length: 50 }, () => ({ tenantId: tenant.id, recipientPhone: "5511999999999", status: "sent" as const, createdAt: NOW }))));
+    const result = await listPlatformTenants(db, { page: 1, now: NOW, quotaExceeded: true });
+    expect(result.total).toBe(1);
+    expect(result.items[0].name).toBe("Franquia esgotada");
+    expect(result.items[0].whatsappUsage).toMatchObject({ used: 50, total: 50, allowed: false });
   });
 });
 

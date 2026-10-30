@@ -1,0 +1,1 @@
+ALTER TABLE "bookings" ADD COLUMN "confirmed_via_whatsapp_at" timestamp with time zone;

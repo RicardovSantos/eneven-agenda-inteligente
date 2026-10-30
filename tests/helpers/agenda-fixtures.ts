@@ -65,3 +65,18 @@ export function bookingValues(
     ...overrides,
   };
 }
+
+export async function seedBooking(
+  db: Db,
+  tenantId: string,
+  overrides: BookingOverrides = {},
+) {
+  const pro = await seedProfessional(db, tenantId);
+  const cust = await seedCustomer(db, tenantId);
+  const [b] = await db
+    .insert(bookings)
+    .values(bookingValues(tenantId, pro.id, cust.id, overrides))
+    .returning();
+  return b;
+}
+

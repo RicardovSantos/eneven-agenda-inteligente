@@ -56,6 +56,23 @@ export const bookingSource = pgEnum("booking_source", ["public", "panel"]);
 
 export const canceledBy = pgEnum("canceled_by", ["customer", "staff"]);
 
+export const whatsappMessageStatus = pgEnum("whatsapp_message_status", [
+  "queued",
+  "sending",
+  "sent",
+  "delivered",
+  "read",
+  "failed",
+]);
+
+export const whatsappTemplateType = pgEnum("whatsapp_template_type", [
+  "booking_created",
+  "reminder_eve",
+  "reminder_2h",
+  "rescheduled",
+  "canceled",
+]);
+
 /** `bytea` como `Buffer` (usado para o logo do estabelecimento). */
 const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({
   dataType: () => "bytea",
@@ -424,6 +441,7 @@ export const bookings = pgTable(
     manageTokenHash: text("manage_token_hash"),
     notes: text("notes"),
     canceledAt: timestamptz("canceled_at"),
+    confirmedViaWhatsappAt: timestamptz("confirmed_via_whatsapp_at"),
     canceledBy: canceledBy("canceled_by"),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, {
       onDelete: "set null",
@@ -548,3 +566,117 @@ export type Membership = typeof memberships.$inferSelect;
 export type OauthAccount = typeof oauthAccounts.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type EmailToken = typeof emailTokens.$inferSelect;
+
+/** Preferências de envio de notificações e lembretes por estabelecimento. */
+export const tenantNotificationSettings = pgTable("tenant_notification_settings", {
+  tenantId: uuid("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  bookingCreated: boolean("booking_created").notNull().default(true),
+  reminderEve: boolean("reminder_eve").notNull().default(true),
+  reminder2h: boolean("reminder_2h").notNull().default(false),
+  rescheduled: boolean("rescheduled").notNull().default(true),
+  canceled: boolean("canceled").notNull().default(true),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+});
+
+/** Histórico e auditoria de mensagens e lembretes enviados/recebidos via WhatsApp. */
+export const whatsappMessages = pgTable(
+  "whatsapp_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    bookingId: uuid("booking_id"),
+    queueId: uuid("queue_id"),
+    direction: text("direction").notNull().default("outbound"),
+    templateType: whatsappTemplateType("template_type"),
+    recipientPhone: text("recipient_phone").notNull(),
+    recipientName: text("recipient_name"),
+    wamId: text("wam_id").unique(),
+    status: whatsappMessageStatus("status").notNull().default("queued"),
+    failureCode: text("failure_code"),
+    failureReason: text("failure_reason"),
+    sentAt: timestamptz("sent_at"),
+    deliveredAt: timestamptz("delivered_at"),
+    readAt: timestamptz("read_at"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "whatsapp_messages_booking_fk",
+      columns: [t.tenantId, t.bookingId],
+      foreignColumns: [bookings.tenantId, bookings.id],
+    }).onDelete("set null"),
+    foreignKey({ name: "whatsapp_messages_queue_fk", columns: [t.tenantId, t.queueId], foreignColumns: [whatsappQueue.tenantId, whatsappQueue.id] }).onDelete("set null"),
+    index("whatsapp_messages_tenant_created_idx").on(t.tenantId, t.createdAt),
+    index("whatsapp_messages_wam_id_idx").on(t.wamId),
+    index("whatsapp_messages_phone_created_idx").on(t.recipientPhone, t.createdAt),
+    check("whatsapp_messages_direction_check", sql`${t.direction} in ('outbound', 'inbound')`),
+  ],
+);
+
+/** Fila transacional de disparos de WhatsApp com agendamento e idempotência. */
+export const whatsappQueue = pgTable(
+  "whatsapp_queue",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    bookingId: uuid("booking_id").notNull(),
+    templateType: whatsappTemplateType("template_type").notNull(),
+    /** Identifica o evento de negócio; reenvios do mesmo evento usam a mesma chave. */
+    eventKey: text("event_key").notNull(),
+    scheduledFor: timestamptz("scheduled_for").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    lockedUntil: timestamptz("locked_until"),
+    processedAt: timestamptz("processed_at"),
+    errorMessage: text("error_message"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "whatsapp_queue_booking_fk",
+      columns: [t.tenantId, t.bookingId],
+      foreignColumns: [bookings.tenantId, bookings.id],
+    }).onDelete("cascade"),
+    unique("whatsapp_queue_tenant_booking_template_event_unique").on(
+      t.tenantId,
+      t.bookingId,
+      t.templateType,
+      t.eventKey,
+    ),
+    unique("whatsapp_queue_tenant_id_id_unique").on(t.tenantId, t.id),
+    index("whatsapp_queue_due_idx").on(t.scheduledFor, t.processedAt, t.lockedUntil),
+  ],
+);
+
+export type TenantNotificationSettings = typeof tenantNotificationSettings.$inferSelect;
+export type NewTenantNotificationSettings = typeof tenantNotificationSettings.$inferInsert;
+export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
+export type NewWhatsappMessage = typeof whatsappMessages.$inferInsert;
+export type WhatsappQueueItem = typeof whatsappQueue.$inferSelect;
+export type NewWhatsappQueueItem = typeof whatsappQueue.$inferInsert;
+
+/** Links adicionais de gestão para notificações; somente o hash é persistido. */
+export const bookingManageTokens = pgTable("booking_manage_tokens", {
+  tokenHash: text("token_hash").primaryKey(),
+  tenantId: tenantIdColumn(),
+  bookingId: uuid("booking_id").notNull(),
+  expiresAt: timestamptz("expires_at").notNull(),
+}, (t) => [
+  foreignKey({ name: "booking_manage_tokens_booking_fk", columns: [t.tenantId, t.bookingId], foreignColumns: [bookings.tenantId, bookings.id] }).onDelete("cascade"),
+  index("booking_manage_tokens_booking_idx").on(t.tenantId, t.bookingId),
+]);
+
+/** Registro global de IDs da Meta; não contém telefone nem conteúdo da mensagem. */
+export const whatsappInboundEvents = pgTable("whatsapp_inbound_events", {
+  id: text("id").primaryKey(),
+  state: text("state").notNull().default("processing"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  claimedAt: timestamptz("claimed_at").notNull().defaultNow(),
+  attempts: integer("attempts").notNull().default(1),
+  /** Conteúdo cifrado temporário para recuperação; removido ao concluir. */
+  payloadEncrypted: text("payload_encrypted"),
+  completedAt: timestamptz("completed_at"),
+}, (t) => [check("whatsapp_inbound_event_state_check", sql`${t.state} in ('processing', 'completed', 'uncertain')`)]);
+
+

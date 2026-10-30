@@ -1,0 +1,363 @@
+import { createHmac } from "node:crypto";
+import { describe, expect, it, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
+import { bookings, tenants, whatsappInboundEvents, whatsappMessages } from "@/db/schema";
+import { setWhatsAppChannelForTests } from "@/server/whatsapp/channel";
+import { FakeWhatsAppChannel } from "@/server/whatsapp/fake-client";
+import { handleMetaWebhookPost, resolveInboundEvent } from "@/server/whatsapp/webhook";
+import { processInteractiveButtonReply } from "@/server/whatsapp/interactive-actions";
+import { hashToken } from "@/server/auth/session";
+import { withTenant } from "@/server/tenant-db";
+import { seedBooking, seedTenant } from "../helpers/agenda-fixtures";
+import { createTestDb } from "../helpers/test-db";
+import { seedSuperAdmin } from "../helpers/platform-fixtures";
+
+describe("Meta WhatsApp Webhook Handling", () => {
+  const secret = "test_meta_app_secret";
+  let fakeChannel: FakeWhatsAppChannel;
+
+  const sign = (data: string) =>
+    `sha256=${createHmac("sha256", secret).update(data).digest("hex")}`;
+
+  beforeEach(() => {
+    fakeChannel = new FakeWhatsAppChannel();
+    setWhatsAppChannelForTests(fakeChannel);
+  });
+
+  describe("Status de entrega (Delivery statuses)", () => {
+    it("atualiza mensagem para delivered e read com os timestamps da Meta", async () => {
+      const db = await createTestDb();
+      const tenant = await seedTenant(db, "webhook-tenant-1");
+      const wamId = "wamid.HBgLMTIzNDU2";
+
+      // Cria mensagem com status queued
+      await withTenant(db, tenant.id, async (tx) => {
+        await tx.insert(whatsappMessages).values({
+          tenantId: tenant.id,
+          recipientPhone: "5511999998888",
+          wamId,
+          status: "queued",
+        });
+      });
+
+      // 1. Recebe status 'delivered'
+      const deliveredPayload = JSON.stringify({
+        object: "whatsapp_business_account",
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messaging_product: "whatsapp",
+                  statuses: [
+                    {
+                      id: wamId,
+                      status: "delivered",
+                      timestamp: "1730200000",
+                      recipient_id: "5511999998888",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const res1 = await handleMetaWebhookPost(
+        db,
+        deliveredPayload,
+        sign(deliveredPayload),
+        secret,
+      );
+      expect(res1.ok).toBe(true);
+
+      const [msg1] = await withTenant(db, tenant.id, (tx) =>
+        tx.select().from(whatsappMessages).where(eq(whatsappMessages.wamId, wamId)),
+      );
+      expect(msg1.status).toBe("delivered");
+      expect(msg1.deliveredAt).toBeDefined();
+
+      // 2. Recebe status 'read'
+      const readPayload = JSON.stringify({
+        object: "whatsapp_business_account",
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messaging_product: "whatsapp",
+                  statuses: [
+                    {
+                      id: wamId,
+                      status: "read",
+                      timestamp: "1730200010",
+                      recipient_id: "5511999998888",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const res2 = await handleMetaWebhookPost(db, readPayload, sign(readPayload), secret);
+      expect(res2.ok).toBe(true);
+
+      const [msg2] = await withTenant(db, tenant.id, (tx) =>
+        tx.select().from(whatsappMessages).where(eq(whatsappMessages.wamId, wamId)),
+      );
+      expect(msg2.status).toBe("read");
+      expect(msg2.readAt).toBeDefined();
+
+      // Uma notificação antiga de envio não pode regredir um status já lido.
+      const lateSent = readPayload.replace('"status":"read"', '"status":"sent"');
+      await handleMetaWebhookPost(db, lateSent, sign(lateSent), secret);
+      const [afterLate] = await withTenant(db, tenant.id, (tx) =>
+        tx.select().from(whatsappMessages).where(eq(whatsappMessages.wamId, wamId)),
+      );
+      expect(afterLate.status).toBe("read");
+    });
+
+    it("registra falha com código e motivo retornado pela Meta", async () => {
+      const db = await createTestDb();
+      const tenant = await seedTenant(db, "webhook-tenant-fail");
+      const wamId = "wamid.FAIL123";
+
+      await withTenant(db, tenant.id, async (tx) => {
+        await tx.insert(whatsappMessages).values({
+          tenantId: tenant.id,
+          recipientPhone: "5511999998888",
+          wamId,
+          status: "queued",
+        });
+      });
+
+      const failedPayload = JSON.stringify({
+        object: "whatsapp_business_account",
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messaging_product: "whatsapp",
+                  statuses: [
+                    {
+                      id: wamId,
+                      status: "failed",
+                      timestamp: "1730200000",
+                      recipient_id: "5511999998888",
+                      errors: [
+                        {
+                          code: 131026,
+                          title: "Message undeliverable",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const res = await handleMetaWebhookPost(db, failedPayload, sign(failedPayload), secret);
+      expect(res.ok).toBe(true);
+
+      const [msg] = await withTenant(db, tenant.id, (tx) =>
+        tx.select().from(whatsappMessages).where(eq(whatsappMessages.wamId, wamId)),
+      );
+      expect(msg.status).toBe("failed");
+      expect(msg.failureCode).toBe("131026");
+      expect(msg.failureReason).toContain("Message undeliverable");
+    });
+  });
+
+  describe("Respostas Interativas de Botão (Quick Replies)", () => {
+    it("não cancela atendimento concluído nem atendimento fora do prazo", async () => {
+      const db = await createTestDb();
+      const tenant = await seedTenant(db, "webhook-cancel-restrictions");
+      const token = "cancel-restriction-token";
+      const start = new Date(Date.now() + 60_000);
+      const booking = await seedBooking(db, tenant.id, {
+        status: "scheduled", manageTokenHash: hashToken(token), startsAt: start,
+        endsAt: new Date(start.getTime() + 1_800_000), blockedUntil: new Date(start.getTime() + 1_800_000),
+      });
+      expect((await processInteractiveButtonReply(db, `CANCEL:${booking.id}:${token}`, "5511999998888")).ok).toBe(false);
+      expect((await processInteractiveButtonReply(db, `CANCEL:${booking.id}:${token}`, "5511999990000")).ok).toBe(false);
+      await withTenant(db, tenant.id, (tx) => tx.update(bookings).set({ status: "completed" }).where(eq(bookings.id, booking.id)));
+      expect((await processInteractiveButtonReply(db, `CANCEL:${booking.id}:${token}`, "5511999990000")).ok).toBe(false);
+    });
+    it("atualiza agendamento para confirmed ao receber clique em CONFIRM", async () => {
+      const db = await createTestDb();
+      const tenant = await seedTenant(db, "webhook-btn-confirm");
+      const rawToken = "secret-token-abc";
+      const booking = await seedBooking(db, tenant.id, {
+        status: "scheduled",
+        manageTokenHash: hashToken(rawToken),
+      });
+
+      const confirmPayload = JSON.stringify({
+        object: "whatsapp_business_account",
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messaging_product: "whatsapp",
+                  messages: [
+                    {
+                      from: "5511999990000",
+                      id: "wamid.reply1",
+                      type: "button",
+                      button: { payload: `CONFIRM:${booking.id}:${rawToken}`, text: "Confirmar" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const res = await handleMetaWebhookPost(db, confirmPayload, sign(confirmPayload), secret);
+      expect(res.ok).toBe(true);
+
+      const [updated] = await withTenant(db, tenant.id, (tx) =>
+        tx.select().from(bookings).where(eq(bookings.id, booking.id)),
+      );
+      expect(updated.status).toBe("confirmed");
+      expect(updated.confirmedViaWhatsappAt).toBeInstanceOf(Date);
+    });
+
+    it("atualiza agendamento para canceled ao receber clique em CANCEL", async () => {
+      const db = await createTestDb();
+      const tenant = await seedTenant(db, "webhook-btn-cancel");
+      const rawToken = "secret-token-cancel";
+      const booking = await seedBooking(db, tenant.id, {
+        status: "scheduled",
+        manageTokenHash: hashToken(rawToken),
+      });
+
+      const cancelPayload = JSON.stringify({
+        object: "whatsapp_business_account",
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messaging_product: "whatsapp",
+                  messages: [
+                    {
+                      from: "5511999990000",
+                      id: "wamid.reply2",
+                      type: "interactive",
+                      interactive: {
+                        type: "button_reply",
+                        button_reply: {
+                          id: `CANCEL:${booking.id}:${rawToken}`,
+                          title: "Cancelar",
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const res = await handleMetaWebhookPost(db, cancelPayload, sign(cancelPayload), secret);
+      expect(res.ok).toBe(true);
+
+      const [updated] = await withTenant(db, tenant.id, (tx) =>
+        tx.select().from(bookings).where(eq(bookings.id, booking.id)),
+      );
+      expect(updated.status).toBe("canceled");
+    });
+  });
+
+  describe("Mensagens livres de texto", () => {
+    it("responde com link de redirecionamento para o WhatsApp do salão", async () => {
+      const db = await createTestDb();
+      const tenant = await seedTenant(db, "webhook-free-text");
+      await db.update(tenants).set({ whatsapp: "5511988887777" }).where(eq(tenants.id, tenant.id));
+      // Simula mensagem anterior enviada a este telefone para saber de qual estabelecimento ele é cliente
+      await withTenant(db, tenant.id, async (tx) => {
+        await tx.insert(whatsappMessages).values({
+          tenantId: tenant.id,
+          recipientPhone: "5511999997777",
+          wamId: "wamid.initial",
+          status: "delivered",
+        });
+      });
+
+      const textPayload = JSON.stringify({
+        object: "whatsapp_business_account",
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messaging_product: "whatsapp",
+                  messages: [
+                    {
+                      from: "5511999997777",
+                      id: "wamid.incoming.text",
+                      type: "text",
+                      text: {
+                        body: "Boa tarde, gostaria de saber se vocês atendem no sábado",
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const res = await handleMetaWebhookPost(db, textPayload, sign(textPayload), secret);
+      expect(res.ok).toBe(true);
+
+      expect(fakeChannel.sentMessages).toHaveLength(1);
+      const reply = fakeChannel.sentMessages[0];
+      expect(reply.to).toBe("5511999997777");
+      expect(reply.type).toBe("text");
+      expect(typeof reply.payload === "string" && reply.payload).toContain(tenant.name);
+      expect(reply.payload).toContain("https://wa.me/5511988887777");
+      await handleMetaWebhookPost(db, textPayload, sign(textPayload), secret);
+      expect(fakeChannel.sentMessages).toHaveLength(1);
+      const [event] = await db.select().from(whatsappInboundEvents).where(eq(whatsappInboundEvents.id, "wamid.incoming.text"));
+      expect(event.state).toBe("completed");
+    });
+
+    it("marca envio com erro como incerto e não repete automaticamente", async () => {
+      const db = await createTestDb();
+      const tenant = await seedTenant(db, "webhook-uncertain");
+      await withTenant(db, tenant.id, (tx) => tx.insert(whatsappMessages).values({
+        tenantId: tenant.id, recipientPhone: "5511999997777", wamId: "wamid.outbound-uncertain", status: "sent",
+      }));
+      const payload = JSON.stringify({ object: "whatsapp_business_account", entry: [{ changes: [{ value: { messages: [
+        { from: "5511999997777", id: "wamid.uncertain", type: "text", text: { body: "oi" } },
+      ] } }] }] });
+      fakeChannel.setNextError("falha de rede");
+      await expect(handleMetaWebhookPost(db, payload, sign(payload), secret)).rejects.toThrow();
+      const [event] = await db.select().from(whatsappInboundEvents).where(eq(whatsappInboundEvents.id, "wamid.uncertain"));
+      expect(event.state).toBe("uncertain");
+      expect(event.payloadEncrypted).not.toContain("5511999997777");
+      await handleMetaWebhookPost(db, payload, sign(payload), secret);
+      expect(fakeChannel.sentMessages).toHaveLength(0);
+      const admin = await seedSuperAdmin(db);
+      await resolveInboundEvent(db, "wamid.uncertain", admin.id, "retry");
+      expect(fakeChannel.sentMessages).toHaveLength(1);
+      const [recovered] = await db.select().from(whatsappInboundEvents).where(eq(whatsappInboundEvents.id, "wamid.uncertain"));
+      expect(recovered.state).toBe("completed");
+      expect(recovered.payloadEncrypted).toBeNull();
+      await expect(resolveInboundEvent(db, "wamid.uncertain", admin.id, "retry")).rejects.toThrow();
+    });
+  });
+});

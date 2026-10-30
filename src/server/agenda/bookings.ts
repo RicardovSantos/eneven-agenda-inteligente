@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gt, inArray } from "drizzle-orm";
 import {
   bookingServices,
+  bookingManageTokens,
   bookings,
   professionalServices,
   services,
@@ -16,6 +17,7 @@ import { upsertCustomer, type CustomerInput } from "./customers";
 import { BookingError } from "./errors";
 import { loadAvailabilityContext } from "./load";
 import { localDateOf } from "./time";
+import { tryEnqueueBookingEvent } from "@/server/whatsapp/booking-events";
 
 export { BookingError, SLOT_TAKEN_MESSAGE } from "./errors";
 export type { BookingErrorCode } from "./errors";
@@ -113,7 +115,7 @@ export async function createBooking(
   if (serviceIds.length === 0) throw new BookingError("invalid_selection");
 
   try {
-    return await withTenant(db, tenantId, async (tx) => {
+    const result = await withTenant(db, tenantId, async (tx) => {
       const rows = await tx
         .select()
         .from(services)
@@ -197,6 +199,8 @@ export async function createBooking(
 
       return { bookingId: booking.id, manageToken: token };
     });
+    await tryEnqueueBookingEvent(db, tenantId, result.bookingId, "booking_created", "created", now);
+    return result;
   } catch (error) {
     // Corrida: outra transação reservou entre a checagem e o INSERT.
     if (isExclusionViolation(error)) throw new BookingError("slot_taken");
@@ -322,6 +326,7 @@ export async function rescheduleBooking(
         })
         .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)));
     });
+    await tryEnqueueBookingEvent(db, tenantId, bookingId, "rescheduled", `${now.toISOString()}:${newStartsAt.toISOString()}`, now);
   } catch (error) {
     if (isExclusionViolation(error)) throw new BookingError("slot_taken");
     throw error;
@@ -346,6 +351,7 @@ export async function cancelBooking(
       .set({ status: "canceled", canceledAt: now, canceledBy: actor, updatedAt: now })
       .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)));
   });
+  await tryEnqueueBookingEvent(db, tenantId, bookingId, "canceled", "canceled", now);
 }
 
 export async function setBookingStatus(
@@ -353,6 +359,7 @@ export async function setBookingStatus(
   tenantId: string,
   bookingId: string,
   status: Exclude<BookingStatus, "canceled">,
+  viaWhatsApp = false,
 ): Promise<void> {
   try {
     await withTenant(db, tenantId, async (tx) => {
@@ -362,7 +369,7 @@ export async function setBookingStatus(
       }
       await tx
         .update(bookings)
-        .set({ status, updatedAt: new Date() })
+        .set({ status, updatedAt: new Date(), ...(status === "confirmed" ? { confirmedViaWhatsappAt: viaWhatsApp ? new Date() : null } : status === "scheduled" ? { confirmedViaWhatsappAt: null } : {}) })
         .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)));
     });
   } catch (error) {
@@ -390,5 +397,18 @@ export async function findBookingByManageToken(
     .where(eq(bookings.manageTokenHash, hashToken(token)))
     .orderBy(asc(bookings.id))
     .limit(1);
-  return row ?? null;
+  if (row) return row;
+  const [extra] = await db.select({ tenantId: bookingManageTokens.tenantId, bookingId: bookingManageTokens.bookingId })
+    .from(bookingManageTokens)
+    .where(and(eq(bookingManageTokens.tokenHash, hashToken(token)), gt(bookingManageTokens.expiresAt, new Date())))
+    .limit(1);
+  return extra ?? null;
+}
+
+/** Emite outro link sem invalidar o link anterior; nunca grava o token em texto. */
+export async function issueAdditionalManageToken(db: Db, tenantId: string, bookingId: string, expiresAt: Date): Promise<string> {
+  if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) throw new Error("Validade inválida.");
+  const { token, hash } = newManageToken();
+  await withTenant(db, tenantId, (tx) => tx.insert(bookingManageTokens).values({ tokenHash: hash, tenantId, bookingId, expiresAt }));
+  return token;
 }

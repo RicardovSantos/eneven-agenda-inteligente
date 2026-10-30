@@ -15,6 +15,7 @@ import type { Db } from "@/db/types";
 import { withTenant } from "@/server/tenant-db";
 import { tenantSituation, type TenantSituation } from "@/server/tenants/release";
 import { UUID } from "./errors";
+import { checkTenantQuota } from "@/server/whatsapp/quota";
 
 const DAY_MS = 86_400_000;
 export const PLATFORM_PAGE_SIZE = 50;
@@ -32,6 +33,7 @@ export type PlatformTenantItem = {
   bookings30d: number;
   ownerLastLoginAt: Date | null;
   createdAt: Date;
+  whatsappUsage?: { used: number; total: number; allowed: boolean };
 };
 
 export type PlatformTenantList = {
@@ -69,7 +71,7 @@ const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
  */
 export async function listPlatformTenants(
   db: Db,
-  input: { situation?: TenantSituation; query?: string; page: number; now?: Date },
+  input: { situation?: TenantSituation; query?: string; page: number; now?: Date; quotaExceeded?: boolean },
 ): Promise<PlatformTenantList> {
   const now = input.now ?? new Date();
   // Valor desconhecido (ex.: vindo da URL) vale como "todas", sem chegar ao enum do banco.
@@ -92,7 +94,8 @@ export async function listPlatformTenants(
       )
     : undefined;
 
-  const where = and(search, situation ? situationCondition(situation, now) : undefined);
+  const exhausted = input.quotaExceeded ? sql`(select count(*) from whatsapp_messages wm where wm.tenant_id = ${tenants.id} and wm.direction = 'outbound' and wm.status in ('sending','sent','delivered','read') and wm.created_at >= date_trunc('month', ${now.toISOString()}::timestamptz at time zone ${tenants.timezone}) at time zone ${tenants.timezone} and wm.created_at < (date_trunc('month', ${now.toISOString()}::timestamptz at time zone ${tenants.timezone}) + interval '1 month') at time zone ${tenants.timezone}) >= case when ${tenants.status} = 'trial' then 50 else (select monthly_messages from plans where id = ${tenants.planId}) end` : undefined;
+  const where = and(search, situation ? situationCondition(situation, now) : undefined, exhausted);
 
   const [countRow] = await db
     .select({
@@ -108,7 +111,7 @@ export async function listPlatformTenants(
     .where(search);
   const counts = { ...countRow };
 
-  const total = situation ? await countWhere(db, where) : counts.all;
+  const total = situation || exhausted ? await countWhere(db, where) : counts.all;
 
   const rows = await db
     .select({
@@ -129,6 +132,7 @@ export async function listPlatformTenants(
     .offset((page - 1) * PLATFORM_PAGE_SIZE);
 
   const ids = rows.map((r) => r.id);
+  const whatsappUsage = new Map(await Promise.all(ids.map(async (id) => [id, await checkTenantQuota(db, id, now)] as const)));
   const owners = ids.length
     ? await db
         .select({
@@ -180,6 +184,7 @@ export async function listPlatformTenants(
         bookings30d: usageOf.get(r.id) ?? 0,
         ownerLastLoginAt: owner?.lastLoginAt ?? null,
         createdAt: r.createdAt,
+        whatsappUsage: whatsappUsage.get(r.id),
       };
     }),
   };

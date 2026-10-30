@@ -219,6 +219,19 @@ export function BookingDetail({
           {booking.notes ? <Row label="Observação">{booking.notes}</Row> : null}
         </dl>
 
+        {booking.whatsappHistory?.length ? (
+          <section aria-label="Histórico de mensagens WhatsApp" className="rounded-2xl bg-canvas p-4 text-sm">
+            <h3 className="font-semibold">Mensagens WhatsApp</h3>
+            <ul className="mt-2 space-y-1">
+              {booking.whatsappHistory.map((message) => (
+                <li key={message.id}>
+                  {message.templateType === "reminder_eve" ? "Lembrete da véspera" : message.templateType === "reminder_2h" ? "Lembrete de 2 horas" : "Notificação"} · {({ queued: "Na fila", sending: "Em envio", sent: "Enviada", delivered: "Entregue", read: "Lida", failed: "Falhou" } as Record<string, string>)[message.status] ?? message.status}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         {mode === "reschedule" ? (
           <div className="flex flex-col gap-4">
             <h3 className="text-sm font-semibold">Novo dia e horário</h3>
