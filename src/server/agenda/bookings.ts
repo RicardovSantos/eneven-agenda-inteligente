@@ -18,6 +18,7 @@ import { BookingError } from "./errors";
 import { loadAvailabilityContext } from "./load";
 import { localDateOf } from "./time";
 import { tryEnqueueBookingEvent } from "@/server/whatsapp/booking-events";
+import { enqueueTestPushEvent } from "@/server/push/events";
 
 export { BookingError, SLOT_TAKEN_MESSAGE } from "./errors";
 export type { BookingErrorCode } from "./errors";
@@ -197,6 +198,8 @@ export async function createBooking(
         })),
       );
 
+      await enqueueTestPushEvent(tx, tenantId, booking.id, "booking_created", "created", now);
+
       return { bookingId: booking.id, manageToken: token };
     });
     await tryEnqueueBookingEvent(db, tenantId, result.bookingId, "booking_created", "created", now);
@@ -325,6 +328,7 @@ export async function rescheduleBooking(
           updatedAt: now,
         })
         .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)));
+      await enqueueTestPushEvent(tx, tenantId, bookingId, "booking_rescheduled", `${now.toISOString()}:${newStartsAt.toISOString()}:${targetPro}`, now);
     });
     await tryEnqueueBookingEvent(db, tenantId, bookingId, "rescheduled", `${now.toISOString()}:${newStartsAt.toISOString()}`, now);
   } catch (error) {
@@ -350,6 +354,7 @@ export async function cancelBooking(
       .update(bookings)
       .set({ status: "canceled", canceledAt: now, canceledBy: actor, updatedAt: now })
       .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)));
+    await enqueueTestPushEvent(tx, tenantId, bookingId, "booking_canceled", "canceled", now);
   });
   await tryEnqueueBookingEvent(db, tenantId, bookingId, "canceled", "canceled", now);
 }

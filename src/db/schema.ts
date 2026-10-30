@@ -581,6 +581,61 @@ export const tenantNotificationSettings = pgTable("tenant_notification_settings"
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 });
 
+/** Inscrições de dispositivos, sempre vinculadas a um usuário do estabelecimento. */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  userId: uuid("user_id").notNull(),
+  endpointHash: text("endpoint_hash").notNull().unique(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ name: "push_subscriptions_membership_fk", columns: [t.userId, t.tenantId], foreignColumns: [memberships.userId, memberships.tenantId] }).onDelete("cascade"),
+  unique("push_subscriptions_tenant_id_id_unique").on(t.tenantId, t.id),
+  index("push_subscriptions_tenant_user_idx").on(t.tenantId, t.userId),
+]);
+
+/** Eventos de agenda sem dados pessoais; processamento de push ainda desligado. */
+export const pushEvents = pgTable("push_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  bookingId: uuid("booking_id").notNull(),
+  eventType: text("event_type").notNull(),
+  eventKey: text("event_key").notNull(),
+  expandedAt: timestamptz("expanded_at"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ name: "push_events_booking_fk", columns: [t.tenantId, t.bookingId], foreignColumns: [bookings.tenantId, bookings.id] }).onDelete("cascade"),
+  unique("push_events_identity_unique").on(t.tenantId, t.bookingId, t.eventType, t.eventKey),
+  unique("push_events_tenant_id_id_unique").on(t.tenantId, t.id),
+  check("push_events_type_check", sql`${t.eventType} in ('booking_created', 'booking_canceled', 'booking_rescheduled')`),
+  check("push_events_key_length_check", sql`length(${t.eventKey}) between 1 and 160`),
+]);
+
+/** Uma reserva por evento e dispositivo, com falhas ambíguas para revisão. */
+export const pushDeliveries = pgTable("push_deliveries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  eventId: uuid("event_id").notNull(),
+  subscriptionId: uuid("subscription_id").notNull(),
+  status: text("status").notNull().default("pending"),
+  claimedAt: timestamptz("claimed_at"),
+  expirationReason: text("expiration_reason"),
+  subscriptionVersion: text("subscription_version"),
+  completedAt: timestamptz("completed_at"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ name: "push_deliveries_event_fk", columns: [t.tenantId, t.eventId], foreignColumns: [pushEvents.tenantId, pushEvents.id] }).onDelete("cascade"),
+  foreignKey({ name: "push_deliveries_subscription_fk", columns: [t.tenantId, t.subscriptionId], foreignColumns: [pushSubscriptions.tenantId, pushSubscriptions.id] }).onDelete("cascade"),
+  unique("push_deliveries_event_subscription_unique").on(t.eventId, t.subscriptionId),
+  index("push_deliveries_status_created_idx").on(t.status, t.createdAt),
+  check("push_deliveries_status_check", sql`${t.status} in ('pending', 'processing', 'sent', 'expired', 'uncertain')`),
+  check("push_deliveries_expiration_reason_check", sql`${t.expirationReason} is null or ${t.expirationReason} in ('event_old', 'subscription_gone')`),
+]);
+
 /** Histórico e auditoria de mensagens e lembretes enviados/recebidos via WhatsApp. */
 export const whatsappMessages = pgTable(
   "whatsapp_messages",

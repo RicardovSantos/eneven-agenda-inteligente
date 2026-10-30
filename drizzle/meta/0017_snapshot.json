@@ -1,6 +1,6 @@
 {
-  "id": "c6598f80-af90-420d-8978-c765459439cb",
-  "prevId": "c64364de-a64e-43dc-a6fb-92b083ca05fa",
+  "id": "bf34890f-bdf8-4987-8f10-3987bd9523af",
+  "prevId": "588c0d5a-f631-4064-baec-01a8cc15534c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -93,389 +93,6 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.billing_invoices": {
-      "name": "billing_invoices",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subscription_id": {
-          "name": "subscription_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider_id": {
-          "name": "provider_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "payment_id": {
-          "name": "payment_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_status": {
-          "name": "provider_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount_cents": {
-          "name": "amount_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "due_at": {
-          "name": "due_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "paid_at": {
-          "name": "paid_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_updated_at": {
-          "name": "provider_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "billing_invoices_tenant_idx": {
-          "name": "billing_invoices_tenant_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "billing_invoices_tenant_id_tenants_id_fk": {
-          "name": "billing_invoices_tenant_id_tenants_id_fk",
-          "tableFrom": "billing_invoices",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "billing_invoices_subscription_fk": {
-          "name": "billing_invoices_subscription_fk",
-          "tableFrom": "billing_invoices",
-          "tableTo": "billing_subscriptions",
-          "columnsFrom": [
-            "tenant_id",
-            "subscription_id"
-          ],
-          "columnsTo": [
-            "tenant_id",
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "billing_invoices_provider_id_unique": {
-          "name": "billing_invoices_provider_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "provider_id"
-          ]
-        },
-        "billing_invoices_payment_id_unique": {
-          "name": "billing_invoices_payment_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "payment_id"
-          ]
-        },
-        "billing_invoices_tenant_id_id_unique": {
-          "name": "billing_invoices_tenant_id_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "tenant_id",
-            "id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "billing_invoices_amount_check": {
-          "name": "billing_invoices_amount_check",
-          "value": "\"billing_invoices\".\"amount_cents\" >= 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.billing_payment_attempts": {
-      "name": "billing_payment_attempts",
-      "schema": "",
-      "columns": {
-        "payment_id": {
-          "name": "payment_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "invoice_id": {
-          "name": "invoice_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider_updated_at": {
-          "name": "provider_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "paid_at": {
-          "name": "paid_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "billing_payment_attempts_invoice_idx": {
-          "name": "billing_payment_attempts_invoice_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "invoice_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "billing_payment_attempts_tenant_id_tenants_id_fk": {
-          "name": "billing_payment_attempts_tenant_id_tenants_id_fk",
-          "tableFrom": "billing_payment_attempts",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "billing_payment_attempts_invoice_fk": {
-          "name": "billing_payment_attempts_invoice_fk",
-          "tableFrom": "billing_payment_attempts",
-          "tableTo": "billing_invoices",
-          "columnsFrom": [
-            "tenant_id",
-            "invoice_id"
-          ],
-          "columnsTo": [
-            "tenant_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.billing_subscriptions": {
-      "name": "billing_subscriptions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "plan_id": {
-          "name": "plan_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider_id": {
-          "name": "provider_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_status": {
-          "name": "provider_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "provider_updated_at": {
-          "name": "provider_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "billing_subscriptions_tenant_idx": {
-          "name": "billing_subscriptions_tenant_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "billing_subscriptions_tenant_id_tenants_id_fk": {
-          "name": "billing_subscriptions_tenant_id_tenants_id_fk",
-          "tableFrom": "billing_subscriptions",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "billing_subscriptions_plan_id_plans_id_fk": {
-          "name": "billing_subscriptions_plan_id_plans_id_fk",
-          "tableFrom": "billing_subscriptions",
-          "tableTo": "plans",
-          "columnsFrom": [
-            "plan_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "billing_subscriptions_provider_id_unique": {
-          "name": "billing_subscriptions_provider_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "provider_id"
-          ]
-        },
-        "billing_subscriptions_tenant_id_id_unique": {
-          "name": "billing_subscriptions_tenant_id_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "tenant_id",
-            "id"
-          ]
-        }
-      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2439,12 +2056,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "past_due_at": {
-          "name": "past_due_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "timezone": {
           "name": "timezone",
           "type": "text",
@@ -3213,6 +2824,417 @@
       },
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.push_subscriptions": {
+      "name": "push_subscriptions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endpoint_hash": {
+          "name": "endpoint_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endpoint": {
+          "name": "endpoint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "p256dh": {
+          "name": "p256dh",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auth": {
+          "name": "auth",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "push_subscriptions_tenant_user_idx": {
+          "name": "push_subscriptions_tenant_user_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "push_subscriptions_tenant_id_tenants_id_fk": {
+          "name": "push_subscriptions_tenant_id_tenants_id_fk",
+          "tableFrom": "push_subscriptions",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "push_subscriptions_membership_fk": {
+          "name": "push_subscriptions_membership_fk",
+          "tableFrom": "push_subscriptions",
+          "tableTo": "memberships",
+          "columnsFrom": [
+            "user_id",
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "user_id",
+            "tenant_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "push_subscriptions_endpoint_hash_unique": {
+          "name": "push_subscriptions_endpoint_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "endpoint_hash"
+          ]
+        },
+        "push_subscriptions_tenant_id_id_unique": {
+          "name": "push_subscriptions_tenant_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.push_events": {
+      "name": "push_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_key": {
+          "name": "event_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expanded_at": {
+          "name": "expanded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "push_events_tenant_id_tenants_id_fk": {
+          "name": "push_events_tenant_id_tenants_id_fk",
+          "tableFrom": "push_events",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "push_events_booking_fk": {
+          "name": "push_events_booking_fk",
+          "tableFrom": "push_events",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "tenant_id",
+            "booking_id"
+          ],
+          "columnsTo": [
+            "tenant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "push_events_identity_unique": {
+          "name": "push_events_identity_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "booking_id",
+            "event_type",
+            "event_key"
+          ]
+        },
+        "push_events_tenant_id_id_unique": {
+          "name": "push_events_tenant_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "push_events_type_check": {
+          "name": "push_events_type_check",
+          "value": "\"push_events\".\"event_type\" in ('booking_created', 'booking_canceled', 'booking_rescheduled')"
+        },
+        "push_events_key_length_check": {
+          "name": "push_events_key_length_check",
+          "value": "length(\"push_events\".\"event_key\") between 1 and 160"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.push_deliveries": {
+      "name": "push_deliveries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_id": {
+          "name": "event_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subscription_id": {
+          "name": "subscription_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expiration_reason": {
+          "name": "expiration_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subscription_version": {
+          "name": "subscription_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "push_deliveries_status_created_idx": {
+          "name": "push_deliveries_status_created_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "push_deliveries_tenant_id_tenants_id_fk": {
+          "name": "push_deliveries_tenant_id_tenants_id_fk",
+          "tableFrom": "push_deliveries",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "push_deliveries_event_fk": {
+          "name": "push_deliveries_event_fk",
+          "tableFrom": "push_deliveries",
+          "tableTo": "push_events",
+          "columnsFrom": [
+            "tenant_id",
+            "event_id"
+          ],
+          "columnsTo": [
+            "tenant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "push_deliveries_subscription_fk": {
+          "name": "push_deliveries_subscription_fk",
+          "tableFrom": "push_deliveries",
+          "tableTo": "push_subscriptions",
+          "columnsFrom": [
+            "tenant_id",
+            "subscription_id"
+          ],
+          "columnsTo": [
+            "tenant_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "push_deliveries_event_subscription_unique": {
+          "name": "push_deliveries_event_subscription_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "event_id",
+            "subscription_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "push_deliveries_status_check": {
+          "name": "push_deliveries_status_check",
+          "value": "\"push_deliveries\".\"status\" in ('pending', 'processing', 'sent', 'expired', 'uncertain')"
+        },
+        "push_deliveries_expiration_reason_check": {
+          "name": "push_deliveries_expiration_reason_check",
+          "value": "\"push_deliveries\".\"expiration_reason\" is null or \"push_deliveries\".\"expiration_reason\" in ('event_old', 'subscription_gone')"
+        }
+      },
       "isRLSEnabled": false
     }
   },
