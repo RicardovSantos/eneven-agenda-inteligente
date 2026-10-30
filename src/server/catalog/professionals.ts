@@ -1,11 +1,13 @@
-import { and, count, eq, gt, inArray, isNull, max, ne } from "drizzle-orm";
+import { and, count, eq, gt, inArray, isNull, max, ne, sql } from "drizzle-orm";
 import {
   bookings,
   businessHours,
   professionalHours,
   professionalServices,
   professionals,
+  plans,
   services,
+  tenants,
 } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { isProfessionalColor } from "@/lib/professional-colors";
@@ -17,7 +19,7 @@ import {
   validateWeeklyHours,
   type WeeklyHours,
 } from "@/lib/weekly-hours";
-import { withTenant, type TenantTx } from "@/server/tenant-db";
+import { withTenant, withTenantTx, type TenantTx } from "@/server/tenant-db";
 import { notFoundError, validationError } from "./errors";
 import { isUuid } from "./services";
 
@@ -168,7 +170,22 @@ export async function saveProfessional(
   const data = validate(input);
   if (input.id !== undefined && !isUuid(input.id)) throw notFoundError();
 
-  return withTenant(db, tenantId, async (tx) => {
+  return db.transaction(async (outer) => {
+    await outer.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}))`);
+    const [plan] = await outer.select({ limit: plans.maxProfessionals }).from(tenants)
+      .innerJoin(plans, eq(tenants.planId, plans.id)).where(eq(tenants.id, tenantId)).limit(1);
+    if (!plan) throw notFoundError();
+    return withTenantTx(outer, tenantId, async (tx) => {
+    if (data.active) {
+      const [existing] = input.id ? await tx.select({ active: professionals.active }).from(professionals)
+        .where(and(eq(professionals.tenantId, tenantId), eq(professionals.id, input.id))).limit(1) : [];
+      if (input.id && !existing) throw notFoundError();
+      if (!existing?.active && plan.limit !== null) {
+        const [active] = await tx.select({ n: count() }).from(professionals)
+          .where(and(eq(professionals.tenantId, tenantId), eq(professionals.active, true)));
+        if (active.n >= plan.limit) throw validationError({ active: `Seu plano permite até ${plan.limit} profissionais ativos.` });
+      }
+    }
     const outside = outsideBusinessHours(data.hours, await loadBusinessWeek(tx, tenantId));
     if (WEEKDAYS.some((d) => outside[d])) {
       throw validationError({ hours: OUTSIDE_BUSINESS_HOURS_MESSAGE });
@@ -239,6 +256,7 @@ export async function saveProfessional(
       );
     }
     return { id };
+    });
   });
 }
 

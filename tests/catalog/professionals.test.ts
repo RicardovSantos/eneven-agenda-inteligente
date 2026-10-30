@@ -69,6 +69,16 @@ async function expectValidation(promise: Promise<unknown>, field?: string) {
 }
 
 describe("saveProfessional", () => {
+  it("limita criação e reativação sem impedir edição ou profissionais inativos", async () => {
+    const first = await saveProfessional(db, tenantId, base);
+    const second = await saveProfessional(db, tenantId, { ...base, name: "Ana" });
+    const inactive = await saveProfessional(db, tenantId, { ...base, name: "Clara", active: false });
+    await expectValidation(saveProfessional(db, tenantId, { ...base, name: "Dora" }), "active");
+    await expectValidation(saveProfessional(db, tenantId, { ...base, id: inactive.id }), "active");
+    await saveProfessional(db, tenantId, { ...base, id: first.id, name: "Editada" });
+    await deactivateProfessional(db, tenantId, second.id);
+    await saveProfessional(db, tenantId, { ...base, id: inactive.id });
+  });
   it("cria com cor, serviços e expediente, e lista de volta", async () => {
     const s = await service();
     const { id } = await saveProfessional(db, tenantId, {
