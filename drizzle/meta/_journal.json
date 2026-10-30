@@ -106,6 +106,13 @@
       "when": 1793376469727,
       "tag": "0014_productive_celestials",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793376757400,
+      "tag": "0015_chief_invaders",
+      "breakpoints": true
     }
   ]
 }

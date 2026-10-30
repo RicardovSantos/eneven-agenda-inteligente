@@ -1,0 +1,47 @@
+import { createECDH } from "node:crypto";
+import { afterEach, expect, it, vi } from "vitest";
+import { memberships, pushDeliveries, pushEvents, pushSubscriptions, users } from "@/db/schema";
+import { processTestPushQueue } from "@/server/push/process-test-queue";
+import { POST } from "@/app/api/cron/notificacoes/route";
+import { seedBooking, seedTenant } from "../helpers/agenda-fixtures";
+import { createTestDb } from "../helpers/test-db";
+
+afterEach(() => vi.unstubAllEnvs());
+
+it("processa uma vez por dispositivo e retém falha incerta", async () => {
+  const db = await createTestDb();
+  const tenant = await seedTenant(db);
+  const booking = await seedBooking(db, tenant.id);
+  const [user] = await db.insert(users).values({ name: "Dona", email: "owner@example.com" }).returning();
+  await db.insert(memberships).values({ userId: user.id, tenantId: tenant.id, role: "owner" });
+  const now = new Date();
+  const key = createECDH("prime256v1"); key.generateKeys();
+  const base = { tenantId: tenant.id, userId: user.id, p256dh: key.getPublicKey().toString("base64url"), auth: Buffer.alloc(16, 1).toString("base64url") };
+  await db.insert(pushSubscriptions).values([
+    { ...base, endpointHash: "a", endpoint: "https://fcm.googleapis.com/a", createdAt: new Date(now.getTime() - 7 * 60_000) },
+    { ...base, endpointHash: "b", endpoint: "https://fcm.googleapis.com/b", createdAt: new Date(now.getTime() - 7 * 60_000) },
+    { ...base, endpointHash: "later", endpoint: "https://fcm.googleapis.com/c", createdAt: new Date(now.getTime() + 1000) },
+  ]);
+  await db.insert(pushEvents).values({ tenantId: tenant.id, bookingId: booking.id, eventType: "booking_created", eventKey: "created", createdAt: now });
+  const sender = vi.fn(async (input: unknown) => {
+    if ((input as { endpoint: string }).endpoint.endsWith("/b")) throw new Error("resultado incerto");
+    return "sent" as const;
+  });
+  expect(await processTestPushQueue(db, sender, now)).toEqual({ expanded: 1, sent: 1, expired: 0, uncertain: 1 });
+  expect((await db.select().from(pushDeliveries)).map((item) => item.status).sort()).toEqual(["sent", "uncertain"]);
+  expect(await processTestPushQueue(db, sender, now)).toEqual({ expanded: 0, sent: 0, expired: 0, uncertain: 0 });
+  expect(sender).toHaveBeenCalledTimes(2);
+  await db.insert(pushEvents).values({ tenantId: tenant.id, bookingId: booking.id, eventType: "booking_canceled", eventKey: "old", createdAt: new Date(now.getTime() - 6 * 60_000) });
+  expect(await processTestPushQueue(db, sender, now)).toEqual({ expanded: 1, sent: 0, expired: 2, uncertain: 0 });
+  expect(sender).toHaveBeenCalledTimes(2);
+});
+
+it("nega a rota de processamento em produção ou sem autorização", async () => {
+  const request = (auth = "") => new Request("http://localhost/api/cron/notificacoes", { method: "POST", headers: { authorization: auth } });
+  vi.stubEnv("NODE_ENV", "production");
+  expect((await POST(request())).status).toBe(503);
+  vi.stubEnv("NODE_ENV", "test"); vi.stubEnv("CRON_SECRET", "secret");
+  expect((await POST(request("Bearer wrong"))).status).toBe(401);
+  vi.stubEnv("PUSH_TEST_ONLY", "false");
+  expect((await POST(request("Bearer secret"))).status).toBe(503);
+});
