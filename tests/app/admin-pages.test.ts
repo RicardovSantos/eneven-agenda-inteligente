@@ -15,13 +15,14 @@ function pagesUnder(dir: string): string[] {
 describe("guarda: páginas da plataforma (/admin)", () => {
   const pages = pagesUnder(root);
 
-  it("existem as quatro telas", () => {
+  it("existem as telas da plataforma", () => {
     const rel = pages.map((p) => path.relative(root, p).replaceAll("\\", "/")).sort();
     expect(rel).toEqual([
       "estabelecimentos/[id]/page.tsx",
       "estabelecimentos/novo/page.tsx",
       "page.tsx",
       "planos/page.tsx",
+      "whatsapp/page.tsx",
     ]);
   });
 
