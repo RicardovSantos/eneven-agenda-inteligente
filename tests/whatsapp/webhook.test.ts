@@ -229,6 +229,7 @@ describe("Meta WhatsApp Webhook Handling", () => {
         tx.select().from(bookings).where(eq(bookings.id, booking.id)),
       );
       expect(updated.status).toBe("confirmed");
+      expect(updated.confirmedViaWhatsappAt).toBeInstanceOf(Date);
     });
 
     it("atualiza agendamento para canceled ao receber clique em CANCEL", async () => {
