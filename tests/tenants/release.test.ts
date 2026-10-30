@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isTenantActive, isTenantReleased } from "@/server/tenants/release";
+import { billingGraceEndsAt, isTenantActive, isTenantReleased } from "@/server/tenants/release";
 
 const NOW = new Date("2030-01-10T12:00:00.000Z");
 const future = new Date("2030-01-20T12:00:00.000Z");
@@ -22,6 +22,8 @@ describe("isTenantActive", () => {
   it("permite acesso por sete dias completos após o atraso informado", () => {
     const start = new Date("2030-01-03T12:00:00.000Z");
     const tenant = { status: "past_due" as const, trialEndsAt: past, pastDueAt: start };
+    expect(billingGraceEndsAt(start)).toEqual(NOW);
+    expect(billingGraceEndsAt(null)).toBeNull();
     expect(isTenantActive(tenant, new Date(NOW.getTime() - 1))).toBe(true);
     expect(isTenantActive(tenant, NOW)).toBe(false);
     expect(isTenantActive({ ...tenant, pastDueAt: null }, NOW)).toBe(false);

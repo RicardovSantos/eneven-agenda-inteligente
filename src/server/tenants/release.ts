@@ -4,16 +4,24 @@ type TenantTiming = {
   pastDueAt?: Date | null;
 };
 
+/** Fim da carência medido em sete períodos completos de 24 horas. */
+export function billingGraceEndsAt(pastDueAt: Date | null | undefined): Date | null {
+  if (!pastDueAt || !Number.isFinite(pastDueAt.getTime())) return null;
+  const end = new Date(pastDueAt.getTime() + 7 * 86_400_000);
+  return Number.isFinite(end.getTime()) ? end : null;
+}
+
 /**
  * Regra única de "estabelecimento ativo": plano `active` ou teste (`trial`)
  * ainda dentro do prazo. Usada pela página pública (`canBook`) e pelo painel
  * (link "Seu link"), para os dois nunca divergirem.
  */
 export function isTenantActive(tenant: TenantTiming, now: Date = new Date()): boolean {
+  const graceEnd = billingGraceEndsAt(tenant.pastDueAt);
   return (
     tenant.status === "active" ||
     (tenant.status === "trial" && tenant.trialEndsAt.getTime() > now.getTime()) ||
-    (tenant.status === "past_due" && !!tenant.pastDueAt && Number.isFinite(tenant.pastDueAt.getTime()) && tenant.pastDueAt.getTime() <= now.getTime() && now.getTime() < tenant.pastDueAt.getTime() + 7 * 86_400_000)
+    (tenant.status === "past_due" && !!tenant.pastDueAt && !!graceEnd && tenant.pastDueAt.getTime() <= now.getTime() && now.getTime() < graceEnd.getTime())
   );
 }
 
