@@ -1,5 +1,5 @@
-import { and, eq, inArray } from "drizzle-orm";
-import { auditLog, billingInvoices, billingSubscriptions, tenants } from "@/db/schema";
+import { and, eq, inArray, ne } from "drizzle-orm";
+import { auditLog, billingInvoices, billingPaymentAttempts, billingSubscriptions, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
 
 /** Simulação: nunca desbloqueia bloqueio manual ou cancelamento em produção. */
@@ -12,11 +12,15 @@ export async function reconcileTestBillingAccess(db: Db, tenantId: string, now =
     // Bloqueios manuais e cancelamentos só podem ser alterados por ação explícita.
     if (tenant.status === "read_only" || tenant.status === "canceled") return "unchanged";
     const subscriptions = await tx.select().from(billingSubscriptions)
-      .where(and(eq(billingSubscriptions.tenantId, tenantId), eq(billingSubscriptions.planId, tenant.planId), inArray(billingSubscriptions.providerStatus, ["authorized", "paused", "canceled"]))).for("update");
-    if (subscriptions.length !== 1 || subscriptions[0].providerStatus !== "authorized" || !subscriptions[0].providerId || !subscriptions[0].providerUpdatedAt) return "review";
+      .where(and(eq(billingSubscriptions.tenantId, tenantId), ne(billingSubscriptions.providerStatus, "abandoned"))).for("update");
+    if (subscriptions.length !== 1 || subscriptions[0].planId !== tenant.planId || subscriptions[0].providerStatus !== "authorized" || !subscriptions[0].providerId || !subscriptions[0].providerUpdatedAt) return "review";
     const invoices = await tx.select().from(billingInvoices)
       .where(and(eq(billingInvoices.tenantId, tenantId), eq(billingInvoices.subscriptionId, subscriptions[0].id))).for("update");
     if (!invoices.length) return "unchanged";
+    // Uma tentativa aprovada não deve esconder outro pagamento estornado ou contestado.
+    const disputed = await tx.select({ paymentId: billingPaymentAttempts.paymentId }).from(billingPaymentAttempts)
+      .where(and(eq(billingPaymentAttempts.tenantId, tenantId), inArray(billingPaymentAttempts.invoiceId, invoices.map((invoice) => invoice.id)), inArray(billingPaymentAttempts.status, ["refunded", "charged_back"]))).limit(1);
+    if (disputed.length) return "review";
     // Não libera acesso com informação incompleta, devolução ou contestação.
     if (invoices.some((invoice) => !invoice.invoiceUpdatedAt || !invoice.dueAt || !["pending", "in_process", "rejected", "approved"].includes(invoice.providerStatus) || (invoice.providerStatus !== "pending" && (!invoice.paymentId || !invoice.providerUpdatedAt)) || (invoice.providerStatus === "approved" && !invoice.paidAt))) return "review";
     const overdue = invoices.filter((invoice) => invoice.providerStatus !== "approved" && invoice.dueAt!.getTime() <= now.getTime()).sort((a, b) => a.dueAt!.getTime() - b.dueAt!.getTime());

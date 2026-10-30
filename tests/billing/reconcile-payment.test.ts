@@ -18,6 +18,8 @@ it("concilia somente pagamento correspondente e não regride eventos antigos", a
   expect(await reconcilePayment(db, "123", config)).toBe("unchanged");
   const old = { ...payment, status: "pending", date_last_updated: "2030-01-01T00:00:00Z" };
   expect(await reconcilePayment(db, "123", { ...config, fetcher: async () => new Response(JSON.stringify(old)) })).toBe("unchanged");
+  const ambiguous = { ...payment, status: "refunded", date_approved: null };
+  await expect(reconcilePayment(db, "123", { ...config, fetcher: async () => new Response(JSON.stringify(ambiguous)) })).rejects.toThrow("ambígua");
   const [stored] = await db.select().from(billingInvoices).where(eq(billingInvoices.id, invoice.id));
   expect(stored.providerStatus).toBe("approved");
   expect(stored.paymentId).toBe("123");

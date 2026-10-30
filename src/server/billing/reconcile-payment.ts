@@ -33,7 +33,10 @@ export async function reconcilePayment(db: Db, paymentId: string, config: {
     })) throw new Error("Pagamento não corresponde à fatura.");
     const [prior] = await tx.select().from(billingPaymentAttempts).where(eq(billingPaymentAttempts.paymentId, paymentId)).limit(1);
     if (prior && (prior.tenantId !== invoice.tenantId || prior.invoiceId !== invoice.id)) throw new Error("Pagamento vinculado a outra fatura.");
-    if (prior && prior.providerUpdatedAt >= updatedAt) return "unchanged";
+    if (prior && prior.providerUpdatedAt >= updatedAt) {
+      if (prior.providerUpdatedAt.getTime() === updatedAt.getTime() && (prior.status !== payment.status || (prior.paidAt?.getTime() ?? null) !== (paidAt?.getTime() ?? null))) throw new Error("Atualização de pagamento ambígua.");
+      return "unchanged";
+    }
     const values = { status: payment.status as string, providerUpdatedAt: updatedAt, paidAt };
     if (prior) await tx.update(billingPaymentAttempts).set(values).where(eq(billingPaymentAttempts.paymentId, paymentId));
     else await tx.insert(billingPaymentAttempts).values({ paymentId, tenantId: invoice.tenantId, invoiceId: invoice.id, ...values });
