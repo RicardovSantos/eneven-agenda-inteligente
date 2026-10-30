@@ -1,13 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { demoServices as services, demoTimes as times } from "./dados";
 
-const services = [
-  { name: "Corte e finalização", duration: "45 min", price: "R$ 65" },
-  { name: "Manicure", duration: "40 min", price: "R$ 40" },
-  { name: "Escova", duration: "30 min", price: "R$ 45" },
-];
-const times = ["09:00", "10:30", "14:00", "15:30"];
 
 export function DemoBooking() {
   const [service, setService] = useState<number | null>(null);
@@ -19,11 +15,12 @@ export function DemoBooking() {
         <p className="text-sm font-semibold text-primary">Eneven Agenda · Demonstração</p>
         <h1 className="mt-4 font-heading text-3xl font-bold sm:text-4xl">Studio Exemplo</h1>
         <p className="mt-2 text-ink-muted">Veja como seus clientes podem escolher um serviço e um horário.</p>
-        <p className="mt-5 rounded-xl border border-line bg-surface p-4 text-sm text-ink-muted">Esta é uma simulação: nenhum horário será reservado e nenhuma mensagem será enviada.</p>
+        <p className="mt-5 rounded-xl border border-line bg-surface p-4 text-sm text-ink-muted">Esta é uma simulação: nenhum horário será reservado e nenhuma mensagem será enviada. <Link className="font-semibold text-primary underline" href="/demo/painel">Ver painel de exemplo</Link></p>
         {finished ? (
           <section className="mt-6 rounded-2xl border border-line bg-surface p-6" aria-live="polite">
             <h2 className="font-heading text-xl font-semibold">Simulação concluída</h2>
             <p className="mt-2 text-ink-muted">{services[service!].name} às {time}. Este agendamento é fictício.</p>
+            <Link href={`/demo/painel?servico=${service}&horario=${encodeURIComponent(time ?? "")}`} className="mt-5 block font-semibold text-primary underline">Ver no painel de exemplo</Link>
             <button className="mt-6 rounded-xl bg-primary px-5 py-3 font-semibold text-white" onClick={() => { setService(null); setTime(null); setFinished(false); }}>Simular novamente</button>
           </section>
         ) : (
