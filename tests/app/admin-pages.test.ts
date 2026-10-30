@@ -18,6 +18,7 @@ describe("guarda: páginas da plataforma (/admin)", () => {
   it("existem as telas da plataforma", () => {
     const rel = pages.map((p) => path.relative(root, p).replaceAll("\\", "/")).sort();
     expect(rel).toEqual([
+      "cobranca/page.tsx",
       "estabelecimentos/[id]/page.tsx",
       "estabelecimentos/novo/page.tsx",
       "page.tsx",

@@ -8,7 +8,7 @@ const statusLabel: Record<string, string> = { pending: "Pendente", approved: "Pa
 
 export default async function AssinaturaPage() {
   const { session, timezone } = await requirePanelRole(["owner"]);
-  const { current, available, invoices } = await getBillingOverview(await getDb(), session.tenantId);
+  const { current, available, invoices, pendingCheckoutUrl } = await getBillingOverview(await getDb(), session.tenantId);
   const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: timezone });
   return <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
     <Link href="/painel/configuracoes" className="text-sm text-primary">‹ Configurações</Link>
@@ -24,6 +24,7 @@ export default async function AssinaturaPage() {
         <p className="text-sm text-ink-muted">{plan.maxProfessionals === null ? "Profissionais ilimitados" : `Até ${plan.maxProfessionals} profissionais`} · {plan.monthlyMessages} mensagens por mês</p>
       </li>)}</ul>
       <p className="mt-3 text-sm text-ink-muted">A contratação e a troca de plano estarão disponíveis em breve.</p>
+      {process.env.NODE_ENV !== "production" && pendingCheckoutUrl ? <a className="mt-3 inline-block text-primary" href={pendingCheckoutUrl} target="_blank" rel="noopener noreferrer">Continuar assinatura de teste →</a> : null}
     </section>
     <section className="rounded-card border border-line bg-surface p-5">
       <h2 className="font-semibold">Faturas</h2>

@@ -51,6 +51,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       </div>
 
       <MetricsCards metrics={metrics} />
+      {process.env.NODE_ENV !== "production" ? <Link href="/admin/cobranca" className="text-primary">Revisar assinaturas de teste →</Link> : null}
 
       <section className="rounded-panel border border-line bg-surface p-5">
         <h2 className="font-semibold">WhatsApp da plataforma</h2>

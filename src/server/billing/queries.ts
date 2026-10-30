@@ -1,5 +1,5 @@
-import { asc, desc, eq } from "drizzle-orm";
-import { billingInvoices, plans, tenants } from "@/db/schema";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { billingInvoices, billingSubscriptions, plans, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { withTenant } from "@/server/tenant-db";
 
@@ -12,5 +12,8 @@ export async function getBillingOverview(db: Db, tenantId: string) {
     .from(plans).where(eq(plans.active, true)).orderBy(asc(plans.sortOrder));
   const invoices = await withTenant(db, tenantId, (tx) => tx.select({ id: billingInvoices.id, amountCents: billingInvoices.amountCents, status: billingInvoices.providerStatus, dueAt: billingInvoices.dueAt, paidAt: billingInvoices.paidAt })
     .from(billingInvoices).where(eq(billingInvoices.tenantId, tenantId)).orderBy(desc(billingInvoices.createdAt), desc(billingInvoices.id)).limit(100));
-  return { current, available, invoices };
+  const [pending] = await withTenant(db, tenantId, (tx) => tx.select({ checkoutUrl: billingSubscriptions.checkoutUrl }).from(billingSubscriptions)
+    .where(and(eq(billingSubscriptions.tenantId, tenantId), eq(billingSubscriptions.providerStatus, "pending")))
+    .orderBy(desc(billingSubscriptions.createdAt)).limit(1));
+  return { current, available, invoices, pendingCheckoutUrl: pending?.checkoutUrl ?? null };
 }

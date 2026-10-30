@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { auditLog, billingSubscriptions } from "@/db/schema";
-import { recoverTestSubscription } from "@/server/billing/recover-subscription";
+import { abandonTestSubscription, recoverTestSubscription } from "@/server/billing/recover-subscription";
 import { seedTenant } from "../helpers/agenda-fixtures";
 import { seedSuperAdmin } from "../helpers/platform-fixtures";
 import { createTestDb } from "../helpers/test-db";
@@ -21,4 +21,18 @@ it("recupera apenas assinatura correspondente e registra auditoria", async () =>
   expect(saved).toMatchObject({ providerStatus: "pending", providerId: "sub-test" });
   expect(await db.select().from(auditLog).where(eq(auditLog.action, "billing.subscription_recovered"))).toHaveLength(1);
   await expect(recoverTestSubscription(db, input, config)).rejects.toThrow("indisponível");
+});
+
+it("registra liberação após verificação manual e não libera tentativa em andamento", async () => {
+  const db = await createTestDb();
+  const tenant = await seedTenant(db);
+  const actor = await seedSuperAdmin(db);
+  const [attempt] = await db.insert(billingSubscriptions).values({ tenantId: tenant.id, planId: tenant.planId, providerStatus: "creating", priceCents: 3990 }).returning();
+  const now = new Date(attempt.createdAt.getTime() + 60_000);
+  await expect(abandonTestSubscription(db, attempt.id, actor.id, now)).rejects.toThrow("indisponível");
+  await abandonTestSubscription(db, attempt.id, actor.id, new Date(now.getTime() + 5 * 60_000));
+  const [saved] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.id, attempt.id));
+  expect(saved.providerStatus).toBe("abandoned");
+  expect(await db.select().from(auditLog).where(eq(auditLog.action, "billing.subscription_abandoned"))).toHaveLength(1);
+  await expect(abandonTestSubscription(db, attempt.id, actor.id, now)).rejects.toThrow("indisponível");
 });

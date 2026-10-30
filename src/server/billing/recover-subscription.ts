@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import { auditLog, billingSubscriptions } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { fetchMercadoPagoResource } from "./mercado-pago-client";
@@ -21,5 +21,19 @@ export async function recoverTestSubscription(db: Db, input: {
       .where(and(eq(billingSubscriptions.id, subscription.id), inArray(billingSubscriptions.providerStatus, ["creating", "uncertain"]))).returning({ id: billingSubscriptions.id });
     if (updated.length !== 1) throw new Error("Ocorrência já foi resolvida.");
     await tx.insert(auditLog).values({ actorUserId: input.actorUserId, tenantId: subscription.tenantId, action: "billing.subscription_recovered", details: { subscriptionId: subscription.id, providerId: verified.id } });
+  });
+}
+
+/** O operador confirma ausência no provedor; esta operação não cancela assinatura remota. */
+export async function abandonTestSubscription(db: Db, subscriptionId: string, actorUserId: string, now = new Date()): Promise<void> {
+  if (process.env.NODE_ENV === "production") throw new Error("Indisponível em produção.");
+  if (!UUID.test(subscriptionId) || !UUID.test(actorUserId) || !Number.isFinite(now.getTime())) throw new Error("Dados inválidos.");
+  const stale = new Date(now.getTime() - 5 * 60_000);
+  await db.transaction(async (tx) => {
+    const updated = await tx.update(billingSubscriptions).set({ providerStatus: "abandoned" })
+      .where(and(eq(billingSubscriptions.id, subscriptionId), isNull(billingSubscriptions.providerId), or(eq(billingSubscriptions.providerStatus, "uncertain"), and(eq(billingSubscriptions.providerStatus, "creating"), lte(billingSubscriptions.createdAt, stale)))))
+      .returning({ id: billingSubscriptions.id, tenantId: billingSubscriptions.tenantId });
+    if (!updated.length) throw new Error("Ocorrência indisponível.");
+    await tx.insert(auditLog).values({ actorUserId, tenantId: updated[0].tenantId, action: "billing.subscription_abandoned", details: { subscriptionId } });
   });
 }
