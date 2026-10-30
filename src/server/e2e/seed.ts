@@ -6,6 +6,7 @@ import {
   bookings,
   customers,
   memberships,
+  plans,
   professionals,
   services,
   tenants,
@@ -76,6 +77,11 @@ export async function seedE2eTenant(db: Db, options: SeedTenantOptions = {}) {
     emailVerifiedAt: options.verified === false ? null : new Date(),
   });
 
+  // Cenários que precisam de três profissionais usam o plano sem limite.
+  const [studio] = (options.extraProfessionals?.length ?? 0) > 1
+    ? await db.select({ id: plans.id }).from(plans).where(eq(plans.code, "studio")).limit(1)
+    : [];
+
   await db
     .update(tenants)
     .set({
@@ -83,6 +89,7 @@ export async function seedE2eTenant(db: Db, options: SeedTenantOptions = {}) {
       address: options.address ?? "Rua Augusta, 120",
       about: options.about ?? null,
       status: options.status ?? "trial",
+      ...(studio ? { planId: studio.id } : {}),
       // Sem o assistente de primeiros passos: o painel abre direto na agenda.
       onboardingCompletedAt: new Date(),
       ...(options.trialEndsAt ? { trialEndsAt: new Date(options.trialEndsAt) } : {}),
