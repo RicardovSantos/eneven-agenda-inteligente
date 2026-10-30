@@ -20,6 +20,8 @@ describe("agendamento de lembretes", () => {
     const [row] = await withTenant(db, a.id, (tx) => tx.select().from(whatsappQueue));
     expect(row.bookingId).toBe(booking.id);
     expect(row.scheduledFor.toISOString()).toBe("2030-10-14T21:00:00.000Z");
+    expect(await scheduleRemindersForTenant(db, a.id, new Date("2030-10-14T21:01:00Z"))).toBe(0);
+    expect(await withTenant(db, a.id, (tx) => tx.select().from(whatsappQueue))).toHaveLength(1);
     const moved = new Date("2030-10-16T12:00:00Z");
     await withTenant(db, a.id, (tx) => tx.update(bookings).set({ startsAt: moved, endsAt: new Date(moved.getTime() + 1_800_000), blockedUntil: new Date(moved.getTime() + 1_800_000) }).where(eq(bookings.id, booking.id)));
     expect(await scheduleRemindersForTenant(db, a.id, now)).toBe(1);

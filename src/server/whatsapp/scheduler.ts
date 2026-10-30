@@ -33,7 +33,7 @@ export async function scheduleRemindersForTenant(db: Db, tenantId: string, now: 
         { templateType: "reminder_eve" as const, enabled: settings?.reminderEve ?? true, scheduledFor: times.eve },
         { templateType: "reminder_2h" as const, enabled: (settings?.reminder2h ?? false) && ["profissional", "studio"].includes(tenant.planCode), scheduledFor: times.twoHours },
       ]) {
-        if (!item.enabled || item.scheduledFor <= now) {
+        if (!item.enabled) {
           await tx.delete(whatsappQueue).where(and(
             eq(whatsappQueue.tenantId, tenantId), eq(whatsappQueue.bookingId, booking.id),
             eq(whatsappQueue.templateType, item.templateType), eq(whatsappQueue.eventKey, eventKey),
@@ -41,6 +41,9 @@ export async function scheduleRemindersForTenant(db: Db, tenantId: string, now: 
           ));
           continue;
         }
+        // O worker processa os itens que já chegaram ao horário. Não os apague
+        // aqui nem crie lembretes atrasados que nunca foram agendados.
+        if (item.scheduledFor <= now) continue;
         const inserted = await tx.insert(whatsappQueue).values({ tenantId, bookingId: booking.id, templateType: item.templateType, scheduledFor: item.scheduledFor, eventKey })
           .onConflictDoNothing().returning({ id: whatsappQueue.id });
         added += inserted.length;
