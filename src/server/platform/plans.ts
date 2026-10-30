@@ -65,7 +65,8 @@ export type PlanInput = z.input<typeof planSchema>;
 
 /**
  * Edita um plano. Desativar só esconde o plano da escolha (quem já está nele
- * continua) e o limite de profissionais ainda não é aplicado.
+ * continua). O limite de profissionais vale para novas ativações; reduzir o
+ * limite não desativa profissionais existentes automaticamente.
  */
 export async function updatePlan(
   db: Db,

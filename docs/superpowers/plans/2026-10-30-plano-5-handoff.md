@@ -6,4 +6,4 @@ As credenciais da Meta e o segredo do cron não estavam configurados no serviço
 
 A branch `plano-5` parte da `main` após o deploy. A próxima etapa definida na especificação é cobrança por Mercado Pago, limite de profissionais e carência de 7 dias. A limitação de profissionais ativos foi iniciada em `src/server/catalog/professionals.ts`, com trava para criação/reativação simultânea. Os testes de catálogo e typecheck passaram; conferir o teste PostgreSQL concorrente no CI. Revisar ainda a concorrência com alteração administrativa de plano/limite e o comportamento de downgrade antes de concluir a tarefa.
 
-Ainda não há plano detalhado nem implementação de cobrança. Antes de codificar a integração de pagamento, verificar documentação oficial atual e definir testes de webhook, idempotência e isolamento.
+As decisões iniciais e referências oficiais da cobrança estão em `2026-10-30-plano-5-cobranca.md`. Ainda não há implementação de cobrança; é necessário detalhar e implementar testes de webhook, idempotência e isolamento.

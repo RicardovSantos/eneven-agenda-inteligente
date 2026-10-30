@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { auditLog, plans, tenants, users } from "@/db/schema";
 import type { Db } from "@/db/types";
@@ -41,6 +41,7 @@ export async function changePlan(
   planId: string,
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}))`);
     const tenant = await loadTenant(tx, tenantId);
     if (!UUID.test(planId)) throw new PlatformError("not_found", "Plano não encontrado.");
     const [plan] = await tx.select().from(plans).where(eq(plans.id, planId)).limit(1);

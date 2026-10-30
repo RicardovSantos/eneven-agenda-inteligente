@@ -173,7 +173,7 @@ export async function saveProfessional(
   return db.transaction(async (outer) => {
     await outer.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}))`);
     const [plan] = await outer.select({ limit: plans.maxProfessionals }).from(tenants)
-      .innerJoin(plans, eq(tenants.planId, plans.id)).where(eq(tenants.id, tenantId)).limit(1);
+      .innerJoin(plans, eq(tenants.planId, plans.id)).where(eq(tenants.id, tenantId)).limit(1).for("share");
     if (!plan) throw notFoundError();
     return withTenantTx(outer, tenantId, async (tx) => {
     if (data.active) {
