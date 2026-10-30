@@ -765,6 +765,19 @@ export const billingSubscriptions = pgTable("billing_subscriptions", {
   index("billing_subscriptions_tenant_idx").on(t.tenantId, t.createdAt),
 ]);
 
+/** Reserva idempotente de aviso; resultados incertos não são reenviados automaticamente. */
+export const billingNotices = pgTable("billing_notices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  pastDueAt: timestamptz("past_due_at").notNull(),
+  state: text("state").notNull().default("sending"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  completedAt: timestamptz("completed_at"),
+}, (t) => [
+  unique("billing_notices_tenant_due_unique").on(t.tenantId, t.pastDueAt),
+  check("billing_notices_state_check", sql`${t.state} in ('sending', 'sent', 'uncertain')`),
+]);
+
 /** Faturas identificadas pelo provedor, sempre vinculadas à assinatura do mesmo tenant. */
 export const billingInvoices = pgTable("billing_invoices", {
   id: uuid("id").primaryKey().defaultRandom(),

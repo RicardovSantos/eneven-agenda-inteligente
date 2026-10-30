@@ -176,6 +176,13 @@
       "when": 1793388697878,
       "tag": "0024_watery_wild_child",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793389328686,
+      "tag": "0025_sudden_iron_fist",
+      "breakpoints": true
     }
   ]
 }

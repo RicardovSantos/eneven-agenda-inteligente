@@ -1,6 +1,8 @@
 # Plano 6 — demonstração, dados e notificações
 
-A prévia da demonstração e a base das notificações foram integradas à `main`. Confirme o commit mais recente, CI e deploy antes de continuar. A cobrança permanece separada na branch `plano-5` e ainda não foi integrada. O Plano 6 está incompleto e o envio de notificações não está ativo.
+A prévia da demonstração e a base das notificações foram integradas à `main`. Na conferência do Easypanel em 30/10/2026, a produção ainda mostrava o commit `a84a5a5` do Plano 4, apesar da `main` mais recente; o contêiner estava saudável e o domínio retornou HTTP 200. O deploy da prévia e das migrações 0013–0016 não foi confirmado. A cobrança permanece separada na branch `plano-5` e ainda não foi integrada. O Plano 6 está incompleto e o envio de notificações não está ativo.
+
+Os logs recentes do serviço mostraram repetidas requisições com referência de Server Action inválida (`x`). Não há evidência suficiente para atribuir a origem; investigar frequência e origem se persistir, sem registrar dados sensíveis.
 
 ## Demonstração
 
