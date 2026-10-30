@@ -1,5 +1,7 @@
 # Plano 5 — ponto de partida
 
+**Avanço posterior:** a conciliação de acesso em `src/server/billing/reconcile-access.ts` foi preparada apenas para testes: exige assinatura e faturas verificadas, preserva bloqueios administrativos, registra auditoria e calcula atraso sem encurtar o período gratuito. Ela ainda não está conectada ao processador de eventos ou ao cron, portanto não altera acesso automaticamente. Antes dessa integração, testar concorrência no PostgreSQL e revisar como reprocessar datas de vencimento, reembolsos e assinaturas substituídas. A cobrança continua bloqueada em produção.
+
 **Teste adiado a pedido de Ricardo:** validar a criação e recuperação de assinatura com o sandbox real do Mercado Pago, incluindo assinatura em outros estados, antes de ativar cobrança. A recuperação em teste passou nos testes locais e no PostgreSQL 17 (CI do commit `7c61421`); ainda não houve teste com o provedor real.
 
 Atualizado em 30/10/2026. Leia este arquivo antes de continuar. Branch `plano-5`, [PR #6 em rascunho](https://github.com/RicardovSantos/eneven-agenda-inteligente/pull/6). Último commit de código enviado nesta atualização: `8586837`. Confirme `git status` e o commit mais recente antes de trabalhar. O Plano 5 não foi integrado à `main` nem implantado.
