@@ -679,4 +679,16 @@ export const whatsappInboundEvents = pgTable("whatsapp_inbound_events", {
   completedAt: timestamptz("completed_at"),
 }, (t) => [check("whatsapp_inbound_event_state_check", sql`${t.state} in ('processing', 'completed', 'uncertain')`)]);
 
+/** Fila global de sinais do provedor; dados de pagamento são obtidos na API. */
+export const billingWebhookEvents = pgTable("billing_webhook_events", {
+  requestId: text("request_id").primaryKey(),
+  resourceId: text("resource_id").notNull(),
+  topic: text("topic").notNull(),
+  receivedAt: timestamptz("received_at").notNull().defaultNow(),
+  processedAt: timestamptz("processed_at"),
+}, (t) => [
+  index("billing_webhook_events_pending_idx").on(t.processedAt, t.receivedAt),
+  check("billing_webhook_events_topic_check", sql`${t.topic} in ('payment', 'subscription_preapproval', 'subscription_authorized_payment')`),
+]);
+
 
