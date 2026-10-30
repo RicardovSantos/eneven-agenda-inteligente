@@ -1,9 +1,10 @@
-import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { billingWebhookEvents } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { reconcilePayment } from "./reconcile-payment";
+import { reconcileSubscription } from "./reconcile-subscription";
 
-/** Processador de plataforma: eventos de outros tópicos aguardam implementação. */
+/** Processa pagamentos e assinaturas; eventos de fatura aguardam implementação. */
 export async function processPaymentEvents(db: Db, config: {
   accessToken: string; collectorId: string; liveMode: boolean; fetcher?: typeof fetch;
 }, limit = 20): Promise<{ processed: number; failed: number }> {
@@ -12,12 +13,13 @@ export async function processPaymentEvents(db: Db, config: {
   if (!max) return { processed: 0, failed: 0 };
   const now = new Date();
   const events = await db.select().from(billingWebhookEvents)
-    .where(and(eq(billingWebhookEvents.topic, "payment"), isNull(billingWebhookEvents.processedAt), or(isNull(billingWebhookEvents.nextAttemptAt), lte(billingWebhookEvents.nextAttemptAt, now))))
+    .where(and(inArray(billingWebhookEvents.topic, ["payment", "subscription_preapproval"]), isNull(billingWebhookEvents.processedAt), or(isNull(billingWebhookEvents.nextAttemptAt), lte(billingWebhookEvents.nextAttemptAt, now))))
     .orderBy(asc(billingWebhookEvents.receivedAt), asc(billingWebhookEvents.requestId)).limit(max);
   const result = { processed: 0, failed: 0 };
   for (const event of events) {
     try {
-      await reconcilePayment(db, event.resourceId, config);
+      if (event.topic === "payment") await reconcilePayment(db, event.resourceId, config);
+      else await reconcileSubscription(db, event.resourceId, config);
       const updated = await db.update(billingWebhookEvents).set({ processedAt: new Date() })
         .where(and(eq(billingWebhookEvents.requestId, event.requestId), isNull(billingWebhookEvents.processedAt)))
         .returning({ id: billingWebhookEvents.requestId });

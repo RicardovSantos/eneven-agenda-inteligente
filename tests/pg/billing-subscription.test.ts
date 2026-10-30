@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, expect, it, vi } from "vitest";
 import { createTestSubscription } from "@/server/billing/create-subscription";
 import { abandonTestSubscription, recoverTestSubscription } from "@/server/billing/recover-subscription";
+import { reconcileSubscription } from "@/server/billing/reconcile-subscription";
 import { billingSubscriptions } from "@/db/schema";
 import { seedTenant } from "../helpers/agenda-fixtures";
 import { seedSuperAdmin } from "../helpers/platform-fixtures";
@@ -9,6 +10,15 @@ import { connectPg } from "./pg-db";
 const pg = connectPg();
 beforeEach(() => pg.truncate());
 afterAll(() => pg.close());
+
+it("serializa eventos duplicados de assinatura", async () => {
+  const tenant = await seedTenant(pg.db);
+  const [subscription] = await pg.db.insert(billingSubscriptions).values({ tenantId: tenant.id, planId: tenant.planId, priceCents: 3990, providerId: "sub-concurrent", providerStatus: "pending" }).returning();
+  const remote = { id: "sub-concurrent", external_reference: subscription.id, collector_id: 42, status: "authorized", last_modified: "2030-01-02T00:00:00Z", auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: 39.9, currency_id: "BRL" } };
+  const config = { accessToken: "TEST-example", collectorId: "42", fetcher: async () => Response.json(remote) };
+  const results = await Promise.all([reconcileSubscription(pg.db, "sub-concurrent", config), reconcileSubscription(pg.db, "sub-concurrent", config)]);
+  expect(results.sort()).toEqual(["unchanged", "updated"]);
+});
 
 it("reserva somente uma assinatura em chamadas simultâneas", async () => {
   const tenant = await seedTenant(pg.db);

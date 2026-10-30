@@ -44,7 +44,7 @@ it("processa eventos repetidos e preserva pagamento aprovado ao registrar tentat
     { requestId: "unknown", resourceId: "999", topic: "payment" },
     { requestId: "subscription", resourceId: "sub", topic: "subscription_preapproval" },
   ]);
-  expect(await processPaymentEvents(db, config)).toEqual({ processed: 3, failed: 1 });
+  expect(await processPaymentEvents(db, config)).toEqual({ processed: 3, failed: 2 });
   const [saved] = await db.select().from(billingInvoices).where(eq(billingInvoices.id, invoice.id));
   expect(saved.providerStatus).toBe("approved");
   expect(saved.paymentId).toBe("100");
