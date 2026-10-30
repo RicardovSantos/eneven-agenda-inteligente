@@ -692,4 +692,36 @@ export const billingWebhookEvents = pgTable("billing_webhook_events", {
   check("billing_webhook_events_topic_check", sql`${t.topic} in ('payment', 'subscription_preapproval', 'subscription_authorized_payment')`),
 ]);
 
+/** Assinaturas vinculadas a um estabelecimento, sem armazenar dados de cartão. */
+export const billingSubscriptions = pgTable("billing_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  planId: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "restrict" }),
+  providerId: text("provider_id").unique(),
+  providerStatus: text("provider_status").notNull().default("pending"),
+  providerUpdatedAt: timestamptz("provider_updated_at"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  unique("billing_subscriptions_tenant_id_id_unique").on(t.tenantId, t.id),
+  index("billing_subscriptions_tenant_idx").on(t.tenantId, t.createdAt),
+]);
+
+/** Faturas identificadas pelo provedor, sempre vinculadas à assinatura do mesmo tenant. */
+export const billingInvoices = pgTable("billing_invoices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  subscriptionId: uuid("subscription_id").notNull(),
+  providerId: text("provider_id").notNull().unique(),
+  providerStatus: text("provider_status").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  dueAt: timestamptz("due_at"),
+  paidAt: timestamptz("paid_at"),
+  providerUpdatedAt: timestamptz("provider_updated_at"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ name: "billing_invoices_subscription_fk", columns: [t.tenantId, t.subscriptionId], foreignColumns: [billingSubscriptions.tenantId, billingSubscriptions.id] }).onDelete("restrict"),
+  index("billing_invoices_tenant_idx").on(t.tenantId, t.createdAt),
+  check("billing_invoices_amount_check", sql`${t.amountCents} >= 0`),
+]);
+
 
