@@ -3,8 +3,9 @@ import { billingWebhookEvents } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { reconcilePayment } from "./reconcile-payment";
 import { reconcileSubscription } from "./reconcile-subscription";
+import { reconcileAuthorizedInvoice } from "./reconcile-invoice";
 
-/** Processa pagamentos e assinaturas; eventos de fatura aguardam implementação. */
+/** Processa sinais de pagamento, assinatura e fatura sem alterar acesso. */
 export async function processPaymentEvents(db: Db, config: {
   accessToken: string; collectorId: string; liveMode: boolean; fetcher?: typeof fetch;
 }, limit = 20): Promise<{ processed: number; failed: number }> {
@@ -13,13 +14,17 @@ export async function processPaymentEvents(db: Db, config: {
   if (!max) return { processed: 0, failed: 0 };
   const now = new Date();
   const events = await db.select().from(billingWebhookEvents)
-    .where(and(inArray(billingWebhookEvents.topic, ["payment", "subscription_preapproval"]), isNull(billingWebhookEvents.processedAt), or(isNull(billingWebhookEvents.nextAttemptAt), lte(billingWebhookEvents.nextAttemptAt, now))))
+    .where(and(inArray(billingWebhookEvents.topic, ["payment", "subscription_preapproval", "subscription_authorized_payment"]), isNull(billingWebhookEvents.processedAt), or(isNull(billingWebhookEvents.nextAttemptAt), lte(billingWebhookEvents.nextAttemptAt, now))))
     .orderBy(asc(billingWebhookEvents.receivedAt), asc(billingWebhookEvents.requestId)).limit(max);
   const result = { processed: 0, failed: 0 };
   for (const event of events) {
     try {
       if (event.topic === "payment") await reconcilePayment(db, event.resourceId, config);
-      else await reconcileSubscription(db, event.resourceId, config);
+      else if (event.topic === "subscription_preapproval") await reconcileSubscription(db, event.resourceId, config);
+      else {
+        const { paymentId } = await reconcileAuthorizedInvoice(db, event.resourceId, config);
+        if (paymentId) await reconcilePayment(db, paymentId, config);
+      }
       const updated = await db.update(billingWebhookEvents).set({ processedAt: new Date() })
         .where(and(eq(billingWebhookEvents.requestId, event.requestId), isNull(billingWebhookEvents.processedAt)))
         .returning({ id: billingWebhookEvents.requestId });

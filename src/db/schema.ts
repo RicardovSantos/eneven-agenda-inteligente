@@ -722,12 +722,24 @@ export const billingInvoices = pgTable("billing_invoices", {
   dueAt: timestamptz("due_at"),
   paidAt: timestamptz("paid_at"),
   providerUpdatedAt: timestamptz("provider_updated_at"),
+  invoiceUpdatedAt: timestamptz("invoice_updated_at"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [
   foreignKey({ name: "billing_invoices_subscription_fk", columns: [t.tenantId, t.subscriptionId], foreignColumns: [billingSubscriptions.tenantId, billingSubscriptions.id] }).onDelete("restrict"),
   unique("billing_invoices_tenant_id_id_unique").on(t.tenantId, t.id),
   index("billing_invoices_tenant_idx").on(t.tenantId, t.createdAt),
   check("billing_invoices_amount_check", sql`${t.amountCents} >= 0`),
+]);
+
+/** Vínculo confirmado na fatura do provedor, não comprova pagamento aprovado. */
+export const billingInvoicePaymentLinks = pgTable("billing_invoice_payment_links", {
+  paymentId: text("payment_id").primaryKey(),
+  tenantId: tenantIdColumn(),
+  invoiceId: uuid("invoice_id").notNull(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ name: "billing_invoice_payment_links_invoice_fk", columns: [t.tenantId, t.invoiceId], foreignColumns: [billingInvoices.tenantId, billingInvoices.id] }).onDelete("cascade"),
+  index("billing_invoice_payment_links_invoice_idx").on(t.tenantId, t.invoiceId),
 ]);
 
 /** Uma fatura pode ter várias tentativas, identificadas de forma única pelo provedor. */

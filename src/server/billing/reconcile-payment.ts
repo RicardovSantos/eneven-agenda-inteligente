@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { billingInvoices, billingPaymentAttempts } from "@/db/schema";
+import { billingInvoicePaymentLinks, billingInvoices, billingPaymentAttempts } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { fetchMercadoPagoResource } from "./mercado-pago-client";
 import { verifyPaymentOwnership } from "./verify-payment";
@@ -25,9 +25,11 @@ export async function reconcilePayment(db: Db, paymentId: string, config: {
     if (!Number.isFinite(paidAt.getTime())) throw new Error("Data de pagamento inválida.");
   }
   return db.transaction(async (tx) => {
-    const [invoice] = await tx.select().from(billingInvoices).where(eq(billingInvoices.id, reference)).limit(1).for("update");
+    const [link] = await tx.select().from(billingInvoicePaymentLinks).where(eq(billingInvoicePaymentLinks.paymentId, paymentId)).limit(1);
+    const [invoice] = await tx.select().from(billingInvoices).where(eq(billingInvoices.id, link?.invoiceId ?? reference)).limit(1).for("update");
+    if (link && (!invoice || link.tenantId !== invoice.tenantId || (reference !== invoice.id && reference !== invoice.subscriptionId))) throw new Error("Pagamento não corresponde à fatura.");
     if (!invoice || !verifyPaymentOwnership(payment, {
-      paymentId, externalReference: invoice.id, collectorId: config.collectorId, amountCents: invoice.amountCents, liveMode: config.liveMode,
+      paymentId, externalReference: reference, collectorId: config.collectorId, amountCents: invoice.amountCents, liveMode: config.liveMode,
     })) throw new Error("Pagamento não corresponde à fatura.");
     const [prior] = await tx.select().from(billingPaymentAttempts).where(eq(billingPaymentAttempts.paymentId, paymentId)).limit(1);
     if (prior && (prior.tenantId !== invoice.tenantId || prior.invoiceId !== invoice.id)) throw new Error("Pagamento vinculado a outra fatura.");
