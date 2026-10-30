@@ -69,6 +69,7 @@ export default async function ConfiguracoesPage() {
       />
       <SlugForm currentSlug={tenant.slug} />
       <Link href="/painel/configuracoes/mensagens" className="rounded-card border border-line bg-surface p-5 font-semibold text-primary">Configurar mensagens WhatsApp →</Link>
+      <Link href="/painel/configuracoes/assinatura" className="rounded-card border border-line bg-surface p-5 font-semibold text-primary">Plano e faturas →</Link>
       <TeamAccessCard
         members={team.map((row) =>
           row.kind === "member"
