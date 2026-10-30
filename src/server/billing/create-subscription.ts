@@ -1,9 +1,9 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { billingSubscriptions, plans, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { validatePendingSubscription } from "./subscription-validation";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CHECKOUT_HOSTS = new Set(["www.mercadopago.com.br", "sandbox.mercadopago.com.br", "www.mercadopago.com.ar", "sandbox.mercadopago.com.ar"]);
 
 /** Somente testes. O chamador deve autenticar o dono e obter o e-mail no servidor. */
 export async function createTestSubscription(db: Db, input: {
@@ -34,18 +34,10 @@ export async function createTestSubscription(db: Db, input: {
     if (!response.ok) throw new Error("Falha ao criar assinatura.");
     const body: unknown = await response.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Resposta inválida.");
-    const result = body as Record<string, unknown>;
-    if (typeof result.id !== "string" || !/^[A-Za-z0-9_-]{1,200}$/.test(result.id) || result.external_reference !== reserved.id || String(result.collector_id ?? "") !== config.collectorId || result.status !== "pending" || typeof result.init_point !== "string") throw new Error("Resposta inválida.");
-    const recurring = result.auto_recurring;
-    if (!recurring || typeof recurring !== "object" || Array.isArray(recurring)) throw new Error("Cobrança inválida.");
-    const terms = recurring as Record<string, unknown>;
-    const amount = terms.transaction_amount;
-    if ((typeof amount !== "number" && (typeof amount !== "string" || !/^\d+(?:\.\d{1,2})?$/.test(amount))) || !Number.isFinite(Number(amount)) || terms.currency_id !== "BRL" || terms.frequency !== 1 || terms.frequency_type !== "months" || Math.abs(Number(amount) * 100 - reserved.priceCents) > 1e-7) throw new Error("Cobrança inválida.");
-    const checkout = new URL(result.init_point);
-    if (checkout.protocol !== "https:" || !CHECKOUT_HOSTS.has(checkout.hostname) || checkout.username || checkout.password || checkout.port) throw new Error("Endereço de pagamento inválido.");
-    const updated = await db.update(billingSubscriptions).set({ providerId: result.id, providerStatus: "pending", checkoutUrl: checkout.toString() }).where(and(eq(billingSubscriptions.id, reserved.id), eq(billingSubscriptions.providerStatus, "creating"))).returning({ id: billingSubscriptions.id });
+    const result = validatePendingSubscription(body as Record<string, unknown>, { reference: reserved.id, collectorId: config.collectorId, priceCents: reserved.priceCents });
+    const updated = await db.update(billingSubscriptions).set({ providerId: result.id, providerStatus: "pending", checkoutUrl: result.checkoutUrl }).where(and(eq(billingSubscriptions.id, reserved.id), eq(billingSubscriptions.providerStatus, "creating"))).returning({ id: billingSubscriptions.id });
     if (!updated.length) throw new Error("Tentativa indisponível.");
-    return { checkoutUrl: checkout.toString() };
+    return { checkoutUrl: result.checkoutUrl };
   } catch {
     // Mesmo um timeout pode ocorrer após o provedor criar a assinatura.
     await db.update(billingSubscriptions).set({ providerStatus: "uncertain" }).where(and(eq(billingSubscriptions.id, reserved.id), eq(billingSubscriptions.providerStatus, "creating")));
