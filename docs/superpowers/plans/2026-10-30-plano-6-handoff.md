@@ -16,4 +16,5 @@ O teste direcionado de navegador `tests/e2e/demo.spec.ts` passou em viewport de 
 
 - Definir e implementar preservação, exportação e exclusão/anonimização conforme a especificação e os termos, incluindo avisos e exceções aplicáveis. Não automatizar exclusões até revisar os requisitos e uma estratégia de recuperação.
 - Implementar notificações push para novos agendamentos, cancelamentos e remarcações, com consentimento, controle por dispositivo e remoção de assinaturas inválidas. Testar Android e iPhone com aplicativo instalado.
+- O service worker já aceita notificações com textos genéricos e abre apenas o próprio painel; não exibe dados de clientes recebidos no payload. Ainda não existem cadastro de dispositivos, consentimento nem envio de push, portanto essa funcionalidade não está ativa. Planejar a migração depois de conciliar a numeração das migrações 0013–0020 pendentes na branch do Plano 5.
 - O Plano 4 ainda requer configuração real da Meta, modelos, webhook e cron e testes finais. O Plano 5 ainda requer implementação e validação no sandbox do Mercado Pago antes de ativar cobrança.

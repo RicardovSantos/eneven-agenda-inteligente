@@ -82,3 +82,33 @@ self.addEventListener("fetch", (event) => {
   }
   // Todo o resto (JS, CSS, imagens, payloads RSC) segue o caminho normal do navegador.
 });
+
+// Não exibir conteúdo arbitrário ou dados de clientes na tela bloqueada.
+self.addEventListener("push", (event) => {
+  let type;
+  try { type = event.data?.json()?.type; } catch { /* Mensagem genérica em payload inválido. */ }
+  const descriptions = {
+    booking_created: "Você recebeu um novo agendamento.",
+    booking_canceled: "Um agendamento foi cancelado.",
+    booking_rescheduled: "Um agendamento foi remarcado.",
+  };
+  const body = typeof type === "string" && Object.hasOwn(descriptions, type) ? descriptions[type] : "Há uma atualização na sua agenda.";
+  event.waitUntil(self.registration.showNotification("Eneven Agenda", { body, icon: "/brand/icon-192.png", data: { destination: "/painel" } }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    // O destino é fixo: nunca navegar para um endereço recebido pelo push.
+    const destination = new URL("/painel", self.location.origin).href;
+    const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of clients) {
+      const url = new URL(client.url);
+      if (url.origin === self.location.origin && (url.pathname === "/painel" || url.pathname.startsWith("/painel/"))) {
+        await client.navigate(destination);
+        return client.focus();
+      }
+    }
+    return self.clients.openWindow(destination);
+  })());
+});
