@@ -712,6 +712,7 @@ export const billingInvoices = pgTable("billing_invoices", {
   tenantId: tenantIdColumn(),
   subscriptionId: uuid("subscription_id").notNull(),
   providerId: text("provider_id").notNull().unique(),
+  paymentId: text("payment_id").unique(),
   providerStatus: text("provider_status").notNull(),
   amountCents: integer("amount_cents").notNull(),
   dueAt: timestamptz("due_at"),
