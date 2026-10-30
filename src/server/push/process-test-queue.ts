@@ -44,8 +44,8 @@ export async function processTestPushQueue(db: Db, sender: Sender, now = new Dat
       if (now.getTime() - claimed.event.createdAt.getTime() > 5 * 60_000) status = "expired";
       else status = await sender({ endpoint: claimed.subscription.endpoint, keys: { p256dh: claimed.subscription.p256dh, auth: claimed.subscription.auth } }, claimed.event.eventType as PushType);
     } catch { status = "uncertain"; }
-    await db.update(pushDeliveries).set({ status, completedAt: now }).where(and(eq(pushDeliveries.id, claimed.delivery.id), eq(pushDeliveries.status, "processing")));
-    result[status]++;
+    const updated = await db.update(pushDeliveries).set({ status, completedAt: now }).where(and(eq(pushDeliveries.id, claimed.delivery.id), eq(pushDeliveries.status, "processing"), eq(pushDeliveries.claimedAt, now))).returning({ id: pushDeliveries.id });
+    if (updated.length) result[status]++;
   }
   return result;
 }

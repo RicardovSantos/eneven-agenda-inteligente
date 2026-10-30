@@ -1,7 +1,8 @@
 import { createECDH } from "node:crypto";
 import { afterEach, expect, it, vi } from "vitest";
-import { memberships, pushDeliveries, pushEvents, pushSubscriptions, users } from "@/db/schema";
+import { auditLog, memberships, pushDeliveries, pushEvents, pushSubscriptions, users } from "@/db/schema";
 import { processTestPushQueue } from "@/server/push/process-test-queue";
+import { reviewTestDelivery } from "@/server/push/review-test-delivery";
 import { POST } from "@/app/api/cron/notificacoes/route";
 import { seedBooking, seedTenant } from "../helpers/agenda-fixtures";
 import { createTestDb } from "../helpers/test-db";
@@ -31,6 +32,10 @@ it("processa uma vez por dispositivo e retém falha incerta", async () => {
   expect((await db.select().from(pushDeliveries)).map((item) => item.status).sort()).toEqual(["sent", "uncertain"]);
   expect(await processTestPushQueue(db, sender, now)).toEqual({ expanded: 0, sent: 0, expired: 0, uncertain: 0 });
   expect(sender).toHaveBeenCalledTimes(2);
+  const uncertain = (await db.select().from(pushDeliveries)).find((delivery) => delivery.status === "uncertain")!;
+  await reviewTestDelivery(db, uncertain.id, user.id, "confirmed", now);
+  await expect(reviewTestDelivery(db, uncertain.id, user.id, "retry", now)).rejects.toThrow("indisponível");
+  expect(await db.select().from(auditLog)).toMatchObject([{ action: "push.test_delivery_reviewed", actorUserId: user.id }]);
   await db.insert(pushEvents).values({ tenantId: tenant.id, bookingId: booking.id, eventType: "booking_canceled", eventKey: "old", createdAt: new Date(now.getTime() - 6 * 60_000) });
   expect(await processTestPushQueue(db, sender, now)).toEqual({ expanded: 1, sent: 0, expired: 2, uncertain: 0 });
   expect(sender).toHaveBeenCalledTimes(2);
