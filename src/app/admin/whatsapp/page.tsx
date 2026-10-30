@@ -14,7 +14,7 @@ export default async function WhatsAppRecoveryPage() {
   const db = await getDb();
   const stale = staleThreshold();
   const events = await db.select().from(whatsappInboundEvents).where(or(eq(whatsappInboundEvents.state, "uncertain"), and(eq(whatsappInboundEvents.state, "processing"), lte(whatsappInboundEvents.claimedAt, stale)))).orderBy(whatsappInboundEvents.createdAt).limit(100);
-  const outgoing = await db.select({ id: whatsappQueue.id, tenantId: whatsappQueue.tenantId, tenantName: tenants.name, templateType: whatsappQueue.templateType })
+  const outgoing = await db.select({ id: whatsappQueue.id, tenantId: whatsappQueue.tenantId, tenantName: tenants.name, templateType: whatsappQueue.templateType, recipientPhone: whatsappMessages.recipientPhone, attemptedAt: whatsappMessages.createdAt })
     .from(whatsappQueue).innerJoin(tenants, eq(tenants.id, whatsappQueue.tenantId))
     .innerJoin(whatsappMessages, and(eq(whatsappMessages.queueId, whatsappQueue.id), eq(whatsappMessages.tenantId, whatsappQueue.tenantId), eq(whatsappMessages.status, "sending")))
     .where(and(isNotNull(whatsappQueue.lockedUntil), isNull(whatsappQueue.processedAt), or(isNotNull(whatsappQueue.errorMessage), lte(whatsappMessages.createdAt, stale))))
@@ -26,6 +26,7 @@ export default async function WhatsAppRecoveryPage() {
     {events.length === 0 && outgoing.length === 0 ? <p>Nenhuma ocorrência para revisar.</p> : null}
     {outgoing.map((event) => <section key={event.id} className="flex flex-col gap-3 rounded-card border border-line bg-surface p-4">
       <p>Envio para {event.tenantName} · {event.templateType}</p>
+      <p className="text-sm">Destinatário: {event.recipientPhone} · Tentativa: {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(event.attemptedAt)} (horário de Brasília)</p>
       <p className="break-all text-sm">Ocorrência: {event.id}</p>
       <WhatsAppRecoveryForm id={event.id} tenantId={event.tenantId} canRetry />
     </section>)}
