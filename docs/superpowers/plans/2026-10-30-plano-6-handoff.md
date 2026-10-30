@@ -12,7 +12,7 @@ O painel ilustrativo permite simular confirmação, cancelamento e restauração
 
 Para concluir: definir acesso ao painel de demonstração e suas permissões, isolar os dados dos estabelecimentos reais e impedir mensagens e outras integrações externas em todas as operações. Preparar recriação diária sem apagar ou modificar dados reais. Testar em navegador e revisar concorrência e proteção contra abuso antes de disponibilizar publicamente.
 
-O teste direcionado de navegador `tests/e2e/demo.spec.ts` passou em viewport de celular, cobrindo múltiplos agendamentos, reinício, o painel e a expiração diária. As duas páginas também foram inspecionadas visualmente em celular (390 px) e computador (1280 px). A suíte completa permanece pendente.
+O teste direcionado de navegador `tests/e2e/demo.spec.ts` passou em viewport de celular, cobrindo múltiplos agendamentos, reinício, o painel e a expiração diária. As duas páginas também foram inspecionadas visualmente em celular (390 px) e computador (1280 px). No CI de `e7cf716`, os testes de demonstração e exportação passaram; o fluxo completo falhou após remarcação e foi ajustado posteriormente. Confirmar o CI do último commit.
 
 ## Dados e notificações
 

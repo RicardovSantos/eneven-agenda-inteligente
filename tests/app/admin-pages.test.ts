@@ -19,8 +19,10 @@ describe("guarda: páginas da plataforma (/admin)", () => {
     const rel = pages.map((p) => path.relative(root, p).replaceAll("\\", "/")).sort();
     expect(rel).toEqual([
       "cobranca/page.tsx",
+      "dados/page.tsx",
       "estabelecimentos/[id]/page.tsx",
       "estabelecimentos/novo/page.tsx",
+      "notificacoes/page.tsx",
       "page.tsx",
       "planos/page.tsx",
       "whatsapp/page.tsx",

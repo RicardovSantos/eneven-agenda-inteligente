@@ -112,7 +112,12 @@ test("do cadastro ao cancelamento: cadastro, primeiros passos, página pública,
   // 6. Remarcar para outro horário livre.
   const before = (await listBookings(request, slug))[0].startsAt;
   await detail.getByRole("button", { name: "Remarcar" }).click();
-  const other = detail.locator("button[data-starts-at]").nth(1);
+  // Escolhe um dia futuro para não depender dos horários restantes de hoje.
+  await expect(detail.getByRole("group", { name: "Dias" }).getByRole("button").nth(1)).toBeVisible();
+  const futureDay = detail.getByRole("group", { name: "Dias" }).getByRole("button").nth(1);
+  await futureDay.click();
+  await expect(futureDay).toHaveAttribute("aria-pressed", "true");
+  const other = detail.locator(`button[data-starts-at]:not([data-starts-at="${before}"])`).first();
   await expect(other).toBeVisible();
   const newStart = (await other.getAttribute("data-starts-at"))!;
   expect(newStart).not.toBe(before);
@@ -120,6 +125,10 @@ test("do cadastro ao cancelamento: cadastro, primeiros passos, página pública,
   await detail.getByRole("button", { name: "Remarcar" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Agendamento remarcado" })).toBeVisible();
   await expect.poll(async () => (await listBookings(request, slug))[0].startsAt).toBe(newStart);
+
+  // A remarcação pode cair em outro dia; abra o detalhe na data escolhida.
+  await open(page, `/painel?data=${saoPauloDate(newStart)}`);
+  await page.getByRole("button", { name: /Paula Souza/ }).click();
 
   // 7. Cancelar pelo diálogo de confirmação.
   await detail.getByRole("button", { name: "Cancelar agendamento" }).click();
