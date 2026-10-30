@@ -16,5 +16,14 @@ it("lista apenas testes vencidos e cancelamentos antigos com data comprovada", a
     { tenantId: recentCanceled.id, action: "tenant.canceled", createdAt: new Date("2029-01-01T00:00:00Z") },
     { tenantId: recentCanceled.id, action: "tenant.canceled", createdAt: new Date("2030-04-01T00:00:00Z") },
   ]);
-  expect((await listRetentionReview(db, now)).map((row) => row.id).sort()).toEqual([trial.id, oldCanceled.id].sort());
+  expect((await listRetentionReview(db, now)).items.map((row) => row.id).sort()).toEqual([trial.id, oldCanceled.id].sort());
+  expect((await listRetentionReview(db, now, 2)).items).toEqual([]);
+  await db.insert(tenants).values(Array.from({ length: 51 }, (_, index) => ({ slug: `inativo-${index}`, name: `Inativo ${index}`, planId: trial.planId, trialEndsAt: new Date("2030-01-01T00:00:00Z") })));
+  const first = await listRetentionReview(db, now);
+  const second = await listRetentionReview(db, now, 2);
+  expect(first.items).toHaveLength(50);
+  expect(first.hasMore).toBe(true);
+  expect(second.items).toHaveLength(3);
+  expect(second.hasMore).toBe(false);
+  expect(new Set([...first.items, ...second.items].map((row) => row.id)).size).toBe(53);
 });
