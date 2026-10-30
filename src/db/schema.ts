@@ -596,6 +596,21 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   index("push_subscriptions_tenant_user_idx").on(t.tenantId, t.userId),
 ]);
 
+/** Eventos de agenda sem dados pessoais; processamento de push ainda desligado. */
+export const pushEvents = pgTable("push_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  bookingId: uuid("booking_id").notNull(),
+  eventType: text("event_type").notNull(),
+  eventKey: text("event_key").notNull(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ name: "push_events_booking_fk", columns: [t.tenantId, t.bookingId], foreignColumns: [bookings.tenantId, bookings.id] }).onDelete("cascade"),
+  unique("push_events_identity_unique").on(t.tenantId, t.bookingId, t.eventType, t.eventKey),
+  check("push_events_type_check", sql`${t.eventType} in ('booking_created', 'booking_canceled', 'booking_rescheduled')`),
+  check("push_events_key_length_check", sql`length(${t.eventKey}) between 1 and 160`),
+]);
+
 /** Histórico e auditoria de mensagens e lembretes enviados/recebidos via WhatsApp. */
 export const whatsappMessages = pgTable(
   "whatsapp_messages",

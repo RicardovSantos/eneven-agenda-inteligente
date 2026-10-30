@@ -8,6 +8,7 @@ import {
   professionalHours,
   professionalServices,
   professionals,
+  pushEvents,
   services,
   tenants,
   timeBlocks,
@@ -92,6 +93,14 @@ async function bookingRow(id: string) {
 }
 
 describe("createBooking", () => {
+  it("registra eventos de teste na mesma transação das alterações da agenda", async () => {
+    const { bookingId } = await book();
+    await rescheduleBooking(db, tenantId, bookingId, local("14:00"), "customer", NOW);
+    await cancelBooking(db, tenantId, bookingId, "customer", NOW);
+    const events = await db.select().from(pushEvents).where(eq(pushEvents.bookingId, bookingId));
+    expect(events.map((event) => event.eventType).sort()).toEqual(["booking_canceled", "booking_created", "booking_rescheduled"]);
+    expect(events.every((event) => event.tenantId === tenantId)).toBe(true);
+  });
   it("cria agendamento público com snapshot dos serviços e token de gestão", async () => {
     const { bookingId, manageToken } = await book();
     const row = await bookingRow(bookingId);
