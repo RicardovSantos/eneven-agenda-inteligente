@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { expect, it, vi } from "vitest";
-import { bookings, memberships, users } from "@/db/schema";
+import { bookings, memberships, tenantLogos, users } from "@/db/schema";
 import { exportTenantAgenda } from "@/server/export/agenda";
 import { seedBooking, seedTenant } from "../helpers/agenda-fixtures";
 import { createTestDb } from "../helpers/test-db";
@@ -14,7 +14,10 @@ it("exporta apenas os dados do dono, sem tokens ou dados de outro estabeleciment
   const db = await createTestDb(); state.db = db;
   const a = await seedTenant(db); const b = await seedTenant(db);
   const [owner] = await db.insert(users).values({ name: "Dona", email: "owner@example.com" }).returning();
+  const [outsider] = await db.insert(users).values({ name: "Outra dona", email: "other@example.com" }).returning();
   await db.insert(memberships).values({ userId: owner.id, tenantId: a.id, role: "owner" });
+  await db.insert(memberships).values({ userId: outsider.id, tenantId: b.id, role: "owner" });
+  await db.insert(tenantLogos).values({ tenantId: a.id, mime: "image/png", data: Buffer.from("logo-ficticia") });
   const bookingA = await seedBooking(db, a.id);
   await seedBooking(db, b.id);
   await db.update(bookings).set({ manageTokenHash: "segredo-nao-exportar" }).where(eq(bookings.id, bookingA.id));
@@ -22,6 +25,8 @@ it("exporta apenas os dados do dono, sem tokens ou dados de outro estabeleciment
   expect(data.bookings).toHaveLength(1);
   expect(data.bookings[0].id).toBe(bookingA.id);
   expect(JSON.stringify(data)).not.toContain("segredo-nao-exportar");
+  expect(JSON.stringify(data)).not.toContain("other@example.com");
+  expect(data.logo?.base64).toBe(Buffer.from("logo-ficticia").toString("base64"));
   await expect(exportTenantAgenda(db, { userId: owner.id, tenantId: b.id })).rejects.toThrow("Acesso indisponível");
   state.session = { userId: owner.id, tenantId: a.id, role: "staff", support: false };
   expect((await GET()).status).toBe(403);
