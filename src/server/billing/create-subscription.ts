@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { billingSubscriptions, plans, tenants } from "@/db/schema";
+import { billingSubscriptions, memberships, plans, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { validatePendingSubscription } from "./subscription-validation";
 
@@ -7,7 +7,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Somente testes. O chamador deve autenticar o dono e obter o e-mail no servidor. */
 export async function createTestSubscription(db: Db, input: {
-  tenantId: string; planId: string; payerEmail: string; backUrl: string;
+  tenantId: string; planId: string; payerEmail: string; backUrl: string; ownerUserId?: string;
 }, config: { accessToken: string; collectorId: string; fetcher?: typeof fetch }): Promise<{ checkoutUrl: string }> {
   if (process.env.NODE_ENV === "production" || !config.accessToken.startsWith("TEST-") || !config.collectorId) throw new Error("Cobrança de teste não configurada.");
   if (!UUID.test(input.tenantId) || !UUID.test(input.planId) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.payerEmail) || input.payerEmail.length > 254) throw new Error("Dados inválidos.");
@@ -16,9 +16,13 @@ export async function createTestSubscription(db: Db, input: {
   if (back.protocol !== "https:" || back.username || back.password) throw new Error("Endereço de retorno inválido.");
   const reserved = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.tenantId}))`);
-    const [tenant] = await tx.select({ id: tenants.id }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+    const [tenant] = await tx.select({ id: tenants.id, planId: tenants.planId, status: tenants.status }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1).for("update");
+    if (input.ownerUserId) {
+      const [member] = await tx.select({ role: memberships.role }).from(memberships).where(and(eq(memberships.tenantId, input.tenantId), eq(memberships.userId, input.ownerUserId))).limit(1).for("update");
+      if (!member || member.role !== "owner") throw new Error("Acesso indisponível.");
+    }
     const [plan] = await tx.select().from(plans).where(and(eq(plans.id, input.planId), eq(plans.active, true))).limit(1).for("share");
-    if (!tenant || !plan || plan.priceCents <= 0) throw new Error("Plano indisponível.");
+    if (!tenant || tenant.planId !== input.planId || !["trial", "active", "past_due"].includes(tenant.status) || !plan || plan.priceCents <= 0) throw new Error("Plano indisponível.");
     const [existing] = await tx.select({ id: billingSubscriptions.id }).from(billingSubscriptions)
       .where(and(eq(billingSubscriptions.tenantId, input.tenantId), inArray(billingSubscriptions.providerStatus, ["creating", "uncertain", "pending", "authorized", "paused"]))).limit(1);
     if (existing) throw new Error("Já existe uma assinatura ou tentativa em análise.");

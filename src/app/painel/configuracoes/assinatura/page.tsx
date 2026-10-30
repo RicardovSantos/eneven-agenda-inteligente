@@ -3,6 +3,8 @@ import { getDb } from "@/db/client";
 import { formatBRL } from "@/lib/format";
 import { getBillingOverview } from "@/server/billing/queries";
 import { requirePanelRole } from "@/server/panel/roles";
+import { testBillingConfig } from "@/server/billing/test-config";
+import { startTestCheckout } from "./actions";
 
 const statusLabel: Record<string, string> = { pending: "Pendente", approved: "Paga", paid: "Paga", rejected: "Não aprovada", cancelled: "Cancelada", canceled: "Cancelada", refunded: "Reembolsada" };
 
@@ -10,6 +12,7 @@ export default async function AssinaturaPage() {
   const { session, timezone } = await requirePanelRole(["owner"]);
   const { current, available, invoices, pendingCheckoutUrl } = await getBillingOverview(await getDb(), session.tenantId);
   const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: timezone });
+  const canTestCheckout = Boolean(testBillingConfig()) && !session.support && session.emailVerified && ["trial", "active", "past_due"].includes(current.status);
   return <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
     <Link href="/painel/configuracoes" className="text-sm text-primary">‹ Configurações</Link>
     <h1 className="text-[1.75rem] font-semibold">Plano e faturas</h1>
@@ -25,6 +28,7 @@ export default async function AssinaturaPage() {
       </li>)}</ul>
       <p className="mt-3 text-sm text-ink-muted">A contratação e a troca de plano estarão disponíveis em breve.</p>
       {process.env.NODE_ENV !== "production" && pendingCheckoutUrl ? <a className="mt-3 inline-block text-primary" href={pendingCheckoutUrl} target="_blank" rel="noopener noreferrer">Continuar assinatura de teste →</a> : null}
+      {canTestCheckout && !pendingCheckoutUrl ? <form action={startTestCheckout} className="mt-4"><input type="hidden" name="planId" value={current.id} /><button type="submit" className="min-h-11 rounded-field bg-primary px-4 font-semibold text-white">Testar assinatura do plano atual</button><p className="mt-2 text-sm text-ink-muted">Somente ambiente de teste. Não altera seu plano nem ativa cobrança real.</p></form> : null}
     </section>
     <section className="rounded-card border border-line bg-surface p-5">
       <h2 className="font-semibold">Faturas</h2>

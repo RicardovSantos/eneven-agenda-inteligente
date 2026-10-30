@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { expect, it, vi } from "vitest";
-import { billingSubscriptions } from "@/db/schema";
+import { billingSubscriptions, memberships, users } from "@/db/schema";
 import { createTestSubscription } from "@/server/billing/create-subscription";
 import { seedTenant } from "../helpers/agenda-fixtures";
 import { createTestDb } from "../helpers/test-db";
@@ -45,4 +45,18 @@ it("não retorna link quando o provedor informa valor divergente ou endereço in
     const [saved] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.tenantId, tenant.id));
     expect(saved.providerStatus).toBe("uncertain");
   }
+});
+
+it("verifica o vínculo do dono dentro da reserva antes de chamar o provedor", async () => {
+  const db = await createTestDb();
+  const tenant = await seedTenant(db);
+  const [user] = await db.insert(users).values({ name: "Dona", email: "dona@example.com" }).returning();
+  const fetcher = vi.fn<typeof fetch>();
+  const input = { tenantId: tenant.id, planId: tenant.planId, payerEmail: user.email, backUrl: "https://agenda.eneven.com.br/painel", ownerUserId: user.id };
+  const config = { accessToken: "TEST-example", collectorId: "42", fetcher };
+  await expect(createTestSubscription(db, input, config)).rejects.toThrow("Acesso indisponível");
+  await db.insert(memberships).values({ tenantId: tenant.id, userId: user.id, role: "staff" });
+  await expect(createTestSubscription(db, input, config)).rejects.toThrow("Acesso indisponível");
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(await db.select().from(billingSubscriptions)).toHaveLength(0);
 });
