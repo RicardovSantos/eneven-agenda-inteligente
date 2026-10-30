@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("demonstra agendamento fictício e mostra o resultado no painel", async ({ page }) => {
   await page.goto("/demo");
-  await expect(page.getByText("nenhum horário será reservado", { exact: false })).toBeVisible();
+  await expect(page.getByText("nenhum horário real será reservado", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: /Manicure/ }).click();
   await page.getByRole("button", { name: "10:30" }).click();
   await page.getByRole("button", { name: "Concluir simulação" }).click();
@@ -21,6 +21,15 @@ test("demonstra agendamento fictício e mostra o resultado no painel", async ({ 
   await appointment.getByRole("button", { name: /Cancelar/ }).click();
   await page.reload();
   await expect(page.getByRole("listitem").filter({ hasText: "Sua simulação" })).toContainText("Cancelado");
+  await page.getByRole("link", { name: "Ver página do cliente" }).click();
+  await page.getByRole("button", { name: /Escova/ }).click();
+  await expect(page.getByRole("button", { name: "10:30" })).toBeDisabled();
+  await page.getByRole("button", { name: "14:00" }).click();
+  await page.getByRole("button", { name: "Concluir simulação" }).click();
+  await page.getByRole("link", { name: "Ver no painel de exemplo" }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: "Sua simulação" })).toHaveCount(2);
+  await page.getByRole("link", { name: "Ver página do cliente" }).click();
+  await page.getByRole("button", { name: "Reiniciar demonstração neste navegador" }).click();
   await page.goto("/demo/painel?servico=1&horario=10%3A30&dia=2000-01-01");
   await expect(page.getByText("Sua simulação")).toHaveCount(0);
 });
@@ -35,4 +44,15 @@ test("reinicia as alterações fictícias no dia seguinte", async ({ page }) => 
   await page.clock.setFixedTime(new Date("2030-01-02T15:00:00Z"));
   await page.reload();
   await expect(item).toContainText("Agendado");
+  await page.goto("/demo");
+  await page.getByRole("button", { name: /Manicure/ }).click();
+  await page.getByRole("button", { name: "10:30" }).click();
+  await page.getByRole("button", { name: "Concluir simulação" }).click();
+  await page.goto("/demo");
+  await page.getByRole("button", { name: /Manicure/ }).click();
+  await expect(page.getByRole("button", { name: "10:30" })).toBeDisabled();
+  await page.clock.setFixedTime(new Date("2030-01-03T15:00:00Z"));
+  await page.reload();
+  await page.getByRole("button", { name: /Manicure/ }).click();
+  await expect(page.getByRole("button", { name: "10:30" })).toBeEnabled();
 });

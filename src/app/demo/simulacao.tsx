@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { demoDay, demoServices as services, demoTimes as times } from "./dados";
+import { addDemoSlot, resetDemo, useDemoSlots } from "./agenda-local";
+import { resetDemoStatuses } from "./painel/agenda";
 
 
 export function DemoBooking() {
@@ -10,13 +12,16 @@ export function DemoBooking() {
   const [time, setTime] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
   const [day, setDay] = useState("");
+  const [error, setError] = useState("");
+  const slots = useDemoSlots();
   return (
     <main className="min-h-screen bg-canvas px-4 py-8 text-ink sm:py-14">
       <div className="mx-auto max-w-xl">
         <p className="text-sm font-semibold text-primary">Eneven Agenda · Demonstração</p>
         <h1 className="mt-4 font-heading text-3xl font-bold sm:text-4xl">Studio Exemplo</h1>
         <p className="mt-2 text-ink-muted">Veja como seus clientes podem escolher um serviço e um horário.</p>
-        <p className="mt-5 rounded-xl border border-line bg-surface p-4 text-sm text-ink-muted">Esta é uma simulação: nenhum horário será reservado e nenhuma mensagem será enviada. <Link className="font-semibold text-primary underline" href="/demo/painel">Ver painel de exemplo</Link></p>
+        <p className="mt-5 rounded-xl border border-line bg-surface p-4 text-sm text-ink-muted">Esta é uma simulação: nenhum horário real será reservado e nenhuma mensagem será enviada. <Link className="font-semibold text-primary underline" href="/demo/painel">Ver painel de exemplo</Link></p>
+        {slots.length > 0 && <button type="button" onClick={() => { resetDemo(); resetDemoStatuses(); setService(null); setTime(null); setFinished(false); setError(""); }} className="mt-3 text-sm font-semibold text-primary underline">Reiniciar demonstração neste navegador</button>}
         {finished ? (
           <section className="mt-6 rounded-2xl border border-line bg-surface p-6" aria-live="polite">
             <h2 className="font-heading text-xl font-semibold">Simulação concluída</h2>
@@ -37,8 +42,9 @@ export function DemoBooking() {
             {service !== null && <section className="rounded-2xl border border-line bg-surface p-6">
               <h2 className="font-heading text-xl font-semibold">2. Escolha um horário</h2>
               <p className="mt-1 text-sm text-ink-muted">Horários ilustrativos</p>
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{times.map((item) => <button key={item} type="button" aria-pressed={time === item} onClick={() => setTime(item)} className={`rounded-xl border px-3 py-3 font-semibold ${time === item ? "border-primary bg-primary-soft" : "border-line"}`}>{item}</button>)}</div>
-              <button type="button" disabled={!time} onClick={() => { setDay(demoDay()); setFinished(true); }} className="mt-5 w-full rounded-xl bg-primary px-5 py-3 font-semibold text-white disabled:opacity-40">Concluir simulação</button>
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{times.map((item) => <button key={item} type="button" disabled={slots.some((slot) => slot.time === item)} aria-pressed={time === item} onClick={() => setTime(item)} className={`rounded-xl border px-3 py-3 font-semibold disabled:opacity-40 ${time === item ? "border-primary bg-primary-soft" : "border-line"}`}>{item}</button>)}</div>
+              {error && <p role="status" className="mt-3 text-sm text-danger">{error}</p>}
+              <button type="button" disabled={!time} onClick={() => { if (!time || !addDemoSlot(service, time)) { setError("Esse horário já foi escolhido nesta demonstração."); return; } setError(""); setDay(demoDay()); setFinished(true); }} className="mt-5 w-full rounded-xl bg-primary px-5 py-3 font-semibold text-white disabled:opacity-40">Concluir simulação</button>
             </section>}
           </div>
         )}

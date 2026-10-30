@@ -22,11 +22,6 @@ export default async function DemoPanel({ searchParams }: { searchParams: Promis
           <Link href="/demo" className="rounded-xl border border-line bg-surface px-4 py-3 text-sm font-semibold text-primary">Ver página do cliente</Link>
         </div>
         <p className="mt-6 rounded-xl border border-line bg-surface p-4 text-sm text-ink-muted">Dados fictícios. Esta prévia não acessa estabelecimentos reais nem envia mensagens.</p>
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-line bg-surface p-5"><p className="text-sm text-ink-muted">Agendamentos de exemplo</p><p className="mt-2 font-heading text-3xl font-semibold">{selection ? 4 : 3}</p></div>
-          <div className="rounded-2xl border border-line bg-surface p-5"><p className="text-sm text-ink-muted">Profissionais</p><p className="mt-2 font-heading text-3xl font-semibold">2</p></div>
-          <div className="rounded-2xl border border-line bg-surface p-5"><p className="text-sm text-ink-muted">Clientes de exemplo</p><p className="mt-2 font-heading text-3xl font-semibold">{selection ? 4 : 3}</p></div>
-        </div>
         <DemoAgenda appointments={appointments} />
       </div>
     </main>

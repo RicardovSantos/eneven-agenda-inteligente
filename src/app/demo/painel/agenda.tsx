@@ -2,6 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 import { demoDay } from "../dados";
+import { demoServices } from "../dados";
+import { useDemoSlots } from "../agenda-local";
 
 type Appointment = { time: string; name: string; service: string; simulated: boolean };
 type Status = "agendado" | "confirmado" | "cancelado";
@@ -35,21 +37,31 @@ function saveStatuses(statuses: Record<string, Status>) {
   window.dispatchEvent(new Event(eventName));
 }
 
+export function resetDemoStatuses() { saveStatuses({}); }
+
 /** Somente situações fictícias são guardadas no navegador até o próximo dia. */
 export function DemoAgenda({ appointments }: { appointments: Appointment[] }) {
   const snapshot = useSyncExternalStore(subscribe, readSnapshot, () => empty);
+  const slots = useDemoSlots();
   const statuses = JSON.parse(snapshot) as Record<string, Status>;
+  const rows = [...appointments.filter((item) => !item.simulated || !slots.some((slot) => slot.time === item.time)), ...slots.map((slot) => ({ time: slot.time, name: "Sua simulação", service: demoServices[slot.service].name, simulated: true }))].sort((a, b) => a.time.localeCompare(b.time));
   function update(item: Appointment, status: Status) {
     const key = `${item.time}:${item.service}`;
     const next = { ...statuses, [key]: status };
     saveStatuses(next);
   }
   return (
+    <>
+    <div className="mt-6 grid gap-3 sm:grid-cols-3">
+      <div className="rounded-2xl border border-line bg-surface p-5"><p className="text-sm text-ink-muted">Agendamentos de exemplo</p><p className="mt-2 font-heading text-3xl font-semibold">{rows.length}</p></div>
+      <div className="rounded-2xl border border-line bg-surface p-5"><p className="text-sm text-ink-muted">Profissionais</p><p className="mt-2 font-heading text-3xl font-semibold">2</p></div>
+      <div className="rounded-2xl border border-line bg-surface p-5"><p className="text-sm text-ink-muted">Clientes de exemplo</p><p className="mt-2 font-heading text-3xl font-semibold">{rows.length}</p></div>
+    </div>
     <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
       <h2 className="font-heading text-xl font-semibold">Agenda de exemplo</h2>
       <p className="mt-1 text-sm text-ink-muted">Experimente confirmar ou cancelar. As alterações são fictícias e reiniciam diariamente neste navegador.</p>
       <ul className="mt-4 divide-y divide-line">
-        {appointments.map((item) => {
+        {rows.map((item) => {
           const saved = statuses[`${item.time}:${item.service}`];
           const status = saved === "confirmado" || saved === "cancelado" ? saved : "agendado";
           return <li key={item.time} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-4">
@@ -65,5 +77,6 @@ export function DemoAgenda({ appointments }: { appointments: Appointment[] }) {
         })}
       </ul>
     </section>
+    </>
   );
 }
