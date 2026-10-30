@@ -4,12 +4,13 @@ import { eq } from "drizzle-orm";
 import { bookings, tenants, whatsappInboundEvents, whatsappMessages } from "@/db/schema";
 import { setWhatsAppChannelForTests } from "@/server/whatsapp/channel";
 import { FakeWhatsAppChannel } from "@/server/whatsapp/fake-client";
-import { handleMetaWebhookPost } from "@/server/whatsapp/webhook";
+import { handleMetaWebhookPost, resolveInboundEvent } from "@/server/whatsapp/webhook";
 import { processInteractiveButtonReply } from "@/server/whatsapp/interactive-actions";
 import { hashToken } from "@/server/auth/session";
 import { withTenant } from "@/server/tenant-db";
 import { seedBooking, seedTenant } from "../helpers/agenda-fixtures";
 import { createTestDb } from "../helpers/test-db";
+import { seedSuperAdmin } from "../helpers/platform-fixtures";
 
 describe("Meta WhatsApp Webhook Handling", () => {
   const secret = "test_meta_app_secret";
@@ -185,8 +186,9 @@ describe("Meta WhatsApp Webhook Handling", () => {
         endsAt: new Date(start.getTime() + 1_800_000), blockedUntil: new Date(start.getTime() + 1_800_000),
       });
       expect((await processInteractiveButtonReply(db, `CANCEL:${booking.id}:${token}`, "5511999998888")).ok).toBe(false);
+      expect((await processInteractiveButtonReply(db, `CANCEL:${booking.id}:${token}`, "5511999990000")).ok).toBe(false);
       await withTenant(db, tenant.id, (tx) => tx.update(bookings).set({ status: "completed" }).where(eq(bookings.id, booking.id)));
-      expect((await processInteractiveButtonReply(db, `CANCEL:${booking.id}:${token}`, "5511999998888")).ok).toBe(false);
+      expect((await processInteractiveButtonReply(db, `CANCEL:${booking.id}:${token}`, "5511999990000")).ok).toBe(false);
     });
     it("atualiza agendamento para confirmed ao receber clique em CONFIRM", async () => {
       const db = await createTestDb();
@@ -207,7 +209,7 @@ describe("Meta WhatsApp Webhook Handling", () => {
                   messaging_product: "whatsapp",
                   messages: [
                     {
-                      from: "5511999998888",
+                      from: "5511999990000",
                       id: "wamid.reply1",
                       type: "button",
                       button: { payload: `CONFIRM:${booking.id}:${rawToken}`, text: "Confirmar" },
@@ -248,7 +250,7 @@ describe("Meta WhatsApp Webhook Handling", () => {
                   messaging_product: "whatsapp",
                   messages: [
                     {
-                      from: "5511999998888",
+                      from: "5511999990000",
                       id: "wamid.reply2",
                       type: "interactive",
                       interactive: {
@@ -345,8 +347,16 @@ describe("Meta WhatsApp Webhook Handling", () => {
       await expect(handleMetaWebhookPost(db, payload, sign(payload), secret)).rejects.toThrow();
       const [event] = await db.select().from(whatsappInboundEvents).where(eq(whatsappInboundEvents.id, "wamid.uncertain"));
       expect(event.state).toBe("uncertain");
+      expect(event.payloadEncrypted).not.toContain("5511999997777");
       await handleMetaWebhookPost(db, payload, sign(payload), secret);
       expect(fakeChannel.sentMessages).toHaveLength(0);
+      const admin = await seedSuperAdmin(db);
+      await resolveInboundEvent(db, "wamid.uncertain", admin.id, "retry");
+      expect(fakeChannel.sentMessages).toHaveLength(1);
+      const [recovered] = await db.select().from(whatsappInboundEvents).where(eq(whatsappInboundEvents.id, "wamid.uncertain"));
+      expect(recovered.state).toBe("completed");
+      expect(recovered.payloadEncrypted).toBeNull();
+      await expect(resolveInboundEvent(db, "wamid.uncertain", admin.id, "retry")).rejects.toThrow();
     });
   });
 });

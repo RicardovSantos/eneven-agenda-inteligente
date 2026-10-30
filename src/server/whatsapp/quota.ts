@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { plans, tenants, whatsappMessages } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { addDaysToDate, localDateOf, zonedInstant } from "@/server/agenda/time";
@@ -27,6 +27,6 @@ export async function checkMetaDailyLimit(db: Db, now: Date = new Date()) {
     .from(whatsappMessages).where(and(eq(whatsappMessages.direction, "outbound"),
       inArray(whatsappMessages.status, ["sending", "sent", "delivered", "read"]),
       gte(whatsappMessages.createdAt, new Date(now.getTime() - 24 * 60 * 60 * 1000)),
-      lt(whatsappMessages.createdAt, now)));
+      lte(whatsappMessages.createdAt, now)));
   return { count: row.count, allowed: row.count < 250, warnSuperAdmin: row.count >= 175 };
 }

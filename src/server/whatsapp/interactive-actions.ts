@@ -1,11 +1,12 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { bookings, tenants, whatsappMessages } from "@/db/schema";
+import { bookings, customers, tenants, whatsappMessages } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { cancelBooking, findBookingByManageToken, setBookingStatus } from "@/server/agenda/bookings";
 import { BookingError } from "@/server/agenda/errors";
 import { appUrl } from "@/server/email/templates";
 import { withTenant } from "@/server/tenant-db";
 import { getWhatsAppChannel } from "./channel";
+import { normalizeBrazilPhone } from "@/lib/phone";
 
 /**
  * Processa resposta interativa de botão (Confirmar, Remarcar ou Cancelar).
@@ -24,14 +25,19 @@ export async function processInteractiveButtonReply(
     return { ok: false, error: "Token de gerenciamento inválido" };
   }
   const [booking] = await withTenant(db, verified.tenantId, (tx) =>
-    tx.select({ status: bookings.status }).from(bookings).where(eq(bookings.id, bookingId)).limit(1),
+    tx.select({ status: bookings.status, phone: customers.phone }).from(bookings)
+      .innerJoin(customers, and(eq(customers.id, bookings.customerId), eq(customers.tenantId, bookings.tenantId)))
+      .where(eq(bookings.id, bookingId)).limit(1),
   );
   if (!booking) return { ok: false, error: "Agendamento não encontrado" };
+  if (!normalizeBrazilPhone(fromPhone) || normalizeBrazilPhone(fromPhone) !== normalizeBrazilPhone(booking.phone)) {
+    return { ok: false, error: "Número não corresponde ao agendamento." };
+  }
 
   switch (action) {
     case "CONFIRM": {
       if (booking.status === "scheduled") {
-        await setBookingStatus(db, verified.tenantId, bookingId, "confirmed");
+        await setBookingStatus(db, verified.tenantId, bookingId, "confirmed", true);
       }
       if (booking.status !== "scheduled" && booking.status !== "confirmed") {
         return { ok: false, error: "Agendamento não pode ser confirmado." };

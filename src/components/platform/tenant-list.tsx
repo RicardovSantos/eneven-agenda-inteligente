@@ -6,13 +6,14 @@ import { PLATFORM_PAGE_SIZE, type PlatformTenantItem, type PlatformTenantList } 
 import type { TenantSituation } from "@/server/tenants/release";
 import { SituationBadge } from "./situation-badge";
 
-export type ListState = { situation?: TenantSituation; query: string; page: number };
+export type ListState = { situation?: TenantSituation; query: string; page: number; quotaExceeded?: boolean };
 
 /** Monta `/admin?situacao=...&q=...&pagina=...` só com o que foi escolhido. */
 export function listHref(state: Partial<ListState>): string {
   const params = new URLSearchParams();
   if (state.situation) params.set("situacao", state.situation);
   if (state.query) params.set("q", state.query);
+  if (state.quotaExceeded) params.set("franquia", "esgotada");
   if (state.page && state.page > 1) params.set("pagina", String(state.page));
   const qs = params.toString();
   return qs ? `/admin?${qs}` : "/admin";
@@ -41,7 +42,7 @@ export function TenantFilters({
           return (
             <Link
               key={f.label}
-              href={listHref({ situation: f.value, query: state.query })}
+              href={listHref({ situation: f.value, query: state.query, quotaExceeded: state.quotaExceeded })}
               aria-current={on ? "true" : undefined}
               className={cn(
                 "inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 text-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
@@ -58,6 +59,7 @@ export function TenantFilters({
           );
         })}
       </nav>
+      <Link href={listHref({ ...state, quotaExceeded: !state.quotaExceeded, page: 1 })} aria-current={state.quotaExceeded ? "true" : undefined} className="rounded-full border border-line px-3 py-2 text-sm">{state.quotaExceeded ? "Mostrar todas as franquias" : "Franquia esgotada"}</Link>
 
       <form
         action="/admin"
@@ -67,6 +69,7 @@ export function TenantFilters({
       >
         <Search className="size-[18px] shrink-0" aria-hidden="true" />
         {state.situation ? <input type="hidden" name="situacao" value={state.situation} /> : null}
+        {state.quotaExceeded ? <input type="hidden" name="franquia" value="esgotada" /> : null}
         <label htmlFor="busca-estabelecimento" className="sr-only">
           Buscar estabelecimento
         </label>
@@ -120,6 +123,7 @@ export function TenantTable({ items, now }: { items: PlatformTenantItem[]; now: 
               <th scope="col" className="border-b border-line px-3 py-3.5 font-semibold">Situação</th>
               <th scope="col" className="border-b border-line px-3 py-3.5 font-semibold">Plano</th>
               <th scope="col" className="border-b border-line px-3 py-3.5 text-right font-semibold">Agend. 30 dias</th>
+              <th scope="col" className="border-b border-line px-3 py-3.5 font-semibold">WhatsApp no mês</th>
               <th scope="col" className="border-b border-line px-5 py-3.5 font-semibold">Último acesso</th>
             </tr>
           </thead>
@@ -144,6 +148,7 @@ export function TenantTable({ items, now }: { items: PlatformTenantItem[]; now: 
                   </td>
                   <td className={CELL}>{t.planName}</td>
                   <td className={cn(CELL, "text-right tabular-nums")}>{t.bookings30d}</td>
+                  <td className={CELL}>{t.whatsappUsage ? <span className={t.whatsappUsage.allowed ? "" : "text-danger"}>{t.whatsappUsage.used}/{t.whatsappUsage.total}{!t.whatsappUsage.allowed ? " · Esgotada" : ""}</span> : "—"}</td>
                   <td className={cn(CELL, "px-5 tabular-nums text-ink-muted")}>
                     {formatLastSeen(t.ownerLastLoginAt, now)}
                   </td>
@@ -177,6 +182,7 @@ export function TenantTable({ items, now }: { items: PlatformTenantItem[]; now: 
                   <span className="min-w-0 truncate">{t.ownerName ?? "—"}</span>
                   <span>{t.planName}</span>
                   <span className="tabular-nums">{t.bookings30d} agend. em 30 dias</span>
+                  {t.whatsappUsage ? <span className={t.whatsappUsage.allowed ? "" : "text-danger"}>WhatsApp: {t.whatsappUsage.used}/{t.whatsappUsage.total}{!t.whatsappUsage.allowed ? " · Esgotada" : ""}</span> : null}
                 </span>
               </Link>
             </li>

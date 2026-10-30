@@ -71,6 +71,27 @@
       "when": 1793299785186,
       "tag": "0009_striped_surge",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793302751809,
+      "tag": "0010_cultured_millenium_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793302814719,
+      "tag": "0011_orange_groot",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793353814973,
+      "tag": "0012_messy_energizer",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
-import { whatsappInboundEvents, whatsappMessages } from "@/db/schema";
+import { and, eq, inArray, lte, or, sql } from "drizzle-orm";
+import { auditLog, whatsappInboundEvents, whatsappMessages } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { withTenant } from "@/server/tenant-db";
+import { decryptInboundEvent, encryptInboundEvent } from "./event-crypto";
 import {
   processFreeTextMessage,
   processInteractiveButtonReply,
@@ -54,6 +55,46 @@ type MetaIncomingMessage = {
     body: string;
   };
 };
+
+async function executeIncoming(db: Db, m: MetaIncomingMessage): Promise<void> {
+  if (m.type === "button" && m.button?.payload) {
+    const result = await processInteractiveButtonReply(db, m.button.payload, m.from);
+    if (result.uncertain) throw new Error("Envio de resposta com resultado incerto.");
+  } else if (m.type === "interactive" && m.interactive?.button_reply) {
+    const result = await processInteractiveButtonReply(db, m.interactive.button_reply.id, m.from);
+    if (result.uncertain) throw new Error("Envio de resposta com resultado incerto.");
+  } else if (m.type === "text") {
+    if (!(await processFreeTextMessage(db, m.from)).ok) throw new Error("Envio de resposta com resultado incerto.");
+  }
+}
+
+async function completeIncoming(db: Db, id: string): Promise<void> {
+  await db.update(whatsappInboundEvents).set({ state: "completed", completedAt: new Date(), payloadEncrypted: null }).where(eq(whatsappInboundEvents.id, id));
+}
+
+/** Operação de plataforma: chamador deve verificar o superadministrador. */
+export async function resolveInboundEvent(db: Db, id: string, actorUserId: string, resolution: "completed" | "retry", now: Date = new Date()): Promise<void> {
+  const stale = new Date(now.getTime() - 5 * 60_000);
+  const [claimed] = await db.update(whatsappInboundEvents).set({ state: "processing", claimedAt: now, attempts: sql`${whatsappInboundEvents.attempts} + 1` })
+    .where(and(eq(whatsappInboundEvents.id, id), or(eq(whatsappInboundEvents.state, "uncertain"), and(eq(whatsappInboundEvents.state, "processing"), lte(whatsappInboundEvents.claimedAt, stale)))))
+    .returning({ payloadEncrypted: whatsappInboundEvents.payloadEncrypted });
+  if (!claimed) throw new Error("Evento indisponível para revisão.");
+  try {
+    if (resolution === "retry") {
+      if (!claimed.payloadEncrypted) throw new Error("Evento antigo sem conteúdo para reprocessar.");
+      const message = decryptInboundEvent<MetaIncomingMessage>(id, claimed.payloadEncrypted);
+      if (message.id !== id) throw new Error("Evento inválido.");
+      await executeIncoming(db, message);
+    }
+    await db.transaction(async (tx) => {
+      await tx.update(whatsappInboundEvents).set({ state: "completed", completedAt: new Date(), payloadEncrypted: null }).where(eq(whatsappInboundEvents.id, id));
+      await tx.insert(auditLog).values({ actorUserId, action: "whatsapp.inbound_resolved", details: { eventId: id, resolution } });
+    });
+  } catch (error) {
+    await db.update(whatsappInboundEvents).set({ state: "uncertain" }).where(eq(whatsappInboundEvents.id, id));
+    throw error;
+  }
+}
 
 type MetaWebhookPayload = {
   object: string;
@@ -143,26 +184,11 @@ export async function handleMetaWebhookPost(
           // Claim persistente impede que entregas concorrentes da Meta repitam efeitos.
           // Se o processo parar durante o envio, permanece processing para revisão;
           // reenvio automático poderia duplicar uma mensagem já aceita pela Meta.
-          const claimed = await db.insert(whatsappInboundEvents).values({ id: m.id }).onConflictDoNothing().returning({ id: whatsappInboundEvents.id });
+          const claimed = await db.insert(whatsappInboundEvents).values({ id: m.id, payloadEncrypted: encryptInboundEvent(m.id, m) }).onConflictDoNothing().returning({ id: whatsappInboundEvents.id });
           if (!claimed.length) continue;
-          const fromPhone = m.from;
           try {
-          // Clique em botão interativo
-          if (m.type === "button" && m.button?.payload) {
-            const result = await processInteractiveButtonReply(db, m.button.payload, fromPhone);
-            if (result.uncertain) throw new Error("Envio de resposta com resultado incerto.");
-          } else if (m.type === "interactive" && m.interactive?.button_reply) {
-            const result = await processInteractiveButtonReply(
-              db,
-              m.interactive.button_reply.id,
-              fromPhone,
-            );
-            if (result.uncertain) throw new Error("Envio de resposta com resultado incerto.");
-          } else if (m.type === "text") {
-            // Mensagem livre de texto
-            if (!(await processFreeTextMessage(db, fromPhone)).ok) throw new Error("Envio de resposta com resultado incerto.");
-          }
-          await db.update(whatsappInboundEvents).set({ state: "completed", completedAt: new Date() }).where(eq(whatsappInboundEvents.id, m.id));
+          await executeIncoming(db, m);
+          await completeIncoming(db, m.id);
           } catch (error) {
             await db.update(whatsappInboundEvents).set({ state: "uncertain" }).where(eq(whatsappInboundEvents.id, m.id));
             throw error;

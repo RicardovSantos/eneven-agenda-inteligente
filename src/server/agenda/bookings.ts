@@ -359,6 +359,7 @@ export async function setBookingStatus(
   tenantId: string,
   bookingId: string,
   status: Exclude<BookingStatus, "canceled">,
+  viaWhatsApp = false,
 ): Promise<void> {
   try {
     await withTenant(db, tenantId, async (tx) => {
@@ -368,7 +369,7 @@ export async function setBookingStatus(
       }
       await tx
         .update(bookings)
-        .set({ status, updatedAt: new Date() })
+        .set({ status, updatedAt: new Date(), ...(status === "confirmed" ? { confirmedViaWhatsappAt: viaWhatsApp ? new Date() : null } : status === "scheduled" ? { confirmedViaWhatsappAt: null } : {}) })
         .where(and(eq(bookings.tenantId, tenantId), eq(bookings.id, bookingId)));
     });
   } catch (error) {

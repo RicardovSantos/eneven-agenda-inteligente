@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { whatsappMessages, whatsappQueue } from "@/db/schema";
 import { withTenant } from "@/server/tenant-db";
-import { processQueue } from "@/server/whatsapp/queue";
+import { processQueue, resolveOutboundQueue } from "@/server/whatsapp/queue";
 import { FakeWhatsAppChannel } from "@/server/whatsapp/fake-client";
 import { setWhatsAppChannelForTests } from "@/server/whatsapp/channel";
 import { seedBooking, seedTenant } from "../helpers/agenda-fixtures";
 import { createTestDb } from "../helpers/test-db";
+import { seedSuperAdmin } from "../helpers/platform-fixtures";
 
 afterEach(() => setWhatsAppChannelForTests(null));
 
@@ -40,6 +41,10 @@ describe("processamento de fila", () => {
     const [row] = await withTenant(db, tenant.id, (tx) => tx.select().from(whatsappQueue));
     expect(row.errorMessage).toContain("incerto");
     expect(row.lockedUntil).not.toBeNull();
+    const admin = await seedSuperAdmin(db);
+    await resolveOutboundQueue(db, tenant.id, row.id, admin.id, "retry");
+    expect((await processQueue(db, 1, now)).sent).toBe(1);
+    expect(fake.sentMessages).toHaveLength(1);
   });
 
   it("não envia quando a franquia do estabelecimento está esgotada", async () => {

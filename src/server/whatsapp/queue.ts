@@ -1,5 +1,5 @@
-import { and, asc, eq, gte, isNull, lte, sql } from "drizzle-orm";
-import { bookingServices, bookings, customers, plans, professionals, tenantNotificationSettings, tenants, whatsappMessages, whatsappQueue } from "@/db/schema";
+import { and, asc, eq, gte, isNull, lt, lte, sql } from "drizzle-orm";
+import { auditLog, bookingServices, bookings, customers, plans, professionals, tenantNotificationSettings, tenants, whatsappMessages, whatsappQueue } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { localDateOf, zonedInstant, addDaysToDate } from "@/server/agenda/time";
 import { issueAdditionalManageToken } from "@/server/agenda/bookings";
@@ -18,7 +18,7 @@ async function reserveNext(db: Db, now: Date) {
     await tx.execute(sql`select pg_advisory_xact_lock(381942730)`);
     const [item] = await tx.select().from(whatsappQueue)
       .where(and(isNull(whatsappQueue.processedAt), isNull(whatsappQueue.lockedUntil), lte(whatsappQueue.scheduledFor, now)))
-      .orderBy(asc(whatsappQueue.scheduledFor), asc(whatsappQueue.id)).limit(1).for("update", { skipLocked: true });
+      .orderBy(sql`case when ${whatsappQueue.templateType} = 'reminder_eve' then 0 else 1 end`, asc(whatsappQueue.scheduledFor), asc(whatsappQueue.id)).limit(1).for("update", { skipLocked: true });
     if (!item) return null;
     const data = await withTenantTx(tx, item.tenantId, async (t) => {
       const [booking] = await t.select({ id: bookings.id, status: bookings.status, startsAt: bookings.startsAt, customerName: customers.name, phone: customers.phone, professionalName: professionals.name })
@@ -45,7 +45,7 @@ async function reserveNext(db: Db, now: Date) {
     const start = zonedInstant(monthStart, 0, tenant!.timezone);
     const end = zonedInstant(nextMonth, 0, tenant!.timezone);
     const counted = sql`${whatsappMessages.direction} = 'outbound' and ${whatsappMessages.status} in ('sending','sent','delivered','read')`;
-    const [usage] = await tx.select({ n: sql<number>`count(*)::int` }).from(whatsappMessages).where(and(eq(whatsappMessages.tenantId, item.tenantId), counted, gte(whatsappMessages.createdAt, start), sql`${whatsappMessages.createdAt} < ${end}`));
+    const [usage] = await tx.select({ n: sql<number>`count(*)::int` }).from(whatsappMessages).where(and(eq(whatsappMessages.tenantId, item.tenantId), counted, gte(whatsappMessages.createdAt, start), lt(whatsappMessages.createdAt, end)));
     const [daily] = await tx.select({ n: sql<number>`count(distinct ${whatsappMessages.recipientPhone})::int`, already: sql<boolean>`coalesce(bool_or(${whatsappMessages.recipientPhone} = ${booking.phone}), false)` })
       .from(whatsappMessages).where(and(counted, gte(whatsappMessages.createdAt, new Date(now.getTime() - 86_400_000)), lte(whatsappMessages.createdAt, now)));
     if (usage.n >= (tenant!.status === "trial" ? 50 : tenant!.limit) || (daily.n >= 250 && !daily.already)) {
@@ -54,7 +54,7 @@ async function reserveNext(db: Db, now: Date) {
     }
     const [message] = await withTenantTx(tx, item.tenantId, async (t) => {
       await t.update(whatsappQueue).set({ lockedUntil: CLAIM_UNTIL, attempts: item.attempts + 1 }).where(eq(whatsappQueue.id, item.id));
-      return t.insert(whatsappMessages).values({ tenantId: item.tenantId, bookingId: item.bookingId, recipientPhone: booking.phone, recipientName: booking.customerName, templateType: item.templateType, status: "sending", createdAt: now }).returning({ id: whatsappMessages.id });
+      return t.insert(whatsappMessages).values({ tenantId: item.tenantId, bookingId: item.bookingId, queueId: item.id, recipientPhone: booking.phone, recipientName: booking.customerName, templateType: item.templateType, status: "sending", createdAt: now }).returning({ id: whatsappMessages.id });
     });
     return { skipped: false as const, item, booking, tenant: tenant!, serviceName: data.services.map((s) => s.name).join(", "), messageId: message.id };
   });
@@ -88,4 +88,23 @@ export async function processQueue(db: Db, maxBatch = 20, now: Date = new Date()
     }
   }
   return summary;
+}
+
+/** Revisão manual após confirmar na Meta o resultado de uma tentativa incerta. */
+export async function resolveOutboundQueue(db: Db, tenantId: string, queueId: string, actorUserId: string, resolution: "completed" | "retry", now: Date = new Date()): Promise<void> {
+  await db.transaction(async (tx) => {
+    await withTenantTx(tx, tenantId, async (t) => {
+      const [item] = await t.select().from(whatsappQueue).where(and(eq(whatsappQueue.tenantId, tenantId), eq(whatsappQueue.id, queueId))).for("update").limit(1);
+      if (!item || !item.lockedUntil || item.processedAt) throw new Error("Ocorrência indisponível.");
+      const [message] = await t.select().from(whatsappMessages).where(and(eq(whatsappMessages.tenantId, tenantId), eq(whatsappMessages.queueId, queueId), eq(whatsappMessages.status, "sending"))).orderBy(asc(whatsappMessages.createdAt)).limit(1);
+      if (!message || (!item.errorMessage && now.getTime() - message.createdAt.getTime() < 5 * 60_000)) throw new Error("Aguarde o processamento ou confirme a ocorrência.");
+      await t.update(whatsappMessages).set(resolution === "completed"
+        ? { status: "sent", sentAt: now, failureReason: "Confirmado manualmente" }
+        : { status: "failed", failureReason: "Reenvio autorizado após revisão" }).where(eq(whatsappMessages.id, message.id));
+      await t.update(whatsappQueue).set(resolution === "completed"
+        ? { processedAt: now, lockedUntil: null, errorMessage: null }
+        : { lockedUntil: null, errorMessage: null }).where(eq(whatsappQueue.id, item.id));
+    });
+    await tx.insert(auditLog).values({ actorUserId, tenantId, action: "whatsapp.outbound_resolved", details: { queueId, resolution } });
+  });
 }

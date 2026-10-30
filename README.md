@@ -2,6 +2,12 @@
 
 SaaS de agendamento multiempresa para negócios que trabalham com hora marcada (salões de beleza, estúdios de piercing, estética). Cada estabelecimento ganha um link público próprio, onde o cliente final agenda sozinho, um painel com agenda, clientes, faturamento e indicadores, e lembretes automáticos no WhatsApp que reduzem faltas. É vendido por assinatura barata e configurado pelo próprio estabelecimento, sem código novo por cliente.
 
+### WhatsApp automático (Plano 4 em desenvolvimento)
+
+Configure `WHATSAPP_API_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_API_VERSION` e `CRON_SECRET` no servidor. Configure o webhook da Meta e os modelos aprovados antes de ativar o envio. Um agendador externo deve chamar `POST /api/cron/whatsapp` periodicamente com o cabeçalho `Authorization: Bearer <CRON_SECRET>`. Guarde os segredos fora do repositório.
+
+O processamento reserva a franquia antes de enviar. Uma falha com resultado incerto exige revisão em `/admin/whatsapp`: confira na Meta se a mensagem foi aceita antes de concluir ou autorizar nova tentativa. Não há garantia de envio exatamente uma vez em falhas de comunicação. Eventos recebidos pendentes de revisão são cifrados com uma chave derivada de `SESSION_SECRET` e removidos após conclusão; trocar ou perder esse segredo impede decifrar os eventos antigos. Resolva as pendências antes da rotação ou preserve o segredo antigo de modo seguro para recuperação.
+
 ## O que já funciona
 
 - Cadastro (senha ou Google), confirmação de e-mail e assistente de primeiros passos (estabelecimento, horário, serviços e equipe).

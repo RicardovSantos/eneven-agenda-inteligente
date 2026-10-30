@@ -441,6 +441,7 @@ export const bookings = pgTable(
     manageTokenHash: text("manage_token_hash"),
     notes: text("notes"),
     canceledAt: timestamptz("canceled_at"),
+    confirmedViaWhatsappAt: timestamptz("confirmed_via_whatsapp_at"),
     canceledBy: canceledBy("canceled_by"),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, {
       onDelete: "set null",
@@ -586,6 +587,7 @@ export const whatsappMessages = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: tenantIdColumn(),
     bookingId: uuid("booking_id"),
+    queueId: uuid("queue_id"),
     direction: text("direction").notNull().default("outbound"),
     templateType: whatsappTemplateType("template_type"),
     recipientPhone: text("recipient_phone").notNull(),
@@ -605,6 +607,7 @@ export const whatsappMessages = pgTable(
       columns: [t.tenantId, t.bookingId],
       foreignColumns: [bookings.tenantId, bookings.id],
     }).onDelete("set null"),
+    foreignKey({ name: "whatsapp_messages_queue_fk", columns: [t.tenantId, t.queueId], foreignColumns: [whatsappQueue.tenantId, whatsappQueue.id] }).onDelete("set null"),
     index("whatsapp_messages_tenant_created_idx").on(t.tenantId, t.createdAt),
     index("whatsapp_messages_wam_id_idx").on(t.wamId),
     index("whatsapp_messages_phone_created_idx").on(t.recipientPhone, t.createdAt),
@@ -641,6 +644,7 @@ export const whatsappQueue = pgTable(
       t.templateType,
       t.eventKey,
     ),
+    unique("whatsapp_queue_tenant_id_id_unique").on(t.tenantId, t.id),
     index("whatsapp_queue_due_idx").on(t.scheduledFor, t.processedAt, t.lockedUntil),
   ],
 );
@@ -668,6 +672,10 @@ export const whatsappInboundEvents = pgTable("whatsapp_inbound_events", {
   id: text("id").primaryKey(),
   state: text("state").notNull().default("processing"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
+  claimedAt: timestamptz("claimed_at").notNull().defaultNow(),
+  attempts: integer("attempts").notNull().default(1),
+  /** Conteúdo cifrado temporário para recuperação; removido ao concluir. */
+  payloadEncrypted: text("payload_encrypted"),
   completedAt: timestamptz("completed_at"),
 }, (t) => [check("whatsapp_inbound_event_state_check", sql`${t.state} in ('processing', 'completed', 'uncertain')`)]);
 

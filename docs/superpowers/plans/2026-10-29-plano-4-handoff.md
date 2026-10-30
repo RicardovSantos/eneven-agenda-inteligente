@@ -1,5 +1,11 @@
 # Plano 4 — handoff para continuidade
 
+## Atualização de 30/10/2026
+
+- Alterações locais posteriores: prioridade de lembrete da véspera na fila, janela diária de cota consistente, histórico de mensagens no detalhe do agendamento, consumo de WhatsApp na lista da plataforma, indicador de limite diário e orientações no README. A correção de lint foi aplicada, mas deve ser confirmada por nova execução.
+- O build e o lint passaram em versões anteriores às últimas mudanças. `test:pg` foi ignorado por falta de `TEST_DATABASE_URL`; não foi uma execução PostgreSQL. Os testes e verificações devem ser executados novamente sobre a versão final.
+- Foram adicionados filtro de franquia esgotada e contagem de confirmação pelo WhatsApp com a migração 0012; ainda precisam de validação. Continuam pendentes os cenários e2e completos, revisão do conjunto e CI PostgreSQL. Confira a implementação completa contra o plano antes de marcar tarefas como concluídas.
+
 Atualizado em 29/10/2026. Leia este arquivo primeiro, depois o plano completo `2026-10-29-plano-4-whatsapp.md` e as instruções de `AGENTS.md`. O trabalho está em andamento; não considere o Plano 4 concluído nem pronto para produção.
 
 ## Onde parou

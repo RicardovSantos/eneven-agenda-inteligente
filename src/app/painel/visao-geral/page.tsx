@@ -14,6 +14,10 @@ import { getDashboard, listPendingOutcomes } from "@/server/dashboard";
 import { requirePanelRole } from "@/server/panel/roles";
 import { isTenantReleased } from "@/server/tenants/release";
 import { checkTenantQuota } from "@/server/whatsapp/quota";
+import { and, eq, gte, lt, isNotNull, inArray, countDistinct } from "drizzle-orm";
+import { bookings, whatsappMessages } from "@/db/schema";
+import { withTenant } from "@/server/tenant-db";
+import { addDaysToDate, zonedInstant } from "@/server/agenda/time";
 
 export const metadata: Metadata = { title: "Visão geral" };
 
@@ -25,10 +29,18 @@ export default async function VisaoGeralPage({ searchParams }: PageProps<"/paine
   const month = parseMonthParam((await searchParams).mes, today.slice(0, 7));
 
   const db = await getDb();
-  const [dashboard, pending, quota] = await Promise.all([
+  const first = `${today.slice(0, 7)}-01`;
+  const next = `${addDaysToDate(`${first.slice(0, 7)}-28`, 4).slice(0, 7)}-01`;
+  const [dashboard, pending, quota, confirmations] = await Promise.all([
     getDashboard(db, { tenantId: session.tenantId, month, timezone, now }),
     listPendingOutcomes(db, session.tenantId, now),
     checkTenantQuota(db, session.tenantId, now),
+    withTenant(db, session.tenantId, async (tx) => {
+      const [row] = await tx.select({ reminders: countDistinct(whatsappMessages.bookingId), confirmed: countDistinct(bookings.id) }).from(whatsappMessages)
+        .leftJoin(bookings, and(eq(bookings.id, whatsappMessages.bookingId), eq(bookings.tenantId, whatsappMessages.tenantId), isNotNull(bookings.confirmedViaWhatsappAt), gte(bookings.confirmedViaWhatsappAt, zonedInstant(first, 0, timezone)), lt(bookings.confirmedViaWhatsappAt, zonedInstant(next, 0, timezone))))
+        .where(and(eq(whatsappMessages.tenantId, session.tenantId), inArray(whatsappMessages.templateType, ["reminder_eve", "reminder_2h"]), inArray(whatsappMessages.status, ["sent", "delivered", "read"]), gte(whatsappMessages.createdAt, zonedInstant(first, 0, timezone)), lt(whatsappMessages.createdAt, zonedInstant(next, 0, timezone))));
+      return row;
+    }),
   ]);
 
   const released = isTenantReleased({
@@ -59,6 +71,7 @@ export default async function VisaoGeralPage({ searchParams }: PageProps<"/paine
       <PendingReview items={items} />
       <StatTiles data={dashboard} />
       <section className="rounded-card border border-line bg-surface p-5"><h2 className="font-semibold">Mensagens WhatsApp</h2><p>{quota.used} de {quota.total} mensagens usadas neste mês.</p>{!quota.allowed ? <p className="text-danger">Franquia esgotada. Use o WhatsApp manual para lembrar seus clientes.</p> : null}</section>
+      <p className="text-sm text-ink-muted">Confirmações pelo WhatsApp entre atendimentos lembrados neste mês: {confirmations.reminders ? `${Math.round(confirmations.confirmed / confirmations.reminders * 100)}% (${confirmations.confirmed}/${confirmations.reminders})` : "sem lembretes enviados"}.</p>
       <DayBars
         days={dashboard.perDay}
         month={month}

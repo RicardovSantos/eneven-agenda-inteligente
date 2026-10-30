@@ -8,6 +8,7 @@ import {
   professionals,
   tenants,
   timeBlocks,
+  whatsappMessages,
 } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { formatTime } from "@/lib/dates";
@@ -53,6 +54,7 @@ export type DayBooking = {
   customer: { id: string; name: string; phone: string; visits: number };
   services: Array<{ name: string; durationMin: number; priceCents: number }>;
   professional: { id: string; name: string; color: string | null };
+  whatsappHistory?: Array<{ id: string; templateType: string | null; status: string; createdAt: string }>;
 };
 
 export type DayBlock = {
@@ -299,6 +301,9 @@ export async function getDayAgenda(
       );
 
     const ids = rows.map((r) => r.id);
+    const messages = ids.length ? await tx.select({ id: whatsappMessages.id, bookingId: whatsappMessages.bookingId, templateType: whatsappMessages.templateType, status: whatsappMessages.status, createdAt: whatsappMessages.createdAt })
+      .from(whatsappMessages).where(and(eq(whatsappMessages.tenantId, tenantId), eq(whatsappMessages.direction, "outbound"), inArray(whatsappMessages.bookingId, ids)))
+      .orderBy(asc(whatsappMessages.createdAt)) : [];
     const lines = ids.length
       ? await tx
           .select({
@@ -371,6 +376,7 @@ export async function getDayAgenda(
         .filter((l) => l.bookingId === r.id)
         .map((l) => ({ name: l.name, durationMin: l.durationMin, priceCents: l.priceCents })),
       professional: { id: r.professionalId, name: r.professionalName, color: r.professionalColor },
+      whatsappHistory: messages.filter((m) => m.bookingId === r.id).map((m) => ({ id: m.id, templateType: m.templateType, status: m.status, createdAt: m.createdAt.toISOString() })),
     }));
 
     const blockItems = blockRows.map((b): DayBlock => {
