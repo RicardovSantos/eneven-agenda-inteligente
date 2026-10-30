@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { expect, it, vi } from "vitest";
-import { bookings, memberships, tenantLogos, users } from "@/db/schema";
+import { bookings, invitations, memberships, tenantLogos, users, whatsappMessages } from "@/db/schema";
 import { exportTenantAgenda } from "@/server/export/agenda";
 import { seedBooking, seedTenant } from "../helpers/agenda-fixtures";
 import { createTestDb } from "../helpers/test-db";
@@ -18,6 +18,8 @@ it("exporta apenas os dados do dono, sem tokens ou dados de outro estabeleciment
   await db.insert(memberships).values({ userId: owner.id, tenantId: a.id, role: "owner" });
   await db.insert(memberships).values({ userId: outsider.id, tenantId: b.id, role: "owner" });
   await db.insert(tenantLogos).values({ tenantId: a.id, mime: "image/png", data: Buffer.from("logo-ficticia") });
+  await db.insert(invitations).values({ tenantId: a.id, name: "Convidada", email: "invite@example.com", role: "staff", tokenHash: "convite-secreto", expiresAt: new Date("2030-01-01T00:00:00Z") });
+  await db.insert(whatsappMessages).values({ tenantId: b.id, recipientPhone: "5511000000000", recipientName: "outra-pessoa" });
   const bookingA = await seedBooking(db, a.id);
   await seedBooking(db, b.id);
   await db.update(bookings).set({ manageTokenHash: "segredo-nao-exportar" }).where(eq(bookings.id, bookingA.id));
@@ -26,6 +28,8 @@ it("exporta apenas os dados do dono, sem tokens ou dados de outro estabeleciment
   expect(data.bookings[0].id).toBe(bookingA.id);
   expect(JSON.stringify(data)).not.toContain("segredo-nao-exportar");
   expect(JSON.stringify(data)).not.toContain("other@example.com");
+  expect(JSON.stringify(data)).not.toContain("convite-secreto");
+  expect(JSON.stringify(data)).not.toContain("outra-pessoa");
   expect(data.logo?.base64).toBe(Buffer.from("logo-ficticia").toString("base64"));
   await expect(exportTenantAgenda(db, { userId: owner.id, tenantId: b.id })).rejects.toThrow("Acesso indisponível");
   state.session = { userId: owner.id, tenantId: a.id, role: "staff", support: false };
