@@ -11,6 +11,16 @@ test("demonstra agendamento fictício e mostra o resultado no painel", async ({ 
   await expect(page.getByText("Sua simulação")).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: "Sua simulação" })).toContainText("Manicure");
   await expect(page.getByRole("listitem").nth(1)).toContainText("Sua simulação");
+  const appointment = page.getByRole("listitem").filter({ hasText: "Sua simulação" });
+  await appointment.getByRole("button", { name: /Confirmar/ }).click();
+  await expect(appointment).toContainText("Confirmado");
+  await appointment.getByRole("button", { name: /Cancelar/ }).click();
+  await expect(appointment).toContainText("Cancelado");
+  await appointment.getByRole("button", { name: /Restaurar/ }).click();
+  await expect(appointment).toContainText("Agendado");
+  await appointment.getByRole("button", { name: /Cancelar/ }).click();
+  await page.reload();
+  await expect(page.getByRole("listitem").filter({ hasText: "Sua simulação" })).toContainText("Agendado");
   await page.goto("/demo/painel?servico=1&horario=10%3A30&dia=2000-01-01");
   await expect(page.getByText("Sua simulação")).toHaveCount(0);
 });

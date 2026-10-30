@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getDemoSelection } from "../dados";
+import { DemoAgenda } from "./agenda";
 
 export const metadata: Metadata = { title: "Painel de demonstração | Eneven", robots: { index: false, follow: false } };
 
@@ -26,13 +27,7 @@ export default async function DemoPanel({ searchParams }: { searchParams: Promis
           <div className="rounded-2xl border border-line bg-surface p-5"><p className="text-sm text-ink-muted">Profissionais</p><p className="mt-2 font-heading text-3xl font-semibold">2</p></div>
           <div className="rounded-2xl border border-line bg-surface p-5"><p className="text-sm text-ink-muted">Clientes de exemplo</p><p className="mt-2 font-heading text-3xl font-semibold">{selection ? 4 : 3}</p></div>
         </div>
-        <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
-          <h2 className="font-heading text-xl font-semibold">Agenda de exemplo</h2>
-          <p className="mt-1 text-sm text-ink-muted">Horários ilustrativos para conhecer o painel.</p>
-          <ul className="mt-4 divide-y divide-line">
-            {appointments.map((item) => <li key={item.time} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-4"><span className={`font-semibold ${item.simulated ? "text-primary" : ""}`}>{item.time}</span><span className="font-semibold">{item.name}</span><span className="text-ink-muted">{item.service}</span>{item.simulated && <span className="ml-auto text-sm text-primary">Fictício</span>}</li>)}
-          </ul>
-        </section>
+        <DemoAgenda appointments={appointments} />
       </div>
     </main>
   );
