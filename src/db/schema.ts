@@ -701,6 +701,8 @@ export const billingSubscriptions = pgTable("billing_subscriptions", {
   planId: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "restrict" }),
   providerId: text("provider_id").unique(),
   providerStatus: text("provider_status").notNull().default("pending"),
+  checkoutUrl: text("checkout_url"),
+  priceCents: integer("price_cents"),
   providerUpdatedAt: timestamptz("provider_updated_at"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [

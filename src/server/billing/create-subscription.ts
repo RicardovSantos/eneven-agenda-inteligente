@@ -1,0 +1,54 @@
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { billingSubscriptions, plans, tenants } from "@/db/schema";
+import type { Db } from "@/db/types";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CHECKOUT_HOSTS = new Set(["www.mercadopago.com.br", "sandbox.mercadopago.com.br", "www.mercadopago.com.ar", "sandbox.mercadopago.com.ar"]);
+
+/** Somente testes. O chamador deve autenticar o dono e obter o e-mail no servidor. */
+export async function createTestSubscription(db: Db, input: {
+  tenantId: string; planId: string; payerEmail: string; backUrl: string;
+}, config: { accessToken: string; collectorId: string; fetcher?: typeof fetch }): Promise<{ checkoutUrl: string }> {
+  if (process.env.NODE_ENV === "production" || !config.accessToken.startsWith("TEST-") || !config.collectorId) throw new Error("Cobrança de teste não configurada.");
+  if (!UUID.test(input.tenantId) || !UUID.test(input.planId) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.payerEmail) || input.payerEmail.length > 254) throw new Error("Dados inválidos.");
+  let back: URL;
+  try { back = new URL(input.backUrl); } catch { throw new Error("Endereço de retorno inválido."); }
+  if (back.protocol !== "https:" || back.username || back.password) throw new Error("Endereço de retorno inválido.");
+  const reserved = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.tenantId}))`);
+    const [tenant] = await tx.select({ id: tenants.id }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+    const [plan] = await tx.select().from(plans).where(and(eq(plans.id, input.planId), eq(plans.active, true))).limit(1).for("share");
+    if (!tenant || !plan || plan.priceCents <= 0) throw new Error("Plano indisponível.");
+    const [existing] = await tx.select({ id: billingSubscriptions.id }).from(billingSubscriptions)
+      .where(and(eq(billingSubscriptions.tenantId, input.tenantId), inArray(billingSubscriptions.providerStatus, ["creating", "uncertain", "pending", "authorized", "paused"]))).limit(1);
+    if (existing) throw new Error("Já existe uma assinatura ou tentativa em análise.");
+    const [subscription] = await tx.insert(billingSubscriptions).values({ tenantId: input.tenantId, planId: plan.id, priceCents: plan.priceCents, providerStatus: "creating" }).returning({ id: billingSubscriptions.id });
+    return { id: subscription.id, priceCents: plan.priceCents, name: plan.name };
+  });
+  try {
+    const response = await (config.fetcher ?? fetch)("https://api.mercadopago.com/preapproval", {
+      method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000),
+      headers: { Authorization: `Bearer ${config.accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ reason: `Eneven - ${reserved.name}`, external_reference: reserved.id, payer_email: input.payerEmail, auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: reserved.priceCents / 100, currency_id: "BRL" }, back_url: back.toString(), status: "pending" }),
+    });
+    if (!response.ok) throw new Error("Falha ao criar assinatura.");
+    const body: unknown = await response.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Resposta inválida.");
+    const result = body as Record<string, unknown>;
+    if (typeof result.id !== "string" || !/^[A-Za-z0-9_-]{1,200}$/.test(result.id) || result.external_reference !== reserved.id || String(result.collector_id ?? "") !== config.collectorId || result.status !== "pending" || typeof result.init_point !== "string") throw new Error("Resposta inválida.");
+    const recurring = result.auto_recurring;
+    if (!recurring || typeof recurring !== "object" || Array.isArray(recurring)) throw new Error("Cobrança inválida.");
+    const terms = recurring as Record<string, unknown>;
+    const amount = terms.transaction_amount;
+    if ((typeof amount !== "number" && (typeof amount !== "string" || !/^\d+(?:\.\d{1,2})?$/.test(amount))) || !Number.isFinite(Number(amount)) || terms.currency_id !== "BRL" || terms.frequency !== 1 || terms.frequency_type !== "months" || Math.abs(Number(amount) * 100 - reserved.priceCents) > 1e-7) throw new Error("Cobrança inválida.");
+    const checkout = new URL(result.init_point);
+    if (checkout.protocol !== "https:" || !CHECKOUT_HOSTS.has(checkout.hostname) || checkout.username || checkout.password || checkout.port) throw new Error("Endereço de pagamento inválido.");
+    const updated = await db.update(billingSubscriptions).set({ providerId: result.id, providerStatus: "pending", checkoutUrl: checkout.toString() }).where(and(eq(billingSubscriptions.id, reserved.id), eq(billingSubscriptions.providerStatus, "creating"))).returning({ id: billingSubscriptions.id });
+    if (!updated.length) throw new Error("Tentativa indisponível.");
+    return { checkoutUrl: checkout.toString() };
+  } catch {
+    // Mesmo um timeout pode ocorrer após o provedor criar a assinatura.
+    await db.update(billingSubscriptions).set({ providerStatus: "uncertain" }).where(and(eq(billingSubscriptions.id, reserved.id), eq(billingSubscriptions.providerStatus, "creating")));
+    throw new Error("Não foi possível confirmar a criação; revise a ocorrência antes de tentar novamente.");
+  }
+}
