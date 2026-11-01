@@ -6,9 +6,9 @@ import { createTestDb } from "../helpers/test-db";
 const state = vi.hoisted(() => ({ db: undefined as unknown, session: undefined as unknown, create: vi.fn(async () => ({ checkoutUrl: "https://sandbox.mercadopago.com.br/checkout" })) }));
 vi.mock("@/db/client", () => ({ getDb: async () => state.db }));
 vi.mock("@/server/auth/guard", () => ({ requireTenantSession: async () => state.session }));
-vi.mock("@/server/billing/create-subscription", () => ({ createTestSubscription: state.create }));
+vi.mock("@/server/billing/create-subscription", () => ({ createSubscription: state.create }));
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw new Error(`redirect:${url}`); } }));
-import { startTestCheckout } from "@/app/painel/configuracoes/assinatura/actions";
+import { startCheckout } from "@/app/painel/configuracoes/assinatura/actions";
 
 afterEach(() => { vi.unstubAllEnvs(); state.create.mockClear(); });
 
@@ -19,16 +19,16 @@ it("aceita somente o dono verificado, plano atual e configuração de teste", as
   vi.stubEnv("NODE_ENV", "test"); vi.stubEnv("MERCADO_PAGO_ACCESS_TOKEN", "TEST-example"); vi.stubEnv("MERCADO_PAGO_COLLECTOR_ID", "42"); vi.stubEnv("MERCADO_PAGO_LIVE_MODE", "false"); vi.stubEnv("APP_URL", "https://agenda.example");
   const form = new FormData(); form.set("planId", tenant.planId); form.set("tenantId", "outra-conta"); form.set("payerEmail", "outro@example.com");
   state.session = { userId: user.id, tenantId: tenant.id, role: "staff", support: false };
-  await expect(startTestCheckout(form)).rejects.toThrow();
+  await expect(startCheckout(form)).rejects.toThrow();
   state.session = { userId: user.id, tenantId: tenant.id, role: "owner", support: true };
-  await expect(startTestCheckout(form)).rejects.toThrow("suporte");
+  await expect(startCheckout(form)).rejects.toThrow("suporte");
   state.session = { userId: user.id, tenantId: tenant.id, role: "owner", support: false };
   form.set("planId", "outro-plano");
-  await expect(startTestCheckout(form)).rejects.toThrow("indisponível");
+  await expect(startCheckout(form)).rejects.toThrow("indisponível");
   expect(state.create).not.toHaveBeenCalled();
   form.set("planId", tenant.planId);
-  await expect(startTestCheckout(form)).rejects.toThrow("redirect:https://sandbox.mercadopago.com.br/checkout");
+  await expect(startCheckout(form)).rejects.toThrow("redirect:https://sandbox.mercadopago.com.br/checkout");
   expect(state.create).toHaveBeenCalledWith(db, expect.objectContaining({ tenantId: tenant.id, planId: tenant.planId, ownerUserId: user.id, payerEmail: "dona@example.com", backUrl: "https://agenda.example/painel/configuracoes/assinatura" }), expect.any(Object));
   vi.stubEnv("NODE_ENV", "production");
-  await expect(startTestCheckout(form)).rejects.toThrow("não configurada");
+  await expect(startCheckout(form)).rejects.toThrow("não configurada");
 });

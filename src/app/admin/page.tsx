@@ -8,6 +8,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { parsePage, parseQuery, parseSituation } from "@/lib/platform-format";
 import { cn } from "@/lib/utils";
 import { requireSuperAdminSession } from "@/server/auth/guard";
+import { liveBillingEnabled } from "@/server/billing/mode";
 import { getPlatformMetrics } from "@/server/platform/metrics";
 import { listPlatformTenants } from "@/server/platform/tenants";
 import { getWhatsAppMetrics } from "@/server/platform/whatsapp-metrics";
@@ -52,7 +53,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
 
       <MetricsCards metrics={metrics} />
       <Link href="/admin/dados" className="text-primary">Revisar dados inativos →</Link>
-      {process.env.NODE_ENV !== "production" ? <Link href="/admin/cobranca" className="text-primary">Revisar assinaturas de teste →</Link> : null}
+      {process.env.NODE_ENV !== "production" || liveBillingEnabled() ? <Link href="/admin/cobranca" className="text-primary">Revisar assinaturas e avisos →</Link> : null}
 
       <section className="rounded-panel border border-line bg-surface p-5">
         <h2 className="font-semibold">WhatsApp da plataforma</h2>

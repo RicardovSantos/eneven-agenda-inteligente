@@ -1,13 +1,14 @@
 import { getDb } from "@/db/client";
 import { safeEqual } from "@/server/auth/signed-cookie";
 import { processPaymentEvents } from "@/server/billing/process-events";
-import { reconcileDueTestBillingAccess } from "@/server/billing/reconcile-due-access";
+import { reconcileDueBillingAccess } from "@/server/billing/reconcile-due-access";
+import { billingAccessEnabled, liveBillingEnabled } from "@/server/billing/mode";
 
 export const dynamic = "force-dynamic";
 
-/** Ambiente de desenvolvimento/teste: não habilitar cobrança real antes da revisão. */
+/** Chamada manual/externa do ciclo de cobrança. Em produção só responde com a cobrança real ligada. */
 export async function POST(request: Request) {
-  if (process.env.NODE_ENV === "production") return new Response("Não disponível", { status: 503 });
+  if (process.env.NODE_ENV === "production" && !liveBillingEnabled()) return new Response("Não disponível", { status: 503 });
   const secret = process.env.CRON_SECRET;
   if (!secret) return new Response("Não configurado", { status: 503 });
   if (!safeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) return new Response("Não autorizado", { status: 401 });
@@ -16,9 +17,10 @@ export async function POST(request: Request) {
   const mode = process.env.MERCADO_PAGO_LIVE_MODE;
   if (!accessToken || !collectorId || (mode !== "true" && mode !== "false")) return new Response("Não configurado", { status: 503 });
   const db = await getDb();
-  const events = await processPaymentEvents(db, { accessToken, collectorId, liveMode: mode === "true" });
-  if (mode === "false" && accessToken.startsWith("TEST-")) {
-    const due = await reconcileDueTestBillingAccess(db, { accessToken, liveMode: false });
+  const config = { accessToken, collectorId, liveMode: mode === "true" };
+  const events = await processPaymentEvents(db, config);
+  if (billingAccessEnabled(config)) {
+    const due = await reconcileDueBillingAccess(db, config);
     return Response.json({ ...events, due });
   }
   return Response.json(events);

@@ -24,6 +24,14 @@ Na página pública, "Nossa equipe" leva cada cartão a `/{slug}/profissional/{i
 
 Categorias de serviço: em Serviços, o campo "Categoria" aceita um nome novo ou um já existente (sem diferenciar maiúsculas); a categoria nasce ao salvar o serviço e some quando fica sem serviços. Serviços sem categoria entram em "Outros serviços". Sem nenhuma categoria cadastrada, a lista continua sem grupos.
 
+### Cobrança (Mercado Pago)
+
+Assinatura mensal no cartão pela API de assinaturas da Mercado Pago (que só aceita cartão de crédito, débito e saldo em conta: Pix recorrente não existe nela). O dono assina e cancela em `/painel/configuracoes/assinatura`; o cancelamento mantém o acesso até o fim do período já pago, sem reembolso do mês. Reembolsos e contestações não mudam o acesso sozinhos: pedem revisão em `/admin/cobranca`.
+
+Variáveis: `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_COLLECTOR_ID` (ID numérico do vendedor, o final do token), `MERCADO_PAGO_WEBHOOK_SECRET` e `MERCADO_PAGO_LIVE_MODE`. A cobrança real **só liga em produção** com `MERCADO_PAGO_LIVE_MODE=true`, token `APP_USR-` e vendedor numérico (`src/server/billing/mode.ts`); sem isso o webhook (`/api/webhooks/mercado-pago`) e o cron respondem 503. Um relógio interno (`src/instrumentation.ts`) roda a cada 10 minutos: processa os avisos, concilia vencimentos, encerra o acesso de assinaturas canceladas e avisa por e-mail os donos com fatura em atraso (carência de 7 dias). Webhook de produção: `https://agenda.eneven.com.br/api/webhooks/mercado-pago`, com os eventos de pagamentos e de assinaturas.
+
+Fora de produção, contas de teste da Mercado Pago (tokens `APP_USR-` de usuário `TESTUSER…`) funcionam com `MERCADO_PAGO_SANDBOX=true` e `MERCADO_PAGO_LIVE_MODE=false`; o app confirma que a conta é de teste antes de criar qualquer assinatura. A Mercado Pago grafa o status `cancelled` (dois "l").
+
 ### Clientes
 
 `/painel/clientes`: lista com busca por nome ou WhatsApp (o cliente entra sozinho ao agendar pelo link, ou é criado à mão em "Novo cliente"), ficha com contato, observações (salvas ao sair do campo), histórico de atendimentos, total gasto e o botão "Agendar", que abre o novo agendamento com o cliente já escolhido. WhatsApp repetido é recusado com um atalho para o cadastro existente. Profissionais veem só os clientes que atenderam e não veem o total gasto.

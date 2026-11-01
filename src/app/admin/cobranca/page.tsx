@@ -5,6 +5,7 @@ import { getDb } from "@/db/client";
 import { billingNotices, billingSubscriptions, tenants } from "@/db/schema";
 import { formatBRL } from "@/lib/format";
 import { requireSuperAdminSession } from "@/server/auth/guard";
+import { liveBillingEnabled } from "@/server/billing/mode";
 import { BillingRecoveryForm } from "@/components/platform/billing-recovery-form";
 import { reviewNoticeAction } from "./actions";
 
@@ -12,7 +13,7 @@ function staleThreshold() { return new Date(Date.now() - 5 * 60_000); }
 
 export default async function BillingRecoveryPage() {
   await requireSuperAdminSession();
-  if (process.env.NODE_ENV === "production") notFound();
+  if (process.env.NODE_ENV === "production" && !liveBillingEnabled()) notFound();
   const db = await getDb();
   const rows = await db.select({ id: billingSubscriptions.id, tenantName: tenants.name, price: billingSubscriptions.priceCents, status: billingSubscriptions.providerStatus, createdAt: billingSubscriptions.createdAt })
     .from(billingSubscriptions).innerJoin(tenants, eq(tenants.id, billingSubscriptions.tenantId))

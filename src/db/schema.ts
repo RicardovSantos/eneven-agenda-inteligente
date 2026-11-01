@@ -826,6 +826,8 @@ export const billingSubscriptions = pgTable("billing_subscriptions", {
   checkoutUrl: text("checkout_url"),
   priceCents: integer("price_cents"),
   providerUpdatedAt: timestamptz("provider_updated_at"),
+  /** Cancelada: até quando o período já pago dá acesso (depois disso o estabelecimento deixa de poder agendar). */
+  accessUntil: timestamptz("access_until"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [
   unique("billing_subscriptions_tenant_id_id_unique").on(t.tenantId, t.id),

@@ -1,18 +1,22 @@
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { auditLog, billingInvoices, billingPaymentAttempts, billingSubscriptions, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { liveBillingEnabled } from "./mode";
 
-/** Simulação: nunca desbloqueia bloqueio manual ou cancelamento em produção. */
-export async function reconcileTestBillingAccess(db: Db, tenantId: string, now = new Date()): Promise<"updated" | "unchanged" | "review"> {
-  if (process.env.NODE_ENV === "production") throw new Error("Conciliação indisponível em produção.");
+/** Nunca desbloqueia bloqueio manual ou cancelamento da conta; só age no modo real em produção ou no sandbox fora dela. */
+export async function reconcileBillingAccess(db: Db, tenantId: string, now = new Date()): Promise<"updated" | "unchanged" | "review"> {
+  if (process.env.NODE_ENV === "production" && !liveBillingEnabled()) throw new Error("Conciliação indisponível em produção.");
   if (!Number.isFinite(now.getTime())) throw new Error("Data inválida.");
   return db.transaction(async (tx) => {
     const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1).for("update");
     if (!tenant) throw new Error("Estabelecimento não encontrado.");
     // Bloqueios manuais e cancelamentos só podem ser alterados por ação explícita.
     if (tenant.status === "read_only" || tenant.status === "canceled") return "unchanged";
-    const subscriptions = await tx.select().from(billingSubscriptions)
+    const allSubscriptions = await tx.select().from(billingSubscriptions)
       .where(and(eq(billingSubscriptions.tenantId, tenantId), ne(billingSubscriptions.providerStatus, "abandoned"))).for("update");
+    // Assinaturas canceladas não decidem o acesso: o fim do período pago é tratado em `applyCancelledExpiry`.
+    const subscriptions = allSubscriptions.filter((item) => item.providerStatus !== "cancelled" && item.providerStatus !== "canceled");
+    if (!subscriptions.length && allSubscriptions.length) return "unchanged";
     if (subscriptions.length !== 1 || subscriptions[0].planId !== tenant.planId || subscriptions[0].providerStatus !== "authorized" || !subscriptions[0].providerId || !subscriptions[0].providerUpdatedAt) return "review";
     const invoices = await tx.select().from(billingInvoices)
       .where(and(eq(billingInvoices.tenantId, tenantId), eq(billingInvoices.subscriptionId, subscriptions[0].id))).for("update");
@@ -38,7 +42,7 @@ export async function reconcileTestBillingAccess(db: Db, tenantId: string, now =
     }
     if (tenant.status === nextStatus && (tenant.pastDueAt?.getTime() ?? null) === (pastDueAt?.getTime() ?? null)) return "unchanged";
     await tx.update(tenants).set({ status: nextStatus, pastDueAt, ...(nextStatus === "active" ? { activatedAt: tenant.activatedAt ?? now } : {}) }).where(eq(tenants.id, tenantId));
-    await tx.insert(auditLog).values({ tenantId, action: "billing.test_access_reconciled", details: { from: tenant.status, to: nextStatus } });
+    await tx.insert(auditLog).values({ tenantId, action: "billing.access_reconciled", details: { from: tenant.status, to: nextStatus } });
     return "updated";
   });
 }

@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 const guard = vi.hoisted(() => vi.fn());
 const recover = vi.hoisted(() => vi.fn());
 vi.mock("@/server/auth/guard", () => ({ requireSuperAdminSession: guard }));
-vi.mock("@/server/billing/recover-subscription", () => ({ recoverTestSubscription: recover, abandonTestSubscription: vi.fn() }));
+vi.mock("@/server/billing/recover-subscription", () => ({ recoverSubscription: recover, abandonTestSubscription: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: vi.fn(async () => ({})) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 import { recoverSubscriptionAction } from "@/app/admin/cobranca/actions";

@@ -2,15 +2,19 @@ import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import { auditLog, billingSubscriptions } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { fetchMercadoPagoResource } from "./mercado-pago-client";
+import { assertBillingConfig, liveBillingEnabled } from "./mode";
+import { assertSandboxAccount } from "./sandbox";
 import { validatePendingSubscription } from "./subscription-validation";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Apenas operador superadministrador autenticado; disponível somente em teste. */
-export async function recoverTestSubscription(db: Db, input: {
+/** Apenas operador superadministrador autenticado. */
+export async function recoverSubscription(db: Db, input: {
   subscriptionId: string; providerId: string; actorUserId: string;
-}, config: { accessToken: string; collectorId: string; fetcher?: typeof fetch }, now = new Date()): Promise<void> {
-  if (process.env.NODE_ENV === "production" || !config.accessToken.startsWith("TEST-") || !config.collectorId) throw new Error("Cobrança de teste não configurada.");
+}, config: { accessToken: string; collectorId: string; live?: boolean; fetcher?: typeof fetch }, now = new Date()): Promise<void> {
+  if (!config.collectorId) throw new Error("Cobrança não configurada.");
+  assertBillingConfig(config);
+  if (!config.live) await assertSandboxAccount(config.accessToken, config.collectorId, config.fetcher);
   if (!UUID.test(input.subscriptionId) || !UUID.test(input.actorUserId) || !Number.isFinite(now.getTime())) throw new Error("Dados inválidos.");
   const [subscription] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.id, input.subscriptionId)).limit(1);
   if (!subscription || !["creating", "uncertain"].includes(subscription.providerStatus) || subscription.priceCents === null || (subscription.providerStatus === "creating" && now.getTime() - subscription.createdAt.getTime() < 5 * 60_000)) throw new Error("Ocorrência indisponível.");
@@ -26,7 +30,7 @@ export async function recoverTestSubscription(db: Db, input: {
 
 /** O operador confirma ausência no provedor; esta operação não cancela assinatura remota. */
 export async function abandonTestSubscription(db: Db, subscriptionId: string, actorUserId: string, now = new Date()): Promise<void> {
-  if (process.env.NODE_ENV === "production") throw new Error("Indisponível em produção.");
+  if (process.env.NODE_ENV === "production" && !liveBillingEnabled()) throw new Error("Indisponível em produção.");
   if (!UUID.test(subscriptionId) || !UUID.test(actorUserId) || !Number.isFinite(now.getTime())) throw new Error("Dados inválidos.");
   const stale = new Date(now.getTime() - 5 * 60_000);
   await db.transaction(async (tx) => {

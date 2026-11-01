@@ -1,11 +1,12 @@
 import { and, asc, eq, gt, inArray, lte, ne } from "drizzle-orm";
 import { billingInvoices, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
-import { reconcileTestBillingAccess } from "./reconcile-access";
+import { reconcileBillingAccess } from "./reconcile-access";
+import { billingAccessEnabled } from "./mode";
 
 /** Percorre todas as páginas para não deixar estabelecimentos para trás. */
-export async function reconcileDueTestBillingAccess(db: Db, config: { accessToken: string; liveMode: boolean }, now = new Date()) {
-  if (process.env.NODE_ENV === "production" || config.liveMode || !config.accessToken.startsWith("TEST-")) throw new Error("Conciliação indisponível fora do ambiente de teste.");
+export async function reconcileDueBillingAccess(db: Db, config: { accessToken: string; liveMode: boolean }, now = new Date()) {
+  if (!billingAccessEnabled(config)) throw new Error("Conciliação indisponível neste ambiente.");
   if (!Number.isFinite(now.getTime())) throw new Error("Data inválida.");
   const result = { updated: 0, unchanged: 0, review: 0, failed: 0 };
   let cursor: string | undefined;
@@ -17,7 +18,7 @@ export async function reconcileDueTestBillingAccess(db: Db, config: { accessToke
     if (!page.length) return result;
     for (const { tenantId } of page) {
       try {
-        result[await reconcileTestBillingAccess(db, tenantId, now)]++;
+        result[await reconcileBillingAccess(db, tenantId, now)]++;
       } catch {
         result.failed++;
       }

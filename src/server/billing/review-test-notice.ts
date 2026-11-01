@@ -1,10 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { auditLog, billingNotices } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { liveBillingEnabled } from "./mode";
 
 /** O chamador deve conferir que o usuário é superadministrador. */
 export async function reviewTestNotice(db: Db, id: string, actorUserId: string, decision: "confirmed" | "retry", now = new Date()): Promise<void> {
-  if (process.env.NODE_ENV === "production") throw new Error("Revisão indisponível em produção.");
+  if (process.env.NODE_ENV === "production" && !liveBillingEnabled()) throw new Error("Revisão indisponível em produção.");
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || !Number.isFinite(now.getTime()) || !["confirmed", "retry"].includes(decision)) throw new Error("Dados inválidos.");
   await db.transaction(async (tx) => {
     const [notice] = await tx.select().from(billingNotices).where(eq(billingNotices.id, id)).limit(1).for("update");

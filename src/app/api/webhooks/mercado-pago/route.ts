@@ -1,11 +1,12 @@
 import { getDb } from "@/db/client";
+import { liveBillingEnabled } from "@/server/billing/mode";
 import { recordBillingWebhook } from "@/server/billing/webhook";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  // O processador ainda não existe: não reconhecer notificações em produção.
-  if (process.env.NODE_ENV === "production") return new Response("Não disponível", { status: 503 });
+  // Em produção só recebe com a cobrança real ligada (credenciais reais e MERCADO_PAGO_LIVE_MODE=true).
+  if (process.env.NODE_ENV === "production" && !liveBillingEnabled()) return new Response("Não disponível", { status: 503 });
   const secret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
   if (!secret) return new Response("Não configurado", { status: 503 });
   const url = new URL(request.url);

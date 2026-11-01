@@ -3,19 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db/client";
 import { requireSuperAdminSession } from "@/server/auth/guard";
-import { abandonTestSubscription, recoverTestSubscription } from "@/server/billing/recover-subscription";
+import { billingConfig, liveBillingEnabled } from "@/server/billing/mode";
+import { abandonTestSubscription, recoverSubscription } from "@/server/billing/recover-subscription";
 import { reviewTestNotice } from "@/server/billing/review-test-notice";
 
 export async function recoverSubscriptionAction(_state: string, form: FormData): Promise<string> {
   const actor = await requireSuperAdminSession();
-  if (process.env.NODE_ENV === "production") return "Indisponível em produção.";
+  if (process.env.NODE_ENV === "production" && !liveBillingEnabled()) return "Indisponível em produção.";
   const subscriptionId = form.get("subscriptionId");
   const providerId = form.get("providerId");
-  const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
-  const collectorId = process.env.MERCADO_PAGO_COLLECTOR_ID;
-  if (typeof subscriptionId !== "string" || typeof providerId !== "string" || !accessToken || !collectorId) return "Informe o ID e configure as credenciais de teste.";
+  const config = billingConfig();
+  if (typeof subscriptionId !== "string" || typeof providerId !== "string" || !config) return "Informe o ID e configure as credenciais.";
+  const { accessToken, collectorId, live } = config;
   try {
-    await recoverTestSubscription(await getDb(), { subscriptionId, providerId, actorUserId: actor.userId }, { accessToken, collectorId });
+    await recoverSubscription(await getDb(), { subscriptionId, providerId, actorUserId: actor.userId }, { accessToken, collectorId, live });
   } catch {
     return "Não foi possível confirmar a assinatura. Confira o ID e os dados no Mercado Pago.";
   }
@@ -34,7 +35,7 @@ export async function reviewNoticeAction(form: FormData): Promise<void> {
 
 export async function abandonSubscriptionAction(form: FormData): Promise<void> {
   const actor = await requireSuperAdminSession();
-  if (process.env.NODE_ENV === "production") throw new Error("Indisponível em produção.");
+  if (process.env.NODE_ENV === "production" && !liveBillingEnabled()) throw new Error("Indisponível em produção.");
   const id = form.get("subscriptionId");
   if (typeof id !== "string") throw new Error("Dados inválidos.");
   await abandonTestSubscription(await getDb(), id, actor.userId);

@@ -4,9 +4,10 @@ import type { Db } from "@/db/types";
 import { reconcilePayment } from "./reconcile-payment";
 import { reconcileSubscription } from "./reconcile-subscription";
 import { reconcileAuthorizedInvoice } from "./reconcile-invoice";
-import { reconcileTestBillingAccess } from "./reconcile-access";
+import { reconcileBillingAccess } from "./reconcile-access";
+import { billingAccessEnabled } from "./mode";
 
-/** Processa sinais; altera acesso somente em ambiente de teste com credencial TEST. */
+/** Processa sinais; altera acesso só no modo real em produção ou no sandbox fora dela. */
 export async function processPaymentEvents(db: Db, config: {
   accessToken: string; collectorId: string; liveMode: boolean; fetcher?: typeof fetch;
 }, limit = 20): Promise<{ processed: number; failed: number }> {
@@ -26,7 +27,7 @@ export async function processPaymentEvents(db: Db, config: {
         const { paymentId } = await reconcileAuthorizedInvoice(db, event.resourceId, config);
         if (paymentId) await reconcilePayment(db, paymentId, config);
       }
-      if (process.env.NODE_ENV !== "production" && !config.liveMode && config.accessToken.startsWith("TEST-")) {
+      if (billingAccessEnabled(config)) {
         let tenantId: string | undefined;
         if (event.topic === "payment") {
           const [attempt] = await db.select({ tenantId: billingPaymentAttempts.tenantId }).from(billingPaymentAttempts).where(eq(billingPaymentAttempts.paymentId, event.resourceId)).limit(1);
@@ -38,7 +39,7 @@ export async function processPaymentEvents(db: Db, config: {
           const [invoice] = await db.select({ tenantId: billingInvoices.tenantId }).from(billingInvoices).where(eq(billingInvoices.providerId, event.resourceId)).limit(1);
           tenantId = invoice?.tenantId;
         }
-        if (!tenantId || await reconcileTestBillingAccess(db, tenantId) === "review") throw new Error("Acesso requer revisão.");
+        if (!tenantId || await reconcileBillingAccess(db, tenantId) === "review") throw new Error("Acesso requer revisão.");
       }
       const updated = await db.update(billingWebhookEvents).set({ processedAt: new Date() })
         .where(and(eq(billingWebhookEvents.requestId, event.requestId), isNull(billingWebhookEvents.processedAt)))

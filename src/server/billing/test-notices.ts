@@ -1,14 +1,28 @@
-import { and, asc, eq, isNotNull, lte, notExists } from "drizzle-orm";
-import { billingNotices, tenants } from "@/db/schema";
+import { and, asc, eq, exists, isNotNull, lte, ne, notExists } from "drizzle-orm";
+import { billingInvoices, billingNotices, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { sendEmail } from "@/server/email/send";
 
 type TestSender = (recipient: string) => Promise<void>;
 
-/** Reserva antes do envio. Uma falha incerta permanece para revisão, sem repetição. */
+/** Aviso de teste: sempre para o endereço de teste, nunca em produção. */
 export async function processTestBillingNotices(db: Db, recipient: string, sender: TestSender, now = new Date(), limit = 20) {
   if (process.env.NODE_ENV === "production") throw new Error("Avisos de teste indisponíveis em produção.");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || recipient.length > 254 || !Number.isFinite(now.getTime())) throw new Error("Configuração de teste inválida.");
+  return processBillingNotices(db, () => sender(recipient), { now, limit });
+}
+
+/**
+ * Reserva antes do envio, um aviso por atraso. Uma falha incerta permanece para
+ * revisão, sem repetição. `requireUnpaidInvoice`: só avisa quem tem fatura não paga
+ * (o fim de uma assinatura cancelada também usa o estado de atraso, mas sem aviso).
+ */
+export async function processBillingNotices(
+  db: Db,
+  send: (tenantId: string) => Promise<void>,
+  { now = new Date(), limit = 20, requireUnpaidInvoice = false }: { now?: Date; limit?: number; requireUnpaidInvoice?: boolean } = {},
+) {
+  if (!Number.isFinite(now.getTime())) throw new Error("Data inválida.");
   const max = Number.isFinite(limit) ? Math.min(100, Math.max(0, Math.floor(limit))) : 0;
   const result = { sent: 0, uncertain: 0 };
   if (!max) return result;
@@ -17,6 +31,9 @@ export async function processTestBillingNotices(db: Db, recipient: string, sende
       eq(tenants.status, "past_due"),
       isNotNull(tenants.pastDueAt),
       lte(tenants.pastDueAt, now),
+      requireUnpaidInvoice
+        ? exists(db.select({ id: billingInvoices.id }).from(billingInvoices).where(and(eq(billingInvoices.tenantId, tenants.id), ne(billingInvoices.providerStatus, "approved"))))
+        : undefined,
       notExists(db.select({ id: billingNotices.id }).from(billingNotices).where(and(
         eq(billingNotices.tenantId, tenants.id),
         eq(billingNotices.pastDueAt, tenants.pastDueAt),
@@ -33,7 +50,7 @@ export async function processTestBillingNotices(db: Db, recipient: string, sende
     });
     if (!reserved) continue;
     let state: "sent" | "uncertain";
-    try { await sender(recipient); state = "sent"; } catch { state = "uncertain"; }
+    try { await send(candidate.id); state = "sent"; } catch { state = "uncertain"; }
     await db.update(billingNotices).set({ state, completedAt: now }).where(and(eq(billingNotices.id, reserved.id), eq(billingNotices.state, "sending")));
     result[state]++;
   }

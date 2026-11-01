@@ -1,15 +1,19 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { billingSubscriptions, memberships, plans, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { assertBillingConfig } from "./mode";
+import { assertSandboxAccount } from "./sandbox";
 import { validatePendingSubscription } from "./subscription-validation";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Somente testes. O chamador deve autenticar o dono e obter o e-mail no servidor. */
-export async function createTestSubscription(db: Db, input: {
+/** O chamador deve autenticar o dono e obter o e-mail no servidor. `live` é a cobrança real (só em produção). */
+export async function createSubscription(db: Db, input: {
   tenantId: string; planId: string; payerEmail: string; backUrl: string; ownerUserId?: string;
-}, config: { accessToken: string; collectorId: string; fetcher?: typeof fetch }): Promise<{ checkoutUrl: string }> {
-  if (process.env.NODE_ENV === "production" || !config.accessToken.startsWith("TEST-") || !config.collectorId) throw new Error("Cobrança de teste não configurada.");
+}, config: { accessToken: string; collectorId: string; live?: boolean; fetcher?: typeof fetch }): Promise<{ checkoutUrl: string }> {
+  if (!config.collectorId) throw new Error("Cobrança não configurada.");
+  assertBillingConfig(config);
+  if (!config.live) await assertSandboxAccount(config.accessToken, config.collectorId, config.fetcher);
   if (!UUID.test(input.tenantId) || !UUID.test(input.planId) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.payerEmail) || input.payerEmail.length > 254) throw new Error("Dados inválidos.");
   let back: URL;
   try { back = new URL(input.backUrl); } catch { throw new Error("Endereço de retorno inválido."); }
