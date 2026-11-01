@@ -16,6 +16,14 @@ O processamento reserva a franquia antes de enviar. Uma falha com resultado ince
 - Menu com o link de agendamento para copiar, liberado quando o e-mail está confirmado e a conta está ativa ou em teste.
 - Clientes, Visão geral (indicadores do mês), acessos da equipe por convite e a Plataforma (`/admin`) do dono da Eneven, descritos abaixo.
 
+### Página pública: fotos, equipe e informações
+
+Em Configurações, "Página de agendamento" aceita até 3 imagens (ambiente, fachada, um trabalho) que passam sozinhas no topo da página, com título e frase editáveis; "Seu estabelecimento" ganhou o Facebook. Em Equipe, cada profissional tem cargo e foto. Toda imagem enviada, em qualquer formato, é convertida para WebP no navegador (para pesar pouco no envio) e de novo no servidor com `sharp` (`src/server/media/`), que é quem vale: carrossel 1600×920, profissional 480×480. A barra de progresso aparece só no envio das fotos pelo painel (convertendo e enviando). As imagens ficam no banco (`tenant_photos`, `professional_photos`, com RLS) e saem por `/api/midia/{slug}/capa/{0-2}` e `/api/midia/{slug}/profissional/{id}`, com cache longo e versão no endereço. O logo continua em PNG (ícones, e-mails e prévia de link dependem disso).
+
+Na página pública, "Nossa equipe" leva cada cartão a `/{slug}/profissional/{id}`: o profissional já vem escolhido, a lista mostra só os serviços dele e o passo seguinte é a data. "Informações do estúdio" mostra o endereço (o toque em "Ver no mapa" oferece Waze, Google Maps ou Mapas da Apple), o horário de funcionamento agrupado por dias e os links do Instagram e do Facebook. A lista de serviços tem busca e, se o estabelecimento usar categorias, vira grupos que abrem e fecham (o primeiro vem aberto, o contador mostra quantos serviços do grupo foram escolhidos e a busca abre todos).
+
+Categorias de serviço: em Serviços, o campo "Categoria" aceita um nome novo ou um já existente (sem diferenciar maiúsculas); a categoria nasce ao salvar o serviço e some quando fica sem serviços. Serviços sem categoria entram em "Outros serviços". Sem nenhuma categoria cadastrada, a lista continua sem grupos.
+
 ### Clientes
 
 `/painel/clientes`: lista com busca por nome ou WhatsApp (o cliente entra sozinho ao agendar pelo link, ou é criado à mão em "Novo cliente"), ficha com contato, observações (salvas ao sair do campo), histórico de atendimentos, total gasto e o botão "Agendar", que abre o novo agendamento com o cliente já escolhido. WhatsApp repetido é recusado com um atalho para o cadastro existente. Profissionais veem só os clientes que atenderam e não veem o total gasto.

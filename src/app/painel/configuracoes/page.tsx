@@ -6,10 +6,12 @@ import { getDb } from "@/db/client";
 import { tenants } from "@/db/schema";
 import { BrandForm } from "@/components/settings/brand-form";
 import { BusinessInfoForm } from "@/components/settings/business-info-form";
+import { PublicPageForm } from "@/components/settings/public-page-form";
 import { HoursForm } from "@/components/settings/hours-form";
 import { RulesForm } from "@/components/settings/rules-form";
 import { SlugForm } from "@/components/settings/slug-form";
 import { TeamAccessCard } from "@/components/settings/team-access-card";
+import { heroPhotoUrl, listHeroPhotos } from "@/server/media";
 import { requirePanelRole } from "@/server/panel/roles";
 import { defaultApplyToTeam, getBusinessHours } from "@/server/settings";
 import { listInvitableProfessionals, listTeamAccess } from "@/server/team/members";
@@ -28,6 +30,7 @@ export default async function ConfiguracoesPage() {
   if (!tenant) redirect("/entrar");
   const hours = await getBusinessHours(db, session.tenantId);
   const applyToTeamDefault = await defaultApplyToTeam(db, session.tenantId);
+  const heroPhotos = await listHeroPhotos(db, session.tenantId);
   const [team, invitable] = await Promise.all([
     listTeamAccess(db, session.tenantId),
     listInvitableProfessionals(db, session.tenantId),
@@ -48,6 +51,7 @@ export default async function ConfiguracoesPage() {
           whatsapp: tenant.whatsapp ?? "",
           address: tenant.address ?? "",
           instagram: tenant.instagram ?? "",
+          facebook: tenant.facebook ?? "",
           about: tenant.about ?? "",
         }}
       />
@@ -56,6 +60,16 @@ export default async function ConfiguracoesPage() {
           name: tenant.name,
           logoUrl: tenant.logoUrl,
           color: tenant.brandColor ?? "#3E07D2",
+        }}
+      />
+      <PublicPageForm
+        initial={{
+          heroTitle: tenant.heroTitle ?? "",
+          heroSubtitle: tenant.heroSubtitle ?? "",
+          photos: [0, 1, 2].map((slot) => {
+            const photo = heroPhotos.find((p) => p.slot === slot);
+            return photo ? heroPhotoUrl(tenant.slug, slot, photo.updatedAt) : null;
+          }),
         }}
       />
       <HoursForm initial={hours} applyToTeamDefault={applyToTeamDefault} />

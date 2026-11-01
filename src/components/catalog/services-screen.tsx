@@ -36,6 +36,8 @@ export type ServiceItem = {
   bufferAfterMin: number;
   priceCents: number;
   visible: boolean;
+  /** Categoria da lista pública; `null` = "Outros serviços". */
+  categoryName: string | null;
   archived: boolean;
   professionalIds: string[];
 };
@@ -73,6 +75,10 @@ export function ServicesScreen({
     [services, showArchived],
   );
   const byId = useMemo(() => new Map(professionals.map((p) => [p.id, p])), [professionals]);
+  const categoryNames = useMemo(
+    () => [...new Set(services.map((s) => s.categoryName).filter((n): n is string => n !== null))],
+    [services],
+  );
   const selectedId = selection?.kind === "edit" ? selection.id : null;
   const editing = selection?.kind === "edit" ? services.find((s) => s.id === selection.id) : undefined;
 
@@ -251,6 +257,7 @@ export function ServicesScreen({
         <ServiceForm
           key={selection.kind === "new" ? "new" : selection.id}
           service={editing}
+          categories={categoryNames}
           professionals={professionals}
           canEdit={canEdit}
           onDone={(created) => {
@@ -356,6 +363,7 @@ function withCurrent(options: number[], current: number | undefined) {
 
 function ServiceForm({
   service,
+  categories,
   professionals,
   canEdit,
   onDone,
@@ -363,6 +371,8 @@ function ServiceForm({
   onArchive,
 }: {
   service?: ServiceItem;
+  /** Categorias que já existem (sugestões do campo). */
+  categories: string[];
   professionals: ProfessionalOption[];
   canEdit: boolean;
   /** `created` = true quando acabou de criar um serviço novo. */
@@ -381,6 +391,7 @@ function ServiceForm({
     service?.professionalIds ?? professionals.filter((p) => p.active).map((p) => p.id),
   );
   const [visible, setVisible] = useState(service?.visible ?? true);
+  const [categoryName, setCategoryName] = useState(service?.categoryName ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Ativos, mais os inativos que já fazem este serviço (para poder desmarcar).
@@ -400,6 +411,7 @@ function ServiceForm({
         bufferAfterMin,
         priceCents,
         visible,
+        categoryName,
         professionalIds,
       });
       setErrors(result.fieldErrors ?? {});
@@ -430,6 +442,33 @@ function ServiceForm({
             className="h-11"
           />
           <FieldError id="s-nome-erro">{errors.name}</FieldError>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="s-categoria" className="font-semibold">
+            Categoria <span className="font-normal text-ink-muted">(opcional)</span>
+          </Label>
+          <Input
+            id="s-categoria"
+            value={categoryName}
+            maxLength={40}
+            list="s-categorias"
+            autoComplete="off"
+            placeholder="Ex.: Cabelo e tratamentos"
+            onChange={(e) => setCategoryName(e.target.value)}
+            aria-invalid={errors.categoryName ? true : undefined}
+            aria-describedby="s-categoria-ajuda"
+            className="h-11"
+          />
+          <datalist id="s-categorias">
+            {categories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+          <p id="s-categoria-ajuda" className="text-[0.8125rem] leading-snug text-ink-muted">
+            Agrupa os serviços na sua página de agendamento. Escolha uma da lista ou digite uma nova.
+          </p>
+          <FieldError>{errors.categoryName}</FieldError>
         </div>
 
         <div className="flex flex-col gap-1.5">

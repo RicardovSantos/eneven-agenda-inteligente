@@ -39,6 +39,27 @@ const instagram = z
     return handle;
   });
 
+/** Aceita `usuario`, `@usuario` ou o link da página; devolve só o nome da página. */
+const facebook = z
+  .string()
+  .optional()
+  .transform((raw, ctx) => {
+    const value = (raw ?? "").trim();
+    if (value === "") return null;
+    const handle = value
+      .replace(/^(?:https?:\/\/)?(?:www\.|m\.|web\.)?(?:facebook|fb)\.com\//i, "")
+      .replace(/[/?#].*$/, "")
+      .replace(/^@/, "");
+    if (!/^[A-Za-z0-9.\-]{5,50}$/.test(handle)) {
+      ctx.addIssue({ code: "custom", message: "Informe o nome da página do Facebook (ex.: seusalao)." });
+      return z.NEVER;
+    }
+    return handle;
+  });
+
+export const HERO_TITLE_MAX = 60;
+export const HERO_SUBTITLE_MAX = 100;
+
 export const businessInfoSchema = z.object({
   name: z
     .string()
@@ -55,9 +76,27 @@ export const businessInfoSchema = z.object({
   }),
   address: optionalText(160, "O endereço pode ter no máximo 160 caracteres."),
   instagram,
+  facebook,
   about: optionalText(ABOUT_MAX, `O texto pode ter no máximo ${ABOUT_MAX} caracteres.`),
 });
 export type BusinessInfoInput = z.input<typeof businessInfoSchema>;
+
+/** Frase de destaque sobre o carrossel da página pública. */
+export const heroTextSchema = z.object({
+  heroTitle: z
+    .string()
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .pipe(z.string().max(HERO_TITLE_MAX, `O título pode ter no máximo ${HERO_TITLE_MAX} caracteres.`))
+    .transform((v) => (v === "" ? null : v)),
+  heroSubtitle: z
+    .string()
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .pipe(z.string().max(HERO_SUBTITLE_MAX, `O texto pode ter no máximo ${HERO_SUBTITLE_MAX} caracteres.`))
+    .transform((v) => (v === "" ? null : v)),
+});
+export type HeroTextInput = z.input<typeof heroTextSchema>;
 
 export const brandingSchema = z.object({
   color: z

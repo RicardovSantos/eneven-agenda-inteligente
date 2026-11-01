@@ -8,6 +8,8 @@ import {
   type ProfessionalInput,
 } from "@/server/catalog";
 import type { WeeklyHours } from "@/lib/weekly-hours";
+import { MediaError, removeProfessionalPhoto, saveProfessionalPhoto } from "@/server/media";
+import { isUuid } from "@/server/catalog/services";
 
 export async function saveProfessionalAction(input: unknown): Promise<CatalogActionResult> {
   return runCatalogAction("Profissional salvo", async ({ db, tenantId }) => {
@@ -18,6 +20,7 @@ export async function saveProfessionalAction(input: unknown): Promise<CatalogAct
     return saveProfessional(db, tenantId, {
       id: typeof raw.id === "string" ? raw.id : undefined,
       name: raw.name as string,
+      title: typeof raw.title === "string" ? raw.title : undefined,
       color: raw.color as string,
       active: raw.active === true,
       serviceIds: raw.serviceIds as string[],
@@ -29,5 +32,37 @@ export async function saveProfessionalAction(input: unknown): Promise<CatalogAct
 export async function deactivateProfessionalAction(id: unknown): Promise<CatalogActionResult> {
   return runCatalogAction("Profissional desativado", async ({ db, tenantId }) => {
     await deactivateProfessional(db, tenantId, String(id));
+  });
+}
+
+/** Troca a foto de um profissional; qualquer formato vira WebP. */
+export async function uploadProfessionalPhotoAction(formData: FormData): Promise<CatalogActionResult> {
+  return runCatalogAction("Foto atualizada", async ({ db, tenantId }) => {
+    const id = formData.get("id");
+    const file = formData.get("photo");
+    if (typeof id !== "string" || !isUuid(id)) {
+      throw new CatalogError("not_found", "Profissional não encontrado.");
+    }
+    if (!(file instanceof File) || file.size === 0) {
+      throw new CatalogError("validation", "Escolha uma imagem.", { photo: "Escolha uma imagem." });
+    }
+    try {
+      await saveProfessionalPhoto(db, tenantId, id, { bytes: Buffer.from(await file.arrayBuffer()) });
+    } catch (error) {
+      if (error instanceof MediaError) {
+        throw new CatalogError("validation", error.message, { photo: error.message });
+      }
+      throw error;
+    }
+    return { id };
+  });
+}
+
+export async function removeProfessionalPhotoAction(id: unknown): Promise<CatalogActionResult> {
+  return runCatalogAction("Foto removida", async ({ db, tenantId }) => {
+    if (typeof id !== "string" || !isUuid(id)) {
+      throw new CatalogError("not_found", "Profissional não encontrado.");
+    }
+    await removeProfessionalPhoto(db, tenantId, id);
   });
 }

@@ -111,7 +111,7 @@ test.describe("página pública de agendamento", () => {
     await page.goBack();
     await expect(page.getByRole("heading", { name: "Escolha o dia e o horário" })).toBeVisible();
     await page.goBack();
-    await expect(page.getByRole("heading", { name: "Escolha o serviço" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Todos os serviços" })).toBeVisible();
     // A seleção continua.
     await expect(page.getByLabel("Troca de joia")).toBeChecked();
   });

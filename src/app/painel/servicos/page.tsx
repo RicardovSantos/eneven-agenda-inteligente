@@ -26,6 +26,7 @@ export default async function ServicosPage() {
     bufferAfterMin: s.bufferAfterMin,
     priceCents: s.priceCents,
     visible: s.visible,
+    categoryName: s.categoryName,
     archived: s.archivedAt !== null,
     professionalIds: s.professionalIds,
   }));

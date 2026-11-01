@@ -24,10 +24,13 @@ import { notFoundError, validationError } from "./errors";
 import { isUuid } from "./services";
 
 export const PROFESSIONAL_NAME_MAX = 60;
+export const PROFESSIONAL_TITLE_MAX = 40;
 
 export type ProfessionalInput = {
   id?: string;
   name: string;
+  /** Cargo mostrado na página pública ("Barbeiro"); opcional. */
+  title?: string;
   /** Uma cor da paleta (`PROFESSIONAL_COLORS`). */
   color: string;
   active: boolean;
@@ -38,6 +41,9 @@ export type ProfessionalInput = {
 export type ProfessionalRow = {
   id: string;
   name: string;
+  title: string | null;
+  /** Versão da foto (ms) ou `null` sem foto; monta o endereço público. */
+  photoVersion: number | null;
   color: string | null;
   active: boolean;
   sortOrder: number;
@@ -113,6 +119,8 @@ export async function listProfessionals(
     return rows.map((p) => ({
       id: p.id,
       name: p.name,
+      title: p.title,
+      photoVersion: p.photoUpdatedAt ? p.photoUpdatedAt.getTime() : null,
       color: p.color,
       active: p.active,
       sortOrder: p.sortOrder,
@@ -129,6 +137,10 @@ function validate(input: ProfessionalInput) {
   if (name === "") errors.name = "Informe o nome do profissional.";
   else if (name.length > PROFESSIONAL_NAME_MAX)
     errors.name = `Use até ${PROFESSIONAL_NAME_MAX} caracteres no nome.`;
+
+  const title = typeof input.title === "string" ? input.title.trim() : "";
+  if (title.length > PROFESSIONAL_TITLE_MAX)
+    errors.title = `Use até ${PROFESSIONAL_TITLE_MAX} caracteres no cargo.`;
 
   if (!isProfessionalColor(input.color)) errors.color = "Escolha uma cor da lista.";
 
@@ -151,6 +163,7 @@ function validate(input: ProfessionalInput) {
   if (Object.keys(errors).length > 0) throw validationError(errors);
   return {
     name,
+    title: title === "" ? null : title,
     color: input.color.toUpperCase(),
     active: input.active === true,
     serviceIds: [...new Set(input.serviceIds)],
@@ -201,7 +214,7 @@ export async function saveProfessional(
       throw validationError({ serviceIds: "Serviço inválido." });
     }
 
-    const values = { name: data.name, color: data.color, active: data.active };
+    const values = { name: data.name, title: data.title, color: data.color, active: data.active };
     let id: string;
     if (input.id) {
       const updated = await tx

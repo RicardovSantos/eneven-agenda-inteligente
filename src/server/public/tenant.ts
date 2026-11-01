@@ -5,6 +5,7 @@ import {
   memberships,
   professionalServices,
   professionals,
+  serviceCategories,
   services,
   tenants,
   users,
@@ -35,6 +36,10 @@ export type PublicTenant = {
   address: string | null;
   about: string | null;
   instagram: string | null;
+  facebook: string | null;
+  /** Frase de destaque sobre o carrossel (nulo: a página usa o texto padrão). */
+  heroTitle: string | null;
+  heroSubtitle: string | null;
   timezone: string;
   maxDaysAhead: number;
   cancelWindowMin: number;
@@ -67,6 +72,9 @@ export function toPublicTenant(row: TenantRow): PublicTenant {
     address: row.address,
     about: row.about,
     instagram: row.instagram,
+    facebook: row.facebook,
+    heroTitle: row.heroTitle,
+    heroSubtitle: row.heroSubtitle,
     timezone: row.timezone,
     maxDaysAhead: row.maxDaysAhead,
     cancelWindowMin: row.cancelWindowMin,
@@ -79,14 +87,28 @@ export type PublicService = {
   description: string | null;
   durationMin: number;
   priceCents: number;
+  /** Categoria ou `null` ("Outros serviços"). */
+  categoryId: string | null;
   /** Profissionais ativos que fazem este serviço. */
   professionalIds: string[];
 };
 
-export type PublicProfessional = { id: string; name: string; color: string | null };
+export type PublicProfessional = {
+  id: string;
+  name: string;
+  /** Cargo ("Barbeiro"); nulo se não informado. */
+  title: string | null;
+  color: string | null;
+  /** Versão da foto (ms) ou `null` sem foto; monta o endereço com `professionalPhotoUrl`. */
+  photoVersion: number | null;
+};
+
+export type PublicCategory = { id: string; name: string };
 
 export type PublicCatalog = {
   services: PublicService[];
+  /** Categorias que têm ao menos um serviço oferecido, na ordem de exibição. */
+  categories: PublicCategory[];
   /** Só quem faz ao menos um serviço oferecido. */
   professionals: PublicProfessional[];
 };
@@ -109,14 +131,20 @@ export async function getPublicCatalog(db: Db, tenantId: string): Promise<Public
         ),
       )
       .orderBy(asc(services.sortOrder), asc(services.createdAt), asc(services.id));
-    if (serviceRows.length === 0) return { services: [], professionals: [] };
+    if (serviceRows.length === 0) return { services: [], categories: [], professionals: [] };
 
     const proRows = await tx
-      .select({ id: professionals.id, name: professionals.name, color: professionals.color })
+      .select({
+        id: professionals.id,
+        name: professionals.name,
+        title: professionals.title,
+        color: professionals.color,
+        photoUpdatedAt: professionals.photoUpdatedAt,
+      })
       .from(professionals)
       .where(and(eq(professionals.tenantId, tenantId), eq(professionals.active, true)))
       .orderBy(asc(professionals.sortOrder), asc(professionals.createdAt), asc(professionals.id));
-    if (proRows.length === 0) return { services: [], professionals: [] };
+    if (proRows.length === 0) return { services: [], categories: [], professionals: [] };
 
     const links = await tx
       .select({
@@ -153,11 +181,27 @@ export async function getPublicCatalog(db: Db, tenantId: string): Promise<Public
         description: s.description,
         durationMin: s.durationMin,
         priceCents: s.priceCents,
+        categoryId: s.categoryId,
         // Mantém a ordem da equipe.
         professionalIds: proRows.filter((p) => byService.get(s.id)!.has(p.id)).map((p) => p.id),
       }));
     const used = new Set(offered.flatMap((s) => s.professionalIds));
-    return { services: offered, professionals: proRows.filter((p) => used.has(p.id)) };
+    const usedCategories = new Set(offered.map((s) => s.categoryId));
+    const categoryRows = await tx
+      .select({ id: serviceCategories.id, name: serviceCategories.name })
+      .from(serviceCategories)
+      .where(eq(serviceCategories.tenantId, tenantId))
+      .orderBy(asc(serviceCategories.sortOrder), asc(serviceCategories.createdAt), asc(serviceCategories.id));
+    return {
+      services: offered,
+      categories: categoryRows.filter((c) => usedCategories.has(c.id)),
+      professionals: proRows
+        .filter((p) => used.has(p.id))
+        .map(({ photoUpdatedAt, ...p }) => ({
+          ...p,
+          photoVersion: photoUpdatedAt ? photoUpdatedAt.getTime() : null,
+        })),
+    };
   });
 }
 

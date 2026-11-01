@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, Loader2, Users } from "lucide-react";
+import { ChevronDown, ChevronLeft, Loader2, Search, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { bookAction, getDatesAction, getSlotsAction } from "@/app/[slug]/actions";
@@ -8,11 +8,13 @@ import { FormAlert } from "@/components/auth/form-alert";
 import { TextField } from "@/components/auth/text-field";
 import { ProgressThread } from "@/components/brand/progress-thread";
 import { formatLongDate } from "@/lib/dates";
+import type { WeekRow } from "@/lib/week-rows";
 import { formatBRL, formatDuration } from "@/lib/format";
 import { formatBrazilPhone, normalizeBrazilPhone } from "@/lib/phone";
 import { SLOT_TAKEN_MESSAGE } from "@/server/agenda/errors";
 import type { BookingView } from "@/server/public/view";
 import { Confirmation } from "./confirmation";
+import { DEFAULT_HERO_SUBTITLE, DEFAULT_HERO_TITLE, HeroCarousel } from "./hero-carousel";
 import {
   BrandMark,
   brandButton,
@@ -21,15 +23,31 @@ import {
   type BookingTenant,
 } from "./shell";
 import { SlotPicker, type PickedSlot } from "./slot-picker";
+import { StudioInfo } from "./studio-info";
+import { ProfessionalAvatar, TeamSection, type TeamMember } from "./team-section";
 
 export type CatalogService = {
   id: string;
   name: string;
+  description: string | null;
+  categoryId: string | null;
   durationMin: number;
   priceCents: number;
   professionalIds: string[];
 };
+export type CatalogCategory = { id: string; name: string };
 export type CatalogProfessional = { id: string; name: string; color: string | null };
+
+/** O que a página inicial mostra além do catálogo (carrossel, equipe e informações do estúdio). */
+export type PublicPageContent = {
+  heroImages: string[];
+  heroTitle: string | null;
+  heroSubtitle: string | null;
+  team: TeamMember[];
+  weekRows: WeekRow[];
+  instagram: string | null;
+  facebook: string | null;
+};
 
 type Step = 0 | 1 | 2 | 3;
 const STEPS = ["Serviço", "Profissional", "Horário", "Seus dados"];
@@ -45,18 +63,32 @@ type Form = { name: string; phone: string; email: string; consent: boolean };
 export function BookingFlow({
   tenant,
   services,
+  categories,
   professionals,
   today,
+  content,
+  lockedProfessional,
 }: {
   tenant: BookingTenant;
   services: CatalogService[];
+  /** Grupos da lista de serviços (vazio: lista sem grupos). */
+  categories: CatalogCategory[];
   professionals: CatalogProfessional[];
   /** Hoje no fuso do salão ("yyyy-MM-dd"), calculado no servidor. */
   today: string;
+  content: PublicPageContent;
+  /**
+   * Página de um profissional (`/{slug}/profissional/{id}`): o profissional já
+   * está escolhido, só aparecem os serviços dele e o passo seguinte é a data.
+   */
+  lockedProfessional?: TeamMember;
 }) {
   const [step, setStep] = useState<Step>(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [professionalId, setProfessionalId] = useState<string>("any");
+  const [professionalId, setProfessionalId] = useState<string>(lockedProfessional?.id ?? "any");
+  const [query, setQuery] = useState("");
+  // Só o primeiro grupo abre sozinho; os demais abrem no toque (todos abrem durante a busca).
+  const [openGroups, setOpenGroups] = useState<string[]>(() => (categories[0] ? [categories[0].id] : []));
   const [slot, setSlot] = useState<PickedSlot | null>(null);
   const [slotError, setSlotError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -73,6 +105,29 @@ export function BookingFlow({
         .filter((s): s is CatalogService => s !== undefined),
     [selectedIds, services],
   );
+  const visibleServices = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase("pt-BR");
+    return needle === ""
+      ? services
+      : services.filter(
+          (s) =>
+            s.name.toLocaleLowerCase("pt-BR").includes(needle) ||
+            (s.description ?? "").toLocaleLowerCase("pt-BR").includes(needle),
+        );
+  }, [services, query]);
+  const groups = useMemo(() => {
+    if (categories.length === 0) return [{ id: "all", name: null as string | null, items: visibleServices }];
+    const known = new Set(categories.map((c) => c.id));
+    const grouped = categories.map((c) => ({
+      id: c.id,
+      name: c.name as string | null,
+      items: visibleServices.filter((s) => s.categoryId === c.id),
+    }));
+    const rest = visibleServices.filter((s) => !s.categoryId || !known.has(s.categoryId));
+    if (rest.length > 0) grouped.push({ id: "other", name: "Outros serviços", items: rest });
+    return grouped.filter((g) => g.items.length > 0);
+  }, [categories, visibleServices]);
+  const searching = query.trim() !== "";
   const eligible = useMemo(
     () =>
       selected.length === 0
@@ -126,6 +181,12 @@ export function BookingFlow({
 
   function continueFromServices() {
     if (selected.length === 0 || eligible.length === 0) return;
+    if (lockedProfessional) {
+      // Profissional já escolhido na página dele: segue direto para a data.
+      setProfessionalId(lockedProfessional.id);
+      goTo(2);
+      return;
+    }
     if (eligible.length === 1) {
       // Um profissional só: o passo 2 é pulado.
       setProfessionalId(eligible[0].id);
@@ -199,17 +260,46 @@ export function BookingFlow({
   return (
     <>
       {view === 0 ? (
-        <header className="flex flex-col gap-[18px] border-b border-line px-5 pt-5 pb-4">
-          <div className="flex items-center gap-3.5">
+        <header className="flex flex-col gap-4 pt-5">
+          <div className="flex items-center gap-3.5 px-5">
             <BrandMark name={tenant.name} logoUrl={tenant.logoUrl} size="lg" />
             <div className="flex min-w-0 flex-col gap-[3px]">
               <h1 className="m-0 font-display text-[21px] leading-tight font-semibold">{tenant.name}</h1>
-              {tenant.subtitle ? (
-                <span className="text-[13px] text-ink-muted">{tenant.subtitle}</span>
-              ) : null}
+              <span className="text-[13px] text-ink-muted">
+                {tenant.subtitle ?? "Agendamento online"}
+              </span>
             </div>
           </div>
-          <ProgressThread steps={STEPS} current={0} label="Etapas do agendamento" />
+          {lockedProfessional ? (
+            <div className="mx-5 flex items-center gap-3.5 rounded-2xl border border-line bg-canvas p-3.5">
+              <ProfessionalAvatar member={lockedProfessional} size={64} />
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-[12.5px] text-ink-muted">Agendando com</span>
+                <span className="truncate font-display text-[18px] font-semibold">
+                  {lockedProfessional.name}
+                </span>
+                {lockedProfessional.title ? (
+                  <span className="truncate text-[13px] text-ink-muted">{lockedProfessional.title}</span>
+                ) : null}
+              </div>
+              <Link
+                href={`/${tenant.slug}`}
+                className="flex min-h-11 shrink-0 items-center px-1 text-[13px] font-semibold text-(--brand) underline-offset-4 hover:underline"
+              >
+                Trocar
+              </Link>
+            </div>
+          ) : content.heroImages.length > 0 ? (
+            <HeroCarousel
+              images={content.heroImages}
+              title={content.heroTitle ?? DEFAULT_HERO_TITLE}
+              subtitle={content.heroSubtitle ?? DEFAULT_HERO_SUBTITLE}
+            />
+          ) : null}
+          <div className="flex flex-col gap-3 border-b border-line bg-canvas px-5 pt-4 pb-4">
+            <h2 className="m-0 font-display text-[15px] font-semibold">Seu agendamento</h2>
+            <ProgressThread steps={STEPS} current={0} label="Etapas do agendamento" />
+          </div>
         </header>
       ) : (
         <header className="flex flex-col gap-4 border-b border-line px-5 py-4">
@@ -230,37 +320,117 @@ export function BookingFlow({
 
       {view === 0 ? (
         <>
-          <main className="flex flex-1 flex-col gap-3 px-5 pt-5">
-            <h2 tabIndex={-1} data-step-heading className="m-0 font-display text-[19px] font-semibold outline-none">Escolha o serviço</h2>
-            <ul className="m-0 flex list-none flex-col p-0">
-              {services.map((service) => (
-                <li key={service.id} className="border-b border-line">
-                  <label className="flex min-h-[68px] cursor-pointer items-center gap-3.5 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(service.id)}
-                      onChange={() => toggleService(service.id)}
-                      aria-label={service.name}
-                      className="m-0 size-[22px] shrink-0 accent-(--brand)"
-                    />
-                    <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                      <span className="text-base font-semibold">{service.name}</span>
-                      <span className="text-[13px] text-ink-muted tabular-nums">
-                        {formatDuration(service.durationMin)}
-                      </span>
-                    </span>
-                    <span className="text-base font-semibold tabular-nums">
-                      {formatBRL(service.priceCents)}
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-            {selected.length > 0 && eligible.length === 0 ? (
-              <FormAlert>
-                Nenhum profissional faz esses serviços juntos. Escolha um de cada vez.
-              </FormAlert>
+          <main className="flex flex-1 flex-col gap-5 pt-5">
+            <div className="flex flex-col gap-3.5 px-5">
+              <label className="flex min-h-[50px] items-center gap-3 rounded-2xl border border-line bg-canvas px-4 focus-within:outline-2 focus-within:outline-(--brand)">
+                <Search className="size-[18px] shrink-0 text-ink-muted" aria-hidden="true" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Pesquisar serviço"
+                  aria-label="Pesquisar serviço"
+                  autoComplete="off"
+                  className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-ink-muted"
+                />
+              </label>
+              <div className="flex flex-col gap-0.5">
+                <h2 tabIndex={-1} data-step-heading className="m-0 font-display text-[22px] font-semibold outline-none">
+                  {lockedProfessional ? `Serviços de ${lockedProfessional.name.split(/\s+/)[0]}` : "Todos os serviços"}
+                </h2>
+                <p className="m-0 text-[13px] text-ink-muted">Escolha um ou mais serviços</p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2.5 px-5">
+              {groups.map((group) => {
+                const open = group.name === null || searching || openGroups.includes(group.id);
+                const chosen = group.items.filter((s) => selectedIds.includes(s.id)).length;
+                const panelId = `group-${group.id}`;
+                return (
+                  <div key={group.id} className="flex flex-col gap-2.5">
+                    {group.name !== null ? (
+                      <button
+                        type="button"
+                        aria-expanded={open}
+                        aria-controls={panelId}
+                        onClick={() =>
+                          setOpenGroups((ids) =>
+                            ids.includes(group.id) ? ids.filter((id) => id !== group.id) : [...ids, group.id],
+                          )
+                        }
+                        className="flex min-h-[51px] items-center gap-3 rounded-2xl border border-line bg-canvas px-4 text-left"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-[15.5px] font-semibold">{group.name}</span>
+                        {chosen > 0 ? (
+                          <span className="shrink-0 rounded-full bg-(--brand) px-2 py-0.5 text-xs font-semibold text-white">
+                            {chosen}
+                          </span>
+                        ) : null}
+                        <ChevronDown
+                          className={`size-[18px] shrink-0 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    ) : null}
+                    {open ? (
+                      <ul id={panelId} className="m-0 flex list-none flex-col gap-2.5 p-0">
+                        {group.items.map((service) => {
+                          const checked = selectedIds.includes(service.id);
+                          return (
+                            <li key={service.id}>
+                              <label
+                                className={`flex cursor-pointer items-start gap-3.5 rounded-2xl border bg-canvas p-3.5 transition-colors ${
+                                  checked ? "border-(--brand)" : "border-line"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleService(service.id)}
+                                  aria-label={service.name}
+                                  className="m-0 mt-1 size-[22px] shrink-0 accent-(--brand)"
+                                />
+                                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                                  <span className="text-base font-semibold">{service.name}</span>
+                                  <span className="text-[13px] text-ink-muted">
+                                    <span className="tabular-nums">{formatDuration(service.durationMin)}</span>
+                                    {service.description ? ` · ${service.description}` : ""}
+                                  </span>
+                                  <span className="mt-1 self-end text-base font-bold tabular-nums text-(--brand)">
+                                    {formatBRL(service.priceCents)}
+                                  </span>
+                                </span>
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+            {visibleServices.length === 0 ? (
+              <p className="m-0 px-5 text-sm text-ink-muted">Nenhum serviço com esse nome.</p>
             ) : null}
+            {selected.length > 0 && eligible.length === 0 ? (
+              <div className="px-5">
+                <FormAlert>
+                  Nenhum profissional faz esses serviços juntos. Escolha um de cada vez.
+                </FormAlert>
+              </div>
+            ) : null}
+            {lockedProfessional ? null : <TeamSection slug={tenant.slug} team={content.team} />}
+            <StudioInfo
+              address={tenant.address}
+              rows={content.weekRows}
+              instagram={content.instagram}
+              facebook={content.facebook}
+            />
+            <div className="mt-2 flex flex-col items-center gap-1 border-t border-line px-5 pt-4 pb-6 text-center">
+              <span className="text-[13px] text-ink-muted">Agendamento simples e seguro</span>
+              <span className="text-xs text-ink-muted">Desenvolvido com Eneven Agenda Inteligente</span>
+            </div>
           </main>
           <Footer
             summary={
@@ -275,7 +445,6 @@ export function BookingFlow({
             }
             disabled={selected.length === 0 || eligible.length === 0}
             onContinue={continueFromServices}
-            poweredBy
           />
         </>
       ) : null}
@@ -420,7 +589,7 @@ export function BookingFlow({
                 type="button"
                 onClick={() => {
                   // Volta ao começo mantendo tudo o que já foi escolhido.
-                  window.history.go(-3 + (eligible.length === 1 ? 1 : 0));
+                  window.history.go(-3 + (eligible.length === 1 || lockedProfessional ? 1 : 0));
                 }}
                 className="flex min-h-11 shrink-0 items-center px-1 text-sm font-semibold text-foreground underline underline-offset-4"
               >

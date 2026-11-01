@@ -1,11 +1,12 @@
-import { and, eq, inArray, isNull, max } from "drizzle-orm";
-import { professionalServices, professionals, services } from "@/db/schema";
+import { and, eq, inArray, isNull, max, notExists, sql } from "drizzle-orm";
+import { professionalServices, professionals, serviceCategories, services } from "@/db/schema";
 import type { Db } from "@/db/types";
-import { withTenant } from "@/server/tenant-db";
+import { withTenant, type TenantTx } from "@/server/tenant-db";
 import { CatalogError, notFoundError, validationError } from "./errors";
 
 export const SERVICE_NAME_MAX = 80;
 export const SERVICE_DESCRIPTION_MAX = 300;
+export const SERVICE_CATEGORY_MAX = 40;
 export const MAX_PRICE_CENTS = 99_999_999;
 
 export type ServiceInput = {
@@ -18,6 +19,8 @@ export type ServiceInput = {
   bufferAfterMin: number;
   priceCents: number;
   visible: boolean;
+  /** Nome da categoria (criada se ainda não existir); vazio tira o serviço de qualquer categoria. */
+  categoryName?: string | null;
   professionalIds: string[];
 };
 
@@ -30,6 +33,8 @@ export type ServiceRow = {
   priceCents: number;
   visible: boolean;
   sortOrder: number;
+  categoryId: string | null;
+  categoryName: string | null;
   archivedAt: Date | null;
   professionalIds: string[];
 };
@@ -60,6 +65,10 @@ function validate(input: ServiceInput) {
   if (!isInt(input.priceCents) || input.priceCents < 0 || input.priceCents > MAX_PRICE_CENTS)
     errors.priceCents = "Informe um preço válido.";
 
+  const category = typeof input.categoryName === "string" ? input.categoryName.trim().replace(/\s+/g, " ") : "";
+  if (category.length > SERVICE_CATEGORY_MAX)
+    errors.categoryName = `Use até ${SERVICE_CATEGORY_MAX} caracteres na categoria.`;
+
   const ids = input.professionalIds;
   if (!Array.isArray(ids) || !ids.every(isUuid))
     errors.professionalIds = "Profissional inválido.";
@@ -72,6 +81,7 @@ function validate(input: ServiceInput) {
     bufferAfterMin: input.bufferAfterMin,
     priceCents: input.priceCents,
     visible: input.visible === true,
+    categoryName: category === "" ? null : category,
     professionalIds: [...new Set(ids)],
   };
 }
@@ -93,6 +103,11 @@ export async function listServices(
         ),
       )
       .orderBy(services.sortOrder, services.createdAt, services.id);
+    const categories = await tx
+      .select({ id: serviceCategories.id, name: serviceCategories.name })
+      .from(serviceCategories)
+      .where(eq(serviceCategories.tenantId, tenantId));
+    const categoryName = new Map(categories.map((c) => [c.id, c.name]));
     const links = await tx
       .select()
       .from(professionalServices)
@@ -110,6 +125,8 @@ export async function listServices(
       priceCents: s.priceCents,
       visible: s.visible,
       sortOrder: s.sortOrder,
+      categoryId: s.categoryId,
+      categoryName: s.categoryId ? (categoryName.get(s.categoryId) ?? null) : null,
       archivedAt: s.archivedAt,
       professionalIds: byService.get(s.id) ?? [],
     }));
@@ -145,9 +162,14 @@ export async function saveService(
       }
     }
 
+    const categoryId = data.categoryName
+      ? await findOrCreateCategory(tx, tenantId, data.categoryName)
+      : null;
+
     const values = {
       name: data.name,
       description: data.description,
+      categoryId,
       durationMin: data.durationMin,
       bufferAfterMin: data.bufferAfterMin,
       priceCents: data.priceCents,
@@ -201,8 +223,43 @@ export async function saveService(
         })),
       );
     }
+    await deleteEmptyCategories(tx, tenantId);
     return { id };
   });
+}
+
+/** Categoria pelo nome (sem diferenciar maiúsculas); cria no fim da lista se ainda não existe. */
+async function findOrCreateCategory(tx: TenantTx, tenantId: string, name: string): Promise<string> {
+  const [existing] = await tx
+    .select({ id: serviceCategories.id })
+    .from(serviceCategories)
+    .where(and(eq(serviceCategories.tenantId, tenantId), sql`lower(${serviceCategories.name}) = lower(${name})`))
+    .limit(1);
+  if (existing) return existing.id;
+  const [{ top }] = await tx
+    .select({ top: max(serviceCategories.sortOrder) })
+    .from(serviceCategories)
+    .where(eq(serviceCategories.tenantId, tenantId));
+  const [created] = await tx
+    .insert(serviceCategories)
+    .values({ tenantId, name, sortOrder: (top ?? -1) + 1 })
+    .returning({ id: serviceCategories.id });
+  return created.id;
+}
+
+/** Categoria sem nenhum serviço (nem arquivado) some: não sobra grupo vazio. */
+async function deleteEmptyCategories(tx: TenantTx, tenantId: string): Promise<void> {
+  await tx.delete(serviceCategories).where(
+    and(
+      eq(serviceCategories.tenantId, tenantId),
+      notExists(
+        tx
+          .select({ one: sql`1` })
+          .from(services)
+          .where(and(eq(services.tenantId, tenantId), eq(services.categoryId, serviceCategories.id))),
+      ),
+    ),
+  );
 }
 
 async function setArchived(db: Db, tenantId: string, id: string, archivedAt: Date | null) {

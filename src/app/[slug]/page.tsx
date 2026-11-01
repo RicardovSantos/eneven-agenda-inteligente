@@ -5,6 +5,7 @@ import { BookingFlow } from "@/components/booking/booking-flow";
 import { PublicShell, type BookingTenant } from "@/components/booking/shell";
 import { Unavailable } from "@/components/booking/unavailable";
 import { loadPublicHeader } from "@/server/public/header";
+import { loadPublicPageContent } from "@/server/public/page-content";
 import { getPublicTenant, type PublicTenant } from "@/server/public/tenant";
 
 // Nome, cor, slug e serviços mudam no painel e precisam aparecer na hora: nada de cache estático.
@@ -59,13 +60,18 @@ export default async function PublicBookingPage({ params }: PageProps<"/[slug]">
   }
 
   const { catalog } = resolved;
+  const content = await loadPublicPageContent(db, tenant, catalog);
   return (
     <PublicShell brandColor={tenant.brandColor}>
       <BookingFlow
         tenant={bookingTenant}
-        services={catalog.services.map(({ id, name, durationMin, priceCents, professionalIds }) => ({
+        content={content}
+        categories={catalog.categories}
+        services={catalog.services.map(({ id, name, description, categoryId, durationMin, priceCents, professionalIds }) => ({
           id,
           name,
+          description,
+          categoryId,
           durationMin,
           priceCents,
           professionalIds,

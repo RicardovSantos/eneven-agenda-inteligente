@@ -2,11 +2,14 @@
 
 import { Check, KeyRound, Loader2, Plus } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   deactivateProfessionalAction,
+  removeProfessionalPhotoAction,
   saveProfessionalAction,
+  uploadProfessionalPhotoAction,
 } from "@/app/painel/equipe/actions";
+import { PhotoField, type PhotoResult } from "@/components/media/photo-field";
 import { WeeklyHoursEditor } from "@/components/hours/weekly-hours-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +37,10 @@ import {
 export type ProfessionalItem = {
   id: string;
   name: string;
+  /** Cargo mostrado na página pública. */
+  title: string | null;
+  /** Endereço público da foto ou `null`. */
+  photoUrl: string | null;
   color: string | null;
   active: boolean;
   serviceIds: string[];
@@ -314,6 +321,19 @@ function ProfessionalForm({
   const [pending, startTransition] = useTransition();
   const isNew = professional === undefined;
   const [name, setName] = useState(professional?.name ?? "");
+  const [title, setTitle] = useState(professional?.title ?? "");
+  // Profissional novo ainda não tem id: a foto escolhida espera o "Salvar" para ser enviada.
+  const [pendingFile, setPendingPhotoState] = useState<{ file: File; url: string } | null>(null);
+  const pendingPhoto = pendingFile?.file ?? null;
+  const pendingPreview = pendingFile?.url ?? null;
+  const setPendingPhoto = (file: File | null) =>
+    setPendingPhotoState(file ? { file, url: URL.createObjectURL(file) } : null);
+  useEffect(() => {
+    const url = pendingFile?.url;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [pendingFile?.url]);
   // Novo: primeira cor livre, expediente igual ao do estabelecimento, faz todos os serviços.
   const [color, setColor] = useState(
     professional?.color ?? nextProfessionalColor(professionals.map((p) => p.color)),
@@ -337,6 +357,7 @@ function ProfessionalForm({
       const result = await saveProfessionalAction({
         id: professional?.id,
         name,
+        title,
         color,
         active,
         serviceIds,
@@ -344,6 +365,13 @@ function ProfessionalForm({
       });
       setErrors(result.fieldErrors ?? {});
       if (result.ok) {
+        if (pendingPhoto && result.id) {
+          const data = new FormData();
+          data.set("id", result.id);
+          data.set("photo", pendingPhoto);
+          const photo = await uploadProfessionalPhotoAction(data);
+          if (!photo.ok) show(photo.error ?? "O profissional foi salvo, mas a foto não foi enviada.", "error");
+        }
         show(result.message ?? "Profissional salvo");
         onDone(isNew);
       } else {
@@ -376,6 +404,55 @@ function ProfessionalForm({
           />
           <FieldError>{errors.name}</FieldError>
         </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="p-cargo" className="font-semibold">Cargo (opcional)</Label>
+          <Input
+            id="p-cargo"
+            value={title}
+            maxLength={40}
+            placeholder="Ex.: Barbeiro, Cabeleireira"
+            onChange={(e) => setTitle(e.target.value)}
+            aria-invalid={errors.title ? true : undefined}
+            className="h-11"
+          />
+          <FieldError>{errors.title}</FieldError>
+        </div>
+
+        <PhotoField
+          label="Foto"
+          hint="Aparece na página de agendamento, em formato redondo. Qualquer formato de imagem."
+          shape="round"
+          maxSide={640}
+          currentUrl={professional ? professional.photoUrl : pendingPreview}
+          placeholder={<span aria-hidden="true" className="text-2xl font-semibold">{(name.trim()[0] ?? "?").toUpperCase()}</span>}
+          disabled={readOnly}
+          onUpload={async (file): Promise<PhotoResult> => {
+            if (!professional) {
+              setPendingPhoto(file);
+              return { ok: true };
+            }
+            const data = new FormData();
+            data.set("id", professional.id);
+            data.set("photo", file);
+            const result = await uploadProfessionalPhotoAction(data);
+            if (result.ok) show(result.message ?? "Foto atualizada");
+            return { ok: result.ok, error: result.fieldErrors?.photo ?? result.error };
+          }}
+          onRemove={
+            professional?.photoUrl || pendingPhoto
+              ? async (): Promise<PhotoResult> => {
+                  if (!professional) {
+                    setPendingPhoto(null);
+                    return { ok: true };
+                  }
+                  const result = await removeProfessionalPhotoAction(professional.id);
+                  if (result.ok) show(result.message ?? "Foto removida");
+                  return { ok: result.ok, error: result.error };
+                }
+              : undefined
+          }
+        />
 
         <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
           <legend className="mb-1 text-sm font-semibold">Cor</legend>

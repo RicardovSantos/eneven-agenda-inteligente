@@ -28,6 +28,7 @@ export async function saveServiceAction(input: unknown): Promise<CatalogActionRe
       bufferAfterMin: raw.bufferAfterMin as number,
       priceCents: raw.priceCents as number,
       visible: raw.visible === true,
+      categoryName: typeof raw.categoryName === "string" ? raw.categoryName : null,
       professionalIds: raw.professionalIds as string[],
     } satisfies ServiceInput);
   });

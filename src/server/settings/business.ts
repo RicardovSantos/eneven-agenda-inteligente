@@ -7,8 +7,10 @@ import {
   brandingSchema,
   businessInfoSchema,
   fieldErrorsOf,
+  heroTextSchema,
   type BookingRulesInput,
   type BusinessInfoInput,
+  type HeroTextInput,
 } from "./schemas";
 import { validationError } from "./errors";
 
@@ -24,6 +26,16 @@ export async function updateBusinessInfo(
   input: BusinessInfoInput,
 ): Promise<void> {
   const parsed = businessInfoSchema.safeParse(input);
+  if (!parsed.success) throw validationError(fieldErrorsOf(parsed.error));
+  await db.update(tenants).set(parsed.data).where(eq(tenants.id, tenantId));
+}
+
+export async function updateHeroText(
+  db: Db,
+  tenantId: string,
+  input: HeroTextInput,
+): Promise<void> {
+  const parsed = heroTextSchema.safeParse(input);
   if (!parsed.success) throw validationError(fieldErrorsOf(parsed.error));
   await db.update(tenants).set(parsed.data).where(eq(tenants.id, tenantId));
 }

@@ -16,6 +16,7 @@ import {
   type TeamActor,
 } from "@/server/team/invitations";
 import { removeMember } from "@/server/team/members";
+import { MediaError, removeHeroPhoto, saveHeroPhoto } from "@/server/media";
 import {
   SettingsError,
   checkSlugAvailability,
@@ -24,6 +25,7 @@ import {
   updateBranding,
   updateBusinessHours,
   updateBusinessInfo,
+  updateHeroText,
   updateSlug,
   uploadLogo,
   type SlugAvailability,
@@ -79,6 +81,9 @@ async function run(
     revalidatePath("/painel", "layout");
     return { message: SAVED, ...result, at: Date.now() };
   } catch (error) {
+    if (error instanceof MediaError) {
+      return { fieldErrors: { photo: error.message }, at: Date.now() };
+    }
     if (error instanceof SettingsError) {
       return error.code === "forbidden"
         ? { error: error.message, at: Date.now() }
@@ -101,9 +106,48 @@ export async function saveBusinessInfoAction(
       whatsapp: text(formData, "whatsapp"),
       address: text(formData, "address"),
       instagram: text(formData, "instagram"),
+      facebook: text(formData, "facebook"),
       about: text(formData, "about"),
     });
     return {};
+  });
+}
+
+export async function saveHeroTextAction(
+  _previous: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  return run(async ({ db, tenantId }) => {
+    await updateHeroText(db, tenantId, {
+      heroTitle: text(formData, "heroTitle"),
+      heroSubtitle: text(formData, "heroSubtitle"),
+    });
+    return {};
+  });
+}
+
+/** Troca a imagem de uma posição do carrossel (0 a 2); qualquer formato vira WebP. */
+export async function uploadHeroPhotoAction(
+  _previous: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  return run(async ({ db, tenantId }) => {
+    const file = formData.get("photo");
+    if (!(file instanceof File) || file.size === 0) throw new MediaError("Escolha uma imagem.");
+    await saveHeroPhoto(db, tenantId, Number(text(formData, "slot")), {
+      bytes: Buffer.from(await file.arrayBuffer()),
+    });
+    return { message: "Imagem atualizada" };
+  });
+}
+
+export async function removeHeroPhotoAction(
+  _previous: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  return run(async ({ db, tenantId }) => {
+    await removeHeroPhoto(db, tenantId, Number(text(formData, "slot")));
+    return { message: "Imagem removida" };
   });
 }
 

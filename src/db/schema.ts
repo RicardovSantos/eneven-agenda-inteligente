@@ -116,7 +116,11 @@ export const tenants = pgTable("tenants", {
   whatsapp: text("whatsapp"),
   address: text("address"),
   instagram: text("instagram"),
+  facebook: text("facebook"),
   about: text("about"),
+  /** Frase de destaque sobre o carrossel da página pública. */
+  heroTitle: text("hero_title"),
+  heroSubtitle: text("hero_subtitle"),
   /** Intervalo entre horários oferecidos na reserva online (minutos). */
   slotIntervalMin: integer("slot_interval_min").notNull().default(15),
   /** Antecedência mínima para reservar (minutos). */
@@ -264,6 +268,22 @@ export const tenantLogos = pgTable("tenant_logos", {
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 });
 
+/** Imagens do carrossel da página pública (até 3 por tenant, já em WebP). */
+export const tenantPhotos = pgTable(
+  "tenant_photos",
+  {
+    tenantId: tenantIdColumn(),
+    slot: smallint("slot").notNull(),
+    mime: text("mime").notNull(),
+    data: bytea("data").notNull(),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "tenant_photos_pk", columns: [t.tenantId, t.slot] }),
+    check("tenant_photos_slot_range", sql`${t.slot} between 0 and 2`),
+  ],
+);
+
 /** Horário de funcionamento (vários intervalos por dia; weekday 0 = domingo). */
 export const businessHours = pgTable(
   "business_hours",
@@ -287,7 +307,11 @@ export const professionals = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: tenantIdColumn(),
     name: text("name").notNull(),
+    /** Cargo exibido na equipe da página pública ("Barbeiro"). */
+    title: text("title"),
     color: text("color"),
+    /** Quando a foto foi enviada (versão do endereço público); nulo = sem foto. */
+    photoUpdatedAt: timestamptz("photo_updated_at"),
     active: boolean("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     userId: uuid("user_id").references(() => users.id, {
@@ -298,6 +322,26 @@ export const professionals = pgTable(
   (t) => [
     index("professionals_tenant_id_idx").on(t.tenantId),
     unique("professionals_tenant_id_id_unique").on(t.tenantId, t.id),
+  ],
+);
+
+/** Foto do profissional (uma por profissional, já em WebP). */
+export const professionalPhotos = pgTable(
+  "professional_photos",
+  {
+    tenantId: tenantIdColumn(),
+    professionalId: uuid("professional_id").notNull(),
+    mime: text("mime").notNull(),
+    data: bytea("data").notNull(),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "professional_photos_pk", columns: [t.tenantId, t.professionalId] }),
+    foreignKey({
+      name: "professional_photos_professional_fk",
+      columns: [t.tenantId, t.professionalId],
+      foreignColumns: [professionals.tenantId, professionals.id],
+    }).onDelete("cascade"),
   ],
 );
 
@@ -325,6 +369,22 @@ export const professionalHours = pgTable(
   ],
 );
 
+/** Categoria de serviços ("Cabelo e tratamentos"): agrupa a lista da página pública. */
+export const serviceCategories = pgTable(
+  "service_categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: tenantIdColumn(),
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("service_categories_tenant_id_idx").on(t.tenantId),
+    unique("service_categories_tenant_id_id_unique").on(t.tenantId, t.id),
+  ],
+);
+
 export const services = pgTable(
   "services",
   {
@@ -339,10 +399,17 @@ export const services = pgTable(
     priceCents: integer("price_cents").notNull(),
     visible: boolean("visible").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
+    /** Categoria opcional; sem ela o serviço aparece em "Outros serviços". */
+    categoryId: uuid("category_id"),
     archivedAt: timestamptz("archived_at"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [
+    foreignKey({
+      name: "services_category_fk",
+      columns: [t.tenantId, t.categoryId],
+      foreignColumns: [serviceCategories.tenantId, serviceCategories.id],
+    }),
     index("services_tenant_id_idx").on(t.tenantId),
     unique("services_tenant_id_id_unique").on(t.tenantId, t.id),
     check("services_duration_positive", sql`${t.durationMin} > 0`),

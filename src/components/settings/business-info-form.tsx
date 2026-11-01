@@ -19,6 +19,7 @@ export type BusinessInfoInitial = {
   whatsapp: string;
   address: string;
   instagram: string;
+  facebook: string;
   about: string;
 };
 
@@ -33,6 +34,7 @@ export function BusinessInfoForm({ initial }: { initial: BusinessInfoInitial }) 
   const [whatsapp, setWhatsapp] = useState(formatBrazilPhone(initial.whatsapp));
   const [address, setAddress] = useState(initial.address);
   const [instagram, setInstagram] = useState(initial.instagram);
+  const [facebook, setFacebook] = useState(initial.facebook);
   const [about, setAbout] = useState(initial.about);
   const errors = state.fieldErrors ?? {};
   const left = ABOUT_MAX - about.length;
@@ -78,6 +80,17 @@ export function BusinessInfoForm({ initial }: { initial: BusinessInfoInitial }) 
             error={errors.instagram}
           />
         </div>
+        <TextField
+          name="facebook"
+          label="Facebook (opcional)"
+          placeholder="seusalao ou link da página"
+          autoCapitalize="none"
+          spellCheck={false}
+          className="h-11"
+          value={facebook}
+          onChange={(e) => setFacebook(e.target.value)}
+          error={errors.facebook}
+        />
         <TextField
           name="address"
           label="Endereço (opcional)"
