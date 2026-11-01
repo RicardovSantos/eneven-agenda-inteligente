@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePanelRole } from "@/server/panel/roles";
 import { getDb } from "@/db/client";
+import { livePushEnabled } from "@/server/push/mode";
 import { listPushDevices } from "@/server/push/subscriptions";
 import { removeSavedDevice } from "./actions";
 import { DeviceControls } from "./device-controls";
@@ -17,7 +18,7 @@ export default async function NotificacoesPage() {
     <div><h1 className="text-[1.75rem] font-semibold">Notificações</h1><p className="text-ink-muted">Cadastre este dispositivo para receber avisos da agenda.</p></div>
     <section className="space-y-4 rounded-card border border-line bg-surface p-5">
       <h2 className="font-semibold">Avisos neste dispositivo</h2>
-      <p className="text-sm text-ink-muted">O envio de avisos sobre agendamentos, cancelamentos e remarcações ainda está em preparação. No iPhone, instale o aplicativo na tela de início para permitir notificações.</p>
+      <p className="text-sm text-ink-muted">{livePushEnabled() ? "Você recebe um aviso neste dispositivo quando houver um novo agendamento, um cancelamento ou uma remarcação. O aviso não mostra dados do cliente." : "O envio de avisos sobre agendamentos, cancelamentos e remarcações ainda está em preparação."} No iPhone, instale o aplicativo na tela de início para permitir notificações.</p>
       <DeviceControls publicKey={publicKey} support={session.support} />
     </section>
     {!session.support && <section className="space-y-4 rounded-card border border-line bg-surface p-5">

@@ -1,0 +1,2 @@
+ALTER TABLE "billing_subscriptions" ADD COLUMN "scheduled_plan_id" uuid;--> statement-breakpoint
+ALTER TABLE "billing_subscriptions" ADD CONSTRAINT "billing_subscriptions_scheduled_plan_id_plans_id_fk" FOREIGN KEY ("scheduled_plan_id") REFERENCES "public"."plans"("id") ON DELETE set null ON UPDATE no action;

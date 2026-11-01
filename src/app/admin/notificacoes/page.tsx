@@ -1,5 +1,6 @@
 import { and, asc, eq, lte, or } from "drizzle-orm";
 import Link from "next/link";
+import { pushAvailable } from "@/server/push/mode";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { pushDeliveries, pushEvents, tenants } from "@/db/schema";
@@ -9,7 +10,7 @@ import { removeExpiredDevice, reviewDelivery } from "./actions";
 function staleThreshold() { return new Date(Date.now() - 5 * 60_000); }
 
 export default async function TestPushReviewPage() {
-  if (process.env.NODE_ENV === "production") notFound();
+  if (!pushAvailable()) notFound();
   await requireSuperAdminSession();
   const stale = staleThreshold();
   const rows = await (await getDb()).select({ id: pushDeliveries.id, status: pushDeliveries.status, claimedAt: pushDeliveries.claimedAt, name: tenants.name, eventType: pushEvents.eventType })

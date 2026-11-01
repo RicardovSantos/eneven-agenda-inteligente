@@ -204,6 +204,20 @@
       "when": 1793561216945,
       "tag": "0028_assinatura_acesso_ate",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793564448365,
+      "tag": "0029_avisos_fim_do_teste",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1793565250845,
+      "tag": "0030_troca_de_plano",
+      "breakpoints": true
     }
   ]
 }

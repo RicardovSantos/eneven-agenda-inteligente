@@ -27,18 +27,35 @@ export async function register() {
     startTimer(
       async () => {
         const result = await runBillingCycle(await getDb());
-        if (result && (result.events.processed || result.events.failed || result.cancelled.expired || result.notices.sent || result.notices.uncertain)) {
-          console.info("Ciclo da cobrança:", JSON.stringify({ events: result.events, cancelled: result.cancelled, notices: result.notices }));
+        if (result && (result.events.processed || result.events.failed || result.cancelled.expired || result.notices.sent || result.notices.uncertain || result.trial.sent || result.trial.uncertain || result.plans.applied || result.plans.canceled || result.plans.failed)) {
+          console.info("Ciclo da cobrança:", JSON.stringify({ events: result.events, cancelled: result.cancelled, notices: result.notices, trial: result.trial, plans: result.plans }));
         }
       },
-      { intervalMs: 10 * 60_000, firstDelayMs: 90_000, registry: billingRegistry(), log: console },
+      { intervalMs: 10 * 60_000, firstDelayMs: 90_000, registry: namedRegistry("__enevenBillingTimerRegistry"), log: console },
+    );
+  }
+
+  const { livePushEnabled, pushVapid } = await import("@/server/push/mode");
+  const vapid = pushVapid(process.env);
+  if (vapid && livePushEnabled(process.env)) {
+    const { getDb } = await import("@/db/client");
+    const { processTestPushQueue, testPushSender } = await import("@/server/push/process-test-queue");
+    const { startWhatsAppTimer: startTimer } = await import("@/server/whatsapp/timer");
+    // Os avisos expiram em 5 minutos, então a fila roda a cada 30 segundos.
+    startTimer(
+      async () => {
+        const result = await processTestPushQueue(await getDb(), testPushSender(vapid));
+        if (result.sent || result.uncertain || result.expired) console.info("Fila de notificações:", JSON.stringify(result));
+      },
+      { intervalMs: 30_000, firstDelayMs: 45_000, registry: namedRegistry("__enevenPushTimerRegistry"), log: console },
     );
   }
 }
 
-/** Registro separado do relógio do WhatsApp, para os dois poderem existir no mesmo processo. */
-function billingRegistry() {
-  const holder = globalThis as { __enevenBillingTimerRegistry?: { __enevenWhatsAppTimer?: ReturnType<typeof setTimeout> | ReturnType<typeof setInterval> } };
-  holder.__enevenBillingTimerRegistry ??= {};
-  return holder.__enevenBillingTimerRegistry;
+/** Registro separado por relógio, para todos poderem existir no mesmo processo. */
+type TimerRegistry = { __enevenWhatsAppTimer?: ReturnType<typeof setTimeout> | ReturnType<typeof setInterval> };
+function namedRegistry(name: string): TimerRegistry {
+  const holder = globalThis as unknown as Record<string, TimerRegistry | undefined>;
+  holder[name] ??= {};
+  return holder[name]!;
 }

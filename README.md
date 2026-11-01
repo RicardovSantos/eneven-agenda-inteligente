@@ -32,6 +32,8 @@ Variáveis: `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_COLLECTOR_ID` (ID numéri
 
 Fora de produção, contas de teste da Mercado Pago (tokens `APP_USR-` de usuário `TESTUSER…`) funcionam com `MERCADO_PAGO_SANDBOX=true` e `MERCADO_PAGO_LIVE_MODE=false`; o app confirma que a conta é de teste antes de criar qualquer assinatura. A Mercado Pago grafa o status `cancelled` (dois "l").
 
+**Troca de plano** (`src/server/billing/change-plan.ts`): sem assinatura vale na hora. Com assinatura, o aumento libera o plano novo na hora e altera o valor das próximas cobranças (PUT no `/preapproval`, nada é cobrado na hora); a redução fica marcada e o relógio aplica um dia antes da próxima cobrança, só se os profissionais ativos couberem no limite do plano menor (senão cancela a troca e registra). O dono pode desfazer a redução marcada. Também há e-mails de fim do teste (3 dias antes e ao terminar), enviados uma vez cada pelo mesmo relógio.
+
 ### Clientes
 
 `/painel/clientes`: lista com busca por nome ou WhatsApp (o cliente entra sozinho ao agendar pelo link, ou é criado à mão em "Novo cliente"), ficha com contato, observações (salvas ao sair do campo), histórico de atendimentos, total gasto e o botão "Agendar", que abre o novo agendamento com o cliente já escolhido. WhatsApp repetido é recusado com um atalho para o cadastro existente. Profissionais veem só os clientes que atenderam e não veem o total gasto.

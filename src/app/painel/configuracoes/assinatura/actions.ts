@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { tenants, users } from "@/db/schema";
 import { cancelSubscription } from "@/server/billing/cancel-subscription";
+import { cancelScheduledPlanChange, changePlan } from "@/server/billing/change-plan";
 import { createSubscription } from "@/server/billing/create-subscription";
 import { billingConfig } from "@/server/billing/mode";
 import { requireOwner } from "@/server/settings/access";
@@ -33,5 +34,22 @@ export async function cancelSubscriptionAction(): Promise<void> {
   const config = billingConfig();
   if (!config) throw new Error("Cobrança não configurada.");
   await cancelSubscription(await getDb(), { tenantId: actor.tenantId, ownerUserId: actor.userId }, config);
+  revalidatePath("/painel/configuracoes/assinatura");
+}
+
+/** Troca de plano: aumento vale na hora (valor novo na próxima cobrança); redução fica para o próximo ciclo. */
+export async function changePlanAction(form: FormData): Promise<void> {
+  const actor = await requireOwner();
+  if (actor.support) throw new Error("Indisponível no modo suporte.");
+  const planId = form.get("planId");
+  if (typeof planId !== "string") throw new Error("Plano inválido.");
+  await changePlan(await getDb(), { tenantId: actor.tenantId, ownerUserId: actor.userId, planId }, billingConfig());
+  revalidatePath("/painel", "layout");
+}
+
+export async function undoPlanChangeAction(): Promise<void> {
+  const actor = await requireOwner();
+  if (actor.support) throw new Error("Indisponível no modo suporte.");
+  await cancelScheduledPlanChange(await getDb(), { tenantId: actor.tenantId, ownerUserId: actor.userId });
   revalidatePath("/painel/configuracoes/assinatura");
 }

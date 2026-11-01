@@ -828,6 +828,8 @@ export const billingSubscriptions = pgTable("billing_subscriptions", {
   providerUpdatedAt: timestamptz("provider_updated_at"),
   /** Cancelada: até quando o período já pago dá acesso (depois disso o estabelecimento deixa de poder agendar). */
   accessUntil: timestamptz("access_until"),
+  /** Troca de plano marcada para o próximo ciclo (downgrade); some quando aplicada ou desfeita. */
+  scheduledPlanId: uuid("scheduled_plan_id").references(() => plans.id, { onDelete: "set null" }),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [
   unique("billing_subscriptions_tenant_id_id_unique").on(t.tenantId, t.id),
@@ -845,6 +847,20 @@ export const billingNotices = pgTable("billing_notices", {
 }, (t) => [
   unique("billing_notices_tenant_due_unique").on(t.tenantId, t.pastDueAt),
   check("billing_notices_state_check", sql`${t.state} in ('sending', 'sent', 'uncertain')`),
+]);
+
+/** Reserva idempotente dos e-mails de fim do teste (um por tipo e estabelecimento); resultado incerto não reenvia. */
+export const trialNotices = pgTable("trial_notices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  kind: text("kind").notNull(),
+  state: text("state").notNull().default("sending"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  completedAt: timestamptz("completed_at"),
+}, (t) => [
+  unique("trial_notices_tenant_kind_unique").on(t.tenantId, t.kind),
+  check("trial_notices_kind_check", sql`${t.kind} in ('ending', 'ended')`),
+  check("trial_notices_state_check", sql`${t.state} in ('sending', 'sent', 'uncertain')`),
 ]);
 
 /** Faturas identificadas pelo provedor, sempre vinculadas à assinatura do mesmo tenant. */

@@ -9,6 +9,7 @@ import { parsePage, parseQuery, parseSituation } from "@/lib/platform-format";
 import { cn } from "@/lib/utils";
 import { requireSuperAdminSession } from "@/server/auth/guard";
 import { liveBillingEnabled } from "@/server/billing/mode";
+import { pushAvailable } from "@/server/push/mode";
 import { getPlatformMetrics } from "@/server/platform/metrics";
 import { listPlatformTenants } from "@/server/platform/tenants";
 import { getWhatsAppMetrics } from "@/server/platform/whatsapp-metrics";
@@ -63,7 +64,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         {whatsapp.daily.warnSuperAdmin ? <p>70% do limite diário atingido.</p> : null}
         <p>{whatsapp.monthlySent} mensagens enviadas no mês · custo estimado {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(whatsapp.estimatedCents / 100)}.</p>
         <Link href="/admin/whatsapp" className="text-primary">Revisar ocorrências WhatsApp →</Link>
-        {process.env.NODE_ENV !== "production" && <p><Link href="/admin/notificacoes" className="text-primary">Revisar notificações de teste →</Link></p>}
+        {pushAvailable() && <p><Link href="/admin/notificacoes" className="text-primary">Revisar notificações de teste →</Link></p>}
       </section>
 
       <TenantFilters state={state} counts={list.counts} />

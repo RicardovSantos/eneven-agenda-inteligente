@@ -1,5 +1,5 @@
-import { and, asc, desc, eq, notInArray } from "drizzle-orm";
-import { billingInvoices, billingSubscriptions, plans, tenants } from "@/db/schema";
+import { and, asc, count, desc, eq, notInArray } from "drizzle-orm";
+import { billingInvoices, billingSubscriptions, plans, professionals, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { withTenant } from "@/server/tenant-db";
 
@@ -15,8 +15,9 @@ export async function getBillingOverview(db: Db, tenantId: string) {
   const [pending] = await withTenant(db, tenantId, (tx) => tx.select({ checkoutUrl: billingSubscriptions.checkoutUrl }).from(billingSubscriptions)
     .where(and(eq(billingSubscriptions.tenantId, tenantId), eq(billingSubscriptions.providerStatus, "pending")))
     .orderBy(desc(billingSubscriptions.createdAt)).limit(1));
-  const [subscription] = await withTenant(db, tenantId, (tx) => tx.select({ providerStatus: billingSubscriptions.providerStatus, accessUntil: billingSubscriptions.accessUntil }).from(billingSubscriptions)
+  const [subscription] = await withTenant(db, tenantId, (tx) => tx.select({ providerStatus: billingSubscriptions.providerStatus, accessUntil: billingSubscriptions.accessUntil, scheduledPlanId: billingSubscriptions.scheduledPlanId }).from(billingSubscriptions)
     .where(and(eq(billingSubscriptions.tenantId, tenantId), notInArray(billingSubscriptions.providerStatus, ["abandoned", "creating", "uncertain"])))
     .orderBy(desc(billingSubscriptions.createdAt)).limit(1));
-  return { current, available, invoices, pendingCheckoutUrl: pending?.checkoutUrl ?? null, subscription: subscription ?? null };
+  const [professionalCount] = await withTenant(db, tenantId, (tx) => tx.select({ n: count() }).from(professionals).where(and(eq(professionals.tenantId, tenantId), eq(professionals.active, true))));
+  return { current, available, invoices, pendingCheckoutUrl: pending?.checkoutUrl ?? null, subscription: subscription ?? null, activeProfessionals: Number(professionalCount?.n ?? 0) };
 }

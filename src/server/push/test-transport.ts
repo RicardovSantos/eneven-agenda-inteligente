@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import { request } from "node:https";
 import ipaddr from "ipaddr.js";
 import { generateRequestDetails } from "web-push";
+import { pushAvailable } from "./mode";
 import { validatePushSubscription } from "./validate-subscription";
 
 type Address = { address: string; family: number };
@@ -28,9 +29,9 @@ export function selectPublicPushAddress(addresses: Address[]): Address {
   return addresses.find(({ family }) => family === 4) ?? addresses[0];
 }
 
-/** Envio experimental: não recebe payload arbitrário e nunca funciona em produção. */
+/** Envio com destinos fixos e endereço público validado; não recebe payload arbitrário. Em produção só com o envio real ligado. */
 export async function sendTestPush(input: unknown, type: PushType, vapid: Vapid): Promise<"sent" | "expired"> {
-  if (process.env.NODE_ENV === "production") throw new Error("Envio de teste indisponível em produção.");
+  if (!pushAvailable()) throw new Error("Envio indisponível em produção.");
   if (!["booking_created", "booking_canceled", "booking_rescheduled"].includes(type)) throw new Error("Evento inválido.");
   const subscription = validatePushSubscription(input);
   const url = assertAllowedPushEndpoint(subscription.endpoint);

@@ -1,15 +1,17 @@
 import type { Db } from "@/db/types";
 import { applyCancelledExpiry } from "./cancel-expiry";
+import { applyScheduledPlanChanges } from "./change-plan";
 import { billingAccessEnabled, billingConfig } from "./mode";
-import { sendOwnerBillingNotice } from "./owner-notice";
+import { sendOwnerBillingNotice, sendTrialNotice } from "./owner-notice";
 import { processPaymentEvents } from "./process-events";
 import { reconcileDueBillingAccess } from "./reconcile-due-access";
 import { processBillingNotices } from "./test-notices";
+import { processTrialNotices } from "./trial-notices";
 
 /**
  * Um ciclo da cobrança real: processa os avisos recebidos da Mercado Pago, concilia os
  * vencimentos, encerra o acesso de assinaturas canceladas cujo período acabou e avisa
- * os donos em atraso. Só roda no modo real; o sandbox continua pelo cron manual.
+ * os donos em atraso e os donos cujo teste grátis está acabando. Só roda no modo real; o sandbox continua pelo cron manual.
  */
 export async function runBillingCycle(db: Db, now = new Date()) {
   const config = billingConfig();
@@ -19,5 +21,7 @@ export async function runBillingCycle(db: Db, now = new Date()) {
   const due = billingAccessEnabled(access) ? await reconcileDueBillingAccess(db, access, now) : null;
   const cancelled = await applyCancelledExpiry(db, now);
   const notices = await processBillingNotices(db, (tenantId) => sendOwnerBillingNotice(db, tenantId), { now, requireUnpaidInvoice: true });
-  return { events, due, cancelled, notices };
+  const plans = await applyScheduledPlanChanges(db, config, now);
+  const trial = await processTrialNotices(db, (tenantId, kind, endsAt) => sendTrialNotice(db, tenantId, kind, endsAt), { now });
+  return { events, due, cancelled, notices, trial, plans };
 }

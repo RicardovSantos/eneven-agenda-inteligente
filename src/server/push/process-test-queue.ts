@@ -1,15 +1,16 @@
 import { and, asc, eq, isNull, lte } from "drizzle-orm";
 import { pushDeliveries, pushEvents, pushSubscriptions } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { pushAvailable } from "./mode";
 import { sendTestPush } from "./test-transport";
 import { pushSubscriptionVersion } from "./subscription-version";
 
 type PushType = "booking_created" | "booking_canceled" | "booking_rescheduled";
 type Sender = (input: unknown, type: PushType) => Promise<"sent" | "expired">;
 
-/** Teste: reserva antes de enviar e mantém casos incertos sem nova tentativa automática. */
+/** Reserva antes de enviar e mantém casos incertos sem nova tentativa automática. */
 export async function processTestPushQueue(db: Db, sender: Sender, now = new Date(), limit = 20) {
-  if (process.env.NODE_ENV === "production") throw new Error("Fila de teste indisponível em produção.");
+  if (!pushAvailable()) throw new Error("Fila de notificações indisponível em produção.");
   if (!Number.isFinite(now.getTime())) throw new Error("Data inválida.");
   const max = Number.isFinite(limit) ? Math.min(100, Math.max(0, Math.floor(limit))) : 0;
   const result = { expanded: 0, sent: 0, expired: 0, uncertain: 0 };
