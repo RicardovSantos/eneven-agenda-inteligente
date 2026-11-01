@@ -37,6 +37,8 @@ export type PanelProfessional = {
   name: string;
   color: string | null;
   userId: string | null;
+  /** Versão da foto (ms) ou `null` sem foto. */
+  photoVersion: number | null;
 };
 
 export type DayBooking = {
@@ -229,10 +231,13 @@ export async function listPanelProfessionals(db: Db, tenantId: string): Promise<
         name: professionals.name,
         color: professionals.color,
         userId: professionals.userId,
+        photoUpdatedAt: professionals.photoUpdatedAt,
       })
       .from(professionals)
       .where(and(eq(professionals.tenantId, tenantId), eq(professionals.active, true)))
       .orderBy(asc(professionals.sortOrder), asc(professionals.createdAt), asc(professionals.id)),
+  ).then((rows) =>
+    rows.map(({ photoUpdatedAt, ...row }) => ({ ...row, photoVersion: photoUpdatedAt ? photoUpdatedAt.getTime() : null })),
   );
 }
 

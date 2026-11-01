@@ -58,18 +58,21 @@ export function TeamSection({ slug, team }: { slug: string; team: TeamMember[] }
         </h2>
         <p className="m-0 text-[13px] text-ink-muted">Escolha quem vai cuidar de você</p>
       </div>
-      <ul className="-mx-5 m-0 flex list-none snap-x gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <ul
+        aria-label="Equipe"
+        className="-mx-5 m-0 flex list-none snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {team.map((member) => (
-          <li key={member.id} className="w-[118px] shrink-0 snap-start">
+          <li key={member.id} className="flex w-[152px] shrink-0 snap-start">
             <Link
               href={`/${slug}/profissional/${member.id}`}
-              className="flex h-full flex-col items-center gap-1.5 rounded-2xl border border-line bg-canvas px-2 pt-4 pb-4 text-center no-underline transition-colors hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--brand)"
+              className="flex w-full flex-col items-center gap-2 rounded-2xl border border-line bg-canvas px-3 pt-5 pb-5 text-center no-underline transition-colors hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--brand)"
             >
-              <ProfessionalAvatar member={member} size={84} />
-              <span className="mt-1 w-full truncate text-[15px] font-semibold text-foreground">
+              <ProfessionalAvatar member={member} size={96} />
+              <span className="mt-1 line-clamp-2 w-full text-[17px] leading-snug font-semibold text-foreground">
                 {member.name}
               </span>
-              <span className="w-full truncate text-[12.5px] text-ink-muted">
+              <span className="line-clamp-2 w-full text-[14px] leading-snug text-ink-muted">
                 {member.title ?? "Profissional"}
               </span>
             </Link>

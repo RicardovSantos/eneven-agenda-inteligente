@@ -4,7 +4,7 @@
  * os serviços que alguém faz. Única regra, usada pela agenda e pela ficha do cliente.
  */
 export function panelBookingOptions(
-  allPros: Array<{ id: string; name: string; color: string | null }>,
+  allPros: Array<{ id: string; name: string; color: string | null; photoUrl?: string | null }>,
   catalog: Array<{
     id: string;
     name: string;
@@ -12,9 +12,9 @@ export function panelBookingOptions(
     priceCents: number;
     professionalIds: string[];
   }>,
-  own: { id: string; name: string; color: string | null } | null,
+  own: { id: string; name: string; color: string | null; photoUrl?: string | null } | null,
 ) {
-  const professionals = (own ? [own] : allPros).map((p) => ({ id: p.id, name: p.name, color: p.color }));
+  const professionals = (own ? [own] : allPros).map((p) => ({ id: p.id, name: p.name, color: p.color, photoUrl: p.photoUrl ?? null }));
   const services = catalog
     .filter((s) => (own ? s.professionalIds.includes(own.id) : s.professionalIds.length > 0))
     .map((s) => ({

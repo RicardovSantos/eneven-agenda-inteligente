@@ -11,6 +11,7 @@ import { requireOnboarded } from "@/server/panel/onboarding-gate";
 import { isTenantActive, isTenantReleased } from "@/server/tenants/release";
 import { isRealDate } from "@/server/public/schemas";
 import { listServices } from "@/server/catalog";
+import { professionalPhotoUrl } from "@/server/media";
 
 export const metadata: Metadata = { title: "Agenda" };
 
@@ -33,7 +34,10 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
   const view = first(params.view) === "dia" ? "dia" : "mes";
 
   // Profissional (`staff`) só enxerga a própria agenda; os demais podem filtrar.
-  const allPros = await listPanelProfessionals(db, session.tenantId);
+  const allPros = (await listPanelProfessionals(db, session.tenantId)).map((p) => ({
+    ...p,
+    photoUrl: p.photoVersion === null ? null : professionalPhotoUrl(data.tenantSlug, p.id, new Date(p.photoVersion)),
+  }));
   const own =
     session.role === "staff" ? await findStaffProfessional(db, session.tenantId, session.userId) : null;
   const banners = <Banners data={data} />;

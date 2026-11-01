@@ -10,6 +10,7 @@ import {
   uploadProfessionalPhotoAction,
 } from "@/app/painel/equipe/actions";
 import { PhotoField, type PhotoResult } from "@/components/media/photo-field";
+import { PersonAvatar } from "@/components/media/person-avatar";
 import { WeeklyHoursEditor } from "@/components/hours/weekly-hours-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,6 @@ import {
 } from "@/lib/weekly-hours";
 import {
   CatalogLayout,
-  ColorDot,
   ConfirmDialog,
   EditPanel,
   EmptyState,
@@ -155,7 +155,7 @@ export function ProfessionalsScreen({
                         aria-pressed={selectedId === p.id}
                         className="flex items-center gap-2.5 text-left font-semibold outline-none focus-visible:underline"
                       >
-                        <ColorDot color={p.color} size={10} />
+                        <PersonAvatar name={p.name} color={p.color} photoUrl={p.photoUrl} size={36} />
                         {p.name}
                         {p.hasAccess ? <AccessTag /> : null}
                       </button>
@@ -191,7 +191,7 @@ export function ProfessionalsScreen({
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-2.5 font-semibold">
-                      <ColorDot color={p.color} size={10} />
+                      <PersonAvatar name={p.name} color={p.color} photoUrl={p.photoUrl} size={40} />
                       <span className="truncate">{p.name}</span>
                       {p.hasAccess ? <AccessTag /> : null}
                     </span>

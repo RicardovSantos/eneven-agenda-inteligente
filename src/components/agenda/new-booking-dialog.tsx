@@ -25,7 +25,7 @@ export type PanelService = {
   priceCents: number;
   professionalIds: string[];
 };
-export type PanelPro = { id: string; name: string; color: string | null };
+export type PanelPro = { id: string; name: string; color: string | null; photoUrl?: string | null };
 
 const LABEL = "text-sm font-semibold";
 

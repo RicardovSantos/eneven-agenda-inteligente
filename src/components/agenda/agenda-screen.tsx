@@ -19,7 +19,8 @@ import { DayColumns } from "./day-columns";
 import { DayList } from "./day-list";
 import { MonthView } from "./month-view";
 import { NewBookingDialog, type PanelPro, type PanelService } from "./new-booking-dialog";
-import { Dot, agendaHref, formatShortWeekdayDay, useMinuteNow } from "./shared";
+import { PersonAvatar } from "@/components/media/person-avatar";
+import { agendaHref, formatShortWeekdayDay, useMinuteNow } from "./shared";
 import { WeekStrip } from "./week-strip";
 
 const NAV_BUTTON =
@@ -219,7 +220,7 @@ export function AgendaScreen({
             </Pill>
             {professionals.map((p) => (
               <Pill key={p.id} href={agendaHref({ data: date, pro: p.id, view })} active={filtered?.id === p.id}>
-                <Dot color={p.color} size={8} />
+                <PersonAvatar name={p.name} color={p.color} photoUrl={p.photoUrl} size={24} />
                 {p.name}
               </Pill>
             ))}
