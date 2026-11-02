@@ -47,6 +47,23 @@ describe("processamento de fila", () => {
     expect(fake.sentMessages).toHaveLength(1);
   });
 
+  it("registra o erro da Meta sem telefone na mensagem", async () => {
+    const db = await createTestDb();
+    const tenant = await seedTenant(db);
+    const now = new Date();
+    const start = new Date(now.getTime() + 86_400_000);
+    const booking = await seedBooking(db, tenant.id, { startsAt: start, endsAt: new Date(start.getTime() + 1_800_000), blockedUntil: new Date(start.getTime() + 1_800_000) });
+    await withTenant(db, tenant.id, (tx) => tx.insert(whatsappQueue).values({ tenantId: tenant.id, bookingId: booking.id, templateType: "canceled", eventKey: "canceled", scheduledFor: now }));
+    const fake = new FakeWhatsAppChannel();
+    fake.setNextError("(#10) Sem acesso à conta 1834961840853477 para 5511960948053", "10");
+    setWhatsAppChannelForTests(fake);
+    expect((await processQueue(db, 1, now)).failed).toBe(1);
+    const [message] = await withTenant(db, tenant.id, (tx) => tx.select().from(whatsappMessages));
+    expect(message.failureCode).toBe("10");
+    expect(message.failureReason).toContain("1834961840853477");
+    expect(message.failureReason).not.toContain("5511960948053");
+  });
+
   it("não envia quando a franquia do estabelecimento está esgotada", async () => {
     const db = await createTestDb();
     const tenant = await seedTenant(db);

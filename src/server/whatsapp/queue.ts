@@ -6,6 +6,7 @@ import { issueAdditionalManageToken } from "@/server/agenda/bookings";
 import { appUrl } from "@/server/email/templates";
 import { withTenant, withTenantTx } from "@/server/tenant-db";
 import { getWhatsAppChannel } from "./channel";
+import { describeSendFailure } from "./failure";
 import { buildTemplatePayload } from "./templates";
 import { isTenantActive } from "@/server/tenants/release";
 
@@ -74,7 +75,12 @@ export async function processQueue(db: Db, maxBatch = 20, now: Date = new Date()
       const token = await issueAdditionalManageToken(db, item.tenantId, item.bookingId, expiresAt);
       const payload = buildTemplatePayload(item.templateType, { customerName: booking.customerName, tenantName: tenant.name, serviceName, professionalName: booking.professionalName, startsAt: booking.startsAt, timezone: tenant.timezone, manageUrl: `${appUrl()}/agendamento/${encodeURIComponent(token)}`, bookingId: booking.id, manageToken: token });
       const sent = await getWhatsAppChannel().sendTemplate(booking.phone, payload);
-      if (!sent.ok) throw new Error("Envio com resultado incerto.");
+      if (!sent.ok) {
+        const failure = describeSendFailure(sent);
+        console.error(`Meta recusou o envio de ${item.templateType}: código ${failure.code ?? "sem código"}, motivo: ${failure.reason}`);
+        await withTenant(db, item.tenantId, (tx) => tx.update(whatsappMessages).set({ failureCode: failure.code, failureReason: failure.reason }).where(eq(whatsappMessages.id, messageId))).catch(() => undefined);
+        throw new Error("Envio com resultado incerto.");
+      }
       await withTenant(db, item.tenantId, async (tx) => {
         await tx.update(whatsappMessages).set({ status: "sent", wamId: sent.wamId, sentAt: now }).where(eq(whatsappMessages.id, messageId));
         await tx.update(whatsappQueue).set({ processedAt: now, lockedUntil: null }).where(eq(whatsappQueue.id, item.id));
