@@ -8,8 +8,9 @@ import { scheduleRemindersForTenant } from "./scheduler";
 export async function enqueueBookingEvent(db: Db, tenantId: string, bookingId: string, type: "booking_created" | "rescheduled" | "canceled", eventKey: string, now: Date): Promise<void> {
   await withTenant(db, tenantId, async (tx) => {
     const [settings] = await tx.select().from(tenantNotificationSettings).where(eq(tenantNotificationSettings.tenantId, tenantId)).limit(1);
-    const enabled = type === "booking_created" ? settings?.bookingCreated : type === "rescheduled" ? settings?.rescheduled : settings?.canceled;
-    if (enabled === false) return;
+    // Padrão: remarcação e cancelamento ligados; confirmação ao agendar só se o dono ativar.
+    const enabled = type === "booking_created" ? settings?.bookingCreated ?? false : type === "rescheduled" ? settings?.rescheduled ?? true : settings?.canceled ?? true;
+    if (!enabled) return;
     await tx.insert(whatsappQueue).values({ tenantId, bookingId, templateType: type, eventKey, scheduledFor: now }).onConflictDoNothing();
   });
   await scheduleRemindersForTenant(db, tenantId, now);

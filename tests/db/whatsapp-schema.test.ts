@@ -40,7 +40,7 @@ describe("Plano 4 - Esquema do WhatsApp e Notificações", () => {
       );
 
       expect(row).toBeDefined();
-      expect(row.bookingCreated).toBe(true);
+      expect(row.bookingCreated).toBe(false);
       expect(row.reminderEve).toBe(true);
       expect(row.reminder2h).toBe(false);
       expect(row.rescheduled).toBe(true);

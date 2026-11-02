@@ -640,7 +640,7 @@ export const tenantNotificationSettings = pgTable("tenant_notification_settings"
   tenantId: uuid("tenant_id")
     .primaryKey()
     .references(() => tenants.id, { onDelete: "cascade" }),
-  bookingCreated: boolean("booking_created").notNull().default(true),
+  bookingCreated: boolean("booking_created").notNull().default(false),
   reminderEve: boolean("reminder_eve").notNull().default(true),
   reminder2h: boolean("reminder_2h").notNull().default(false),
   rescheduled: boolean("rescheduled").notNull().default(true),

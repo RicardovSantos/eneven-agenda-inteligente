@@ -15,7 +15,7 @@ export default async function MensagensPage() {
   const quota = await checkTenantQuota(db, session.tenantId);
   const twoHours = ["profissional", "studio"].includes(tenant?.code ?? "");
   const options = [
-    { key: "bookingCreated", label: "Confirmação de novo agendamento", checked: settings?.bookingCreated ?? true },
+    { key: "bookingCreated", label: "Confirmação de novo agendamento", checked: settings?.bookingCreated ?? false },
     { key: "reminderEve", label: "Lembrete na véspera", checked: settings?.reminderEve ?? true },
     { key: "reminder2h", label: "Lembrete 2 horas antes", checked: twoHours && (settings?.reminder2h ?? false), disabled: !twoHours },
     { key: "rescheduled", label: "Aviso de remarcação", checked: settings?.rescheduled ?? true },

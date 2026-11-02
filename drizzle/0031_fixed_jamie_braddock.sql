@@ -1,0 +1,1 @@
+ALTER TABLE "tenant_notification_settings" ALTER COLUMN "booking_created" SET DEFAULT false;
