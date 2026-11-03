@@ -72,7 +72,7 @@ for (const scheme of SCHEMES) {
     // Uma pessoa só na equipe: "Aplicar também à equipe" já vem marcado.
     const solo = await seedTenant(request);
     await loginAs(page, request, solo.slug);
-    await open(page, "/painel/configuracoes");
+    await open(page, "/painel/configuracoes/horario");
     const checkbox = page.getByLabel("Aplicar também à equipe");
     await expect(checkbox).toBeChecked();
     await checkbox.scrollIntoViewIfNeeded();
@@ -81,7 +81,7 @@ for (const scheme of SCHEMES) {
     // Equipe com expedientes diferentes: desmarcado; salvar sem aplicar mostra o aviso.
     const team = await seedTenant(request, { extraProfessionals: ["Léo"] });
     await loginAs(page, request, team.slug);
-    await open(page, "/painel/configuracoes");
+    await open(page, "/painel/configuracoes/horario");
     const teamCheckbox = page.getByLabel("Aplicar também à equipe");
     await expect(teamCheckbox).not.toBeChecked();
     await page.getByLabel("Segunda, intervalo 1: de").fill("08:00");

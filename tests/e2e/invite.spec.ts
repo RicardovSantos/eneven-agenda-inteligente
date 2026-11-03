@@ -67,7 +67,7 @@ test.describe("acessos da equipe", () => {
 
     // O proprietário remove o acesso.
     await loginAs(page, request, slug);
-    await open(page, "/painel/configuracoes");
+    await open(page, "/painel/configuracoes/acessos");
     const card = page.getByRole("region", { name: "Acessos da equipe" });
     await expect(card.getByText("Profissional · Bia Souza")).toBeVisible();
     await card.getByRole("button", { name: "Remover acesso de Bia Profissional" }).click();
@@ -89,7 +89,7 @@ test.describe("acessos da equipe", () => {
   test("proprietário convida pelo cartão e o convite aparece como enviado", async ({ page, request }) => {
     const { slug } = await seedTenant(request, { extraProfessionals: ["Bia Souza"] });
     await loginAs(page, request, slug);
-    await open(page, "/painel/configuracoes");
+    await open(page, "/painel/configuracoes/acessos");
 
     const card = page.getByRole("region", { name: "Acessos da equipe" });
     await expect(card.getByText("Proprietário")).toBeVisible();

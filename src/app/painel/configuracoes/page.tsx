@@ -1,110 +1,57 @@
-import { ExportDataButton } from "@/components/settings/export-data-button";
-import { eq } from "drizzle-orm";
-import Link from "next/link";
+import {
+  Bell,
+  Clock,
+  CreditCard,
+  Download,
+  Globe,
+  MessageCircle,
+  Palette,
+  SlidersHorizontal,
+  Store,
+  Users,
+} from "lucide-react";
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { getDb } from "@/db/client";
-import { tenants } from "@/db/schema";
-import { ThemeForm } from "@/components/settings/theme-form";
-import { BrandForm } from "@/components/settings/brand-form";
-import { BusinessInfoForm } from "@/components/settings/business-info-form";
-import { PublicPageForm } from "@/components/settings/public-page-form";
-import { HoursForm } from "@/components/settings/hours-form";
-import { RulesForm } from "@/components/settings/rules-form";
-import { SlugForm } from "@/components/settings/slug-form";
-import { TeamAccessCard } from "@/components/settings/team-access-card";
-import { heroPhotoUrl, listHeroPhotos } from "@/server/media";
+import { SettingsGroup, SettingsRow } from "@/components/settings/settings-nav";
 import { requirePanelRole } from "@/server/panel/roles";
-import { defaultApplyToTeam, getBusinessHours } from "@/server/settings";
-import { listInvitableProfessionals, listTeamAccess } from "@/server/team/members";
 
 export const metadata: Metadata = { title: "Configurações" };
 
+const BASE = "/painel/configuracoes";
+
 export default async function ConfiguracoesPage() {
   const { session } = await requirePanelRole(["owner"]);
-
-  const db = await getDb();
-  const [tenant] = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.id, session.tenantId))
-    .limit(1);
-  if (!tenant) redirect("/entrar");
-  const hours = await getBusinessHours(db, session.tenantId);
-  const applyToTeamDefault = await defaultApplyToTeam(db, session.tenantId);
-  const heroPhotos = await listHeroPhotos(db, session.tenantId);
-  const [team, invitable] = await Promise.all([
-    listTeamAccess(db, session.tenantId),
-    listInvitableProfessionals(db, session.tenantId),
-  ]);
 
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-[1.75rem] font-semibold">Configurações</h1>
-        <p className="text-ink-muted">
-          Ajuste como seu estabelecimento aparece e como as pessoas agendam.
-        </p>
+        <p className="m-0 text-ink-muted">Escolha o que você quer ajustar.</p>
       </div>
 
-      <ThemeForm />
-      <BusinessInfoForm
-        initial={{
-          name: tenant.name,
-          whatsapp: tenant.whatsapp ?? "",
-          address: tenant.address ?? "",
-          instagram: tenant.instagram ?? "",
-          facebook: tenant.facebook ?? "",
-          about: tenant.about ?? "",
-        }}
-      />
-      <BrandForm
-        initial={{
-          name: tenant.name,
-          logoUrl: tenant.logoUrl,
-          color: tenant.brandColor ?? "#3E07D2",
-        }}
-      />
-      <PublicPageForm
-        initial={{
-          heroTitle: tenant.heroTitle ?? "",
-          heroSubtitle: tenant.heroSubtitle ?? "",
-          photos: [0, 1, 2].map((slot) => {
-            const photo = heroPhotos.find((p) => p.slot === slot);
-            return photo ? heroPhotoUrl(tenant.slug, slot, photo.updatedAt) : null;
-          }),
-        }}
-      />
-      <HoursForm initial={hours} applyToTeamDefault={applyToTeamDefault} />
-      <RulesForm
-        initial={{
-          slotIntervalMin: tenant.slotIntervalMin,
-          minNoticeMin: tenant.minNoticeMin,
-          maxDaysAhead: tenant.maxDaysAhead,
-          cancelWindowMin: tenant.cancelWindowMin,
-        }}
-      />
-      <SlugForm currentSlug={tenant.slug} />
-      <Link href="/painel/configuracoes/mensagens" className="rounded-card border border-line bg-surface p-5 font-semibold text-primary">Configurar mensagens WhatsApp →</Link>
-      <Link href="/painel/configuracoes/assinatura" className="rounded-card border border-line bg-surface p-5 font-semibold text-primary">Plano e faturas →</Link>
-      <Link href="/painel/configuracoes/notificacoes" className="rounded-card border border-line bg-surface p-5 font-semibold text-primary">Configurar notificações do dispositivo →</Link>
-      {!session.support && <ExportDataButton />}
-      <TeamAccessCard
-        members={team.map((row) =>
-          row.kind === "member"
-            ? row
-            : {
-                kind: "invite" as const,
-                invitationId: row.invitationId,
-                name: row.name,
-                email: row.email,
-                role: row.role,
-                professionalName: row.professionalName,
-                expired: row.expired,
-              },
-        )}
-        professionals={invitable}
-      />
+      <SettingsGroup title="Geral">
+        <SettingsRow href={`${BASE}/aparencia`} Icon={Palette} label="Aparência" description="Tema claro, escuro ou automático" />
+        <SettingsRow href={`${BASE}/assinatura`} Icon={CreditCard} label="Plano e faturas" description="Seu plano, pagamento e faturas" />
+        <SettingsRow href={`${BASE}/dados`} Icon={Download} label="Seus dados" description={session.support ? "Indisponível no modo suporte" : "Baixar uma cópia das suas informações"} />
+      </SettingsGroup>
+
+      <SettingsGroup title="Seu estabelecimento">
+        <SettingsRow href={`${BASE}/estabelecimento`} Icon={Store} label="Dados e marca" description="Nome, contato, redes sociais, logo e cor" />
+        <SettingsRow href={`${BASE}/pagina`} Icon={Globe} label="Página de agendamento" description="Fotos, textos e o link que seus clientes usam" />
+      </SettingsGroup>
+
+      <SettingsGroup title="Atendimento">
+        <SettingsRow href={`${BASE}/horario`} Icon={Clock} label="Horário de atendimento" description="Dias e horários em que você atende" />
+        <SettingsRow href={`${BASE}/regras`} Icon={SlidersHorizontal} label="Regras de agendamento" description="Intervalos, antecedência e cancelamento" />
+      </SettingsGroup>
+
+      <SettingsGroup title="Equipe">
+        <SettingsRow href={`${BASE}/acessos`} Icon={Users} label="Acessos da equipe" description="Convidar pessoas e controlar o que cada uma vê" />
+      </SettingsGroup>
+
+      <SettingsGroup title="Avisos">
+        <SettingsRow href={`${BASE}/mensagens`} Icon={MessageCircle} label="Mensagens no WhatsApp" description="Lembretes e confirmações para seus clientes" />
+        <SettingsRow href={`${BASE}/notificacoes`} Icon={Bell} label="Notificações do aparelho" description="Avisos de agendamento neste dispositivo" />
+      </SettingsGroup>
     </div>
   );
 }
