@@ -14,6 +14,15 @@ function LogoutForm({ children, className }: { children: ReactNode; className?: 
   );
 }
 
+/** Selo "SUPORTE": a conta aberta é a de um cliente, não a do próprio usuário. */
+function SupportTag() {
+  return (
+    <span className="mb-1 inline-block w-fit shrink-0 rounded-md bg-amber-400 px-1.5 py-0.5 text-[0.6875rem] font-bold uppercase leading-none tracking-wide text-neutral-900">
+      Suporte
+    </span>
+  );
+}
+
 /**
  * Casca definitiva do painel: barra lateral de 232px em telas largas; topo
  * com o nome do estabelecimento e navegação inferior no celular.
@@ -25,8 +34,11 @@ export function PanelShell({
   role,
   isSuperAdmin,
   notice,
+  support = false,
   children,
 }: {
+  /** Super-admin dentro do estabelecimento ("entrou como"): mostra o rótulo SUPORTE no menu e no topo. */
+  support?: boolean;
   userName: string;
   tenantName: string;
   /** Link público do salão quando liberado (e-mail confirmado e conta ativa/em teste); senão `null`. */
@@ -50,6 +62,7 @@ export function PanelShell({
         <div className="flex flex-col gap-3 border-t border-line p-4">
           <SidebarLink label={publicLink?.label ?? ""} url={publicLink?.url ?? null} />
           <div className="min-w-0 pt-1">
+            {support ? <SupportTag /> : null}
             <p className="truncate font-semibold leading-snug">{userName}</p>
             <p className="truncate text-sm leading-snug text-ink-muted">{tenantName}</p>
           </div>
@@ -68,7 +81,10 @@ export function PanelShell({
       <div className="min-w-0 flex-1">
       {/* Topo (celular) */}
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-line bg-surface pl-4 pr-1 lg:hidden">
-        <p className="truncate font-display text-lg font-semibold">{tenantName}</p>
+        <p className="flex min-w-0 items-center gap-2 font-display text-lg font-semibold">
+          {support ? <SupportTag /> : null}
+          <span className="truncate">{tenantName}</span>
+        </p>
         <LogoutForm>
           <button
             type="submit"
