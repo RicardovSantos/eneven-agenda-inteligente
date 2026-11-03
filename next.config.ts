@@ -28,7 +28,8 @@ const nextConfig: NextConfig = {
   // PGlite carrega arquivos .wasm/.data relativos ao próprio pacote.
   serverExternalPackages: ["@electric-sql/pglite"],
   // Envio do logo (até 1 MB) por ação do servidor: o padrão de 1 MB não cobre o corpo multipart.
-  experimental: { serverActions: { bodySizeLimit: "2mb" } },
+  // `staleTimes.dynamic`: voltar a uma aba do painel em até 30 s reaproveita a página já carregada (ações do servidor limpam esse cache).
+  experimental: { serverActions: { bodySizeLimit: "2mb" }, staleTimes: { dynamic: 30 } },
   // A fonte da imagem de prévia (opengraph-image) é lida do disco: sem isto o build standalone não a copia.
   outputFileTracingIncludes: {
     "/[[]slug]/opengraph-image": ["./src/assets/fonts/Outfit-Bold.woff"],
