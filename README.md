@@ -34,6 +34,22 @@ Fora de produção, contas de teste da Mercado Pago (tokens `APP_USR-` de usuár
 
 **Troca de plano** (`src/server/billing/change-plan.ts`): sem assinatura vale na hora. Com assinatura, o aumento libera o plano novo na hora e altera o valor das próximas cobranças (PUT no `/preapproval`, nada é cobrado na hora); a redução fica marcada e o relógio aplica um dia antes da próxima cobrança, só se os profissionais ativos couberem no limite do plano menor (senão cancela a troca e registra). O dono pode desfazer a redução marcada. Também há e-mails de fim do teste (3 dias antes e ao terminar), enviados uma vez cada pelo mesmo relógio.
 
+### Profissional com foto em todas as telas
+
+Onde a tela mostra quem atende, aparece a foto redonda do profissional com um anel na cor dele e o nome ao lado; sem foto, a inicial sobre a cor. Vale para a lista do dia na agenda (celular e computador, com o profissional numa linha própria abaixo do serviço), o detalhe do agendamento, o cabeçalho das colunas da agenda, as etiquetas de quem faz cada serviço, a edição do serviço e o novo agendamento. Os componentes são `PersonAvatar` e `PersonLabel` (`src/components/media/person-avatar.tsx`); a foto vem de `professionalPhotoUrl` (`src/server/media`). Na lista de serviços do celular, a duração fica numa linha e os profissionais sempre abaixo dela.
+
+### Configuração geral e tema
+
+Em `/painel/configuracoes`, a primeira seção, "Configuração geral", escolhe o tema: **Automático** (segue o aparelho, o padrão), **Claro** ou **Escuro**. A escolha fica salva **neste aparelho** (`localStorage`, chave `eneven-tema`), não na conta: em outro celular ou no computador é preciso escolher de novo. Um script no `<head>` (`src/app/layout.tsx`, `THEME_INIT_SCRIPT` em `src/lib/theme.ts`) põe a classe `light` ou `dark` no `<html>` antes da primeira pintura, sem piscar; o `globals.css` já responde a essas classes. Sem escolha salva, vale `prefers-color-scheme`.
+
+### Baixar os dados do estabelecimento
+
+Em Configurações, "Baixar dados do estabelecimento" entrega um JSON com os dados da conta (só o dono, fora do modo suporte; rota `GET /api/painel/exportar-agenda`). O botão (`ExportDataButton`) busca o arquivo em segundo plano e usa a folha de compartilhar do aparelho (Salvar em Arquivos, AirDrop...); onde ela não existe, faz o download normal. Um link `download` abria o JSON em tela cheia no iPhone com o app instalado, sem botão de voltar. A logo vai dentro do arquivo em base64.
+
+### Telas de entrada no celular
+
+A casca das telas de entrada (`AuthShell`: entrar, cadastro, recuperar senha, convite, confirmar e-mail) ocupa exatamente a área visível no celular (`fixed inset-0`) e só rola por dentro quando o conteúdo não cabe (teclado aberto, tela baixa). Antes duas alturas `min-h-dvh` empilhadas deixavam a página rolar solta, com espaço vazio embaixo, no iPhone. No computador continua em duas colunas.
+
 ### Clientes
 
 `/painel/clientes`: lista com busca por nome ou WhatsApp (o cliente entra sozinho ao agendar pelo link, ou é criado à mão em "Novo cliente"), ficha com contato, observações (salvas ao sair do campo), histórico de atendimentos, total gasto e o botão "Agendar", que abre o novo agendamento com o cliente já escolhido. WhatsApp repetido é recusado com um atalho para o cadastro existente. Profissionais veem só os clientes que atenderam e não veem o total gasto.
@@ -153,6 +169,8 @@ A aplicação roda em um container (`Dockerfile`, Node 24 Alpine) no Easypanel, 
 | `LEGAL_*` | opcionais |
 
 O `APP_URL` também é um argumento da imagem (`ARG APP_URL`, padrão `https://agenda.eneven.com.br`) nos estágios de build e final: no build grava o endereço nas páginas estáticas e, na imagem final, vira a variável de ambiente padrão (a variável do Easypanel, se existir, prevalece). Em produção a aplicação nunca cai em `localhost`: sem `APP_URL` ela falha em vez de mandar links errados. Localmente, `pnpm build` funciona sem `APP_URL` (a checagem é ignorada só durante o `next build`), porque páginas estáticas como a inicial gravam nele o endereço da imagem de compartilhamento. Se o domínio mudar, passe `--build-arg APP_URL=...` (ou crie o argumento no Easypanel) e refaça o build.
+
+**Latência (São Paulo).** O servidor atual fica em Nuremberg (Hetzner): a ida e volta até `/api/health` foi de cerca de 217 ms em 02/11/2026, e quase todo o tempo de cada navegação no painel é rede. Está decidido mover só o `agenda-web` e o `agenda-db` para uma VPS em São Paulo (a Hostinger KVM 2 foi a escolhida), mas **a migração ainda não foi feita**. Ao migrar: o app supõe uma única réplica, então desligue os relógios internos do servidor antigo assim que o novo ligar (`WHATSAPP_INTERNAL_TIMER=off` para o do WhatsApp; o de cobrança só roda com `MERCADO_PAGO_LIVE_MODE=true`), copie o `SESSION_SECRET` (cifra eventos pendentes do WhatsApp) e aponte o registro `A agenda` para o IP novo, sem proxy.
 
 **Domínio e DNS.** Registro `A agenda` apontando para o IP da VPS, com o proxy da Cloudflare desligado (nuvem cinza); o Easypanel emite o HTTPS. Domínio do serviço na porta 3000.
 
