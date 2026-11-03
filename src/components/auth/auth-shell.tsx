@@ -16,8 +16,10 @@ export function AuthShell({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-dvh bg-canvas lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <main className="flex min-h-dvh flex-col px-6 pb-10 pt-6 lg:px-12 lg:py-12">
+    // No celular a tela ocupa exatamente a área visível (`fixed inset-0`) e a página
+    // não rola solta: só rola por dentro se o conteúdo não couber (teclado aberto, tela baixa).
+    <div className="fixed inset-0 overflow-y-auto overscroll-y-none bg-canvas lg:static lg:grid lg:min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:overflow-visible">
+      <main className="flex min-h-full flex-col px-6 pb-10 pt-6 lg:min-h-dvh lg:px-12 lg:py-12">
         <div className="mx-auto flex w-full max-w-[480px] flex-1 flex-col lg:mx-0 lg:max-w-[420px]">
           <header>
             <BrandLogo width={140} priority className="lg:hidden" />
