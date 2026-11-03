@@ -11,13 +11,18 @@ export type TeamMember = {
   photoUrl: string | null;
 };
 
-/** Foto redonda do profissional; sem foto, as iniciais sobre a cor dele. */
+/**
+ * Foto redonda do profissional; sem foto, as iniciais sobre a cor dele.
+ * Com `colorRing`, um anel na cor do profissional contorna a foto (a mesma cor da agenda).
+ */
 export function ProfessionalAvatar({
   member,
   size,
+  colorRing = false,
 }: {
   member: Pick<TeamMember, "name" | "color" | "photoUrl">;
   size: number;
+  colorRing?: boolean;
 }) {
   const initials = (
     <span
@@ -28,18 +33,25 @@ export function ProfessionalAvatar({
       {initialsOf(member.name)}
     </span>
   );
+  const photo = member.photoUrl ? (
+    <SafeImage src={member.photoUrl} alt="" className="size-full rounded-full" fallback={initials} />
+  ) : (
+    <div className="size-full overflow-hidden rounded-full">{initials}</div>
+  );
+  if (colorRing) {
+    // Anel de 3 px na cor do profissional, com 2 px de respiro entre ele e a foto.
+    return (
+      <div
+        className="shrink-0 rounded-full bg-surface p-0.5"
+        style={{ width: size, height: size, boxShadow: `0 0 0 3px ${member.color ?? "var(--ink-muted)"}` }}
+      >
+        {photo}
+      </div>
+    );
+  }
   return (
     <div className="shrink-0 rounded-full ring-2 ring-line" style={{ width: size, height: size }}>
-      {member.photoUrl ? (
-        <SafeImage
-          src={member.photoUrl}
-          alt=""
-          className="size-full rounded-full"
-          fallback={initials}
-        />
-      ) : (
-        <div className="size-full overflow-hidden rounded-full">{initials}</div>
-      )}
+      {photo}
     </div>
   );
 }

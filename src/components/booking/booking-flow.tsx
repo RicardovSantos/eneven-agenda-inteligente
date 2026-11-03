@@ -464,9 +464,9 @@ export function BookingFlow({
                 icon={
                   <span
                     aria-hidden="true"
-                    className="grid size-8 shrink-0 place-items-center rounded-full bg-primary-soft text-foreground"
+                    className="mx-[3px] grid size-11 shrink-0 place-items-center rounded-full bg-primary-soft text-foreground"
                   >
-                    <Users className="size-4" />
+                    <Users className="size-5" />
                   </span>
                 }
               />
@@ -477,11 +477,13 @@ export function BookingFlow({
                   onSelect={() => choosePro(pro.id)}
                   label={pro.name}
                   icon={
-                    <span
-                      aria-hidden="true"
-                      className="mx-[11px] size-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: pro.color ?? "var(--ink-muted)" }}
-                    />
+                    <span aria-hidden="true" className="mx-[3px] shrink-0">
+                      <ProfessionalAvatar
+                        member={{ name: pro.name, color: pro.color, photoUrl: content.team.find((m) => m.id === pro.id)?.photoUrl ?? null }}
+                        size={44}
+                        colorRing
+                      />
+                    </span>
                   }
                 />
               ))}
