@@ -303,6 +303,19 @@ export async function verifyE2eOwnerEmail(db: Db, slug: string) {
   return { ok: true };
 }
 
+/** Faz o dono do estabelecimento também ser super-admin (como a conta do Ricardo), para testar os dois contextos. */
+export async function promoteE2eOwnerToSuperAdmin(db: Db, slug: string) {
+  const tenantId = await tenantIdOf(db, slug);
+  const [owner] = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(eq(memberships.tenantId, tenantId))
+    .limit(1);
+  if (!owner) throw new Error(`Proprietário não encontrado: ${slug}`);
+  await db.update(users).set({ isSuperAdmin: true }).where(eq(users.id, owner.userId));
+  return { ok: true };
+}
+
 /**
  * Usuário novo com o papel dado (`reception` ou `staff`) no estabelecimento,
  * com sessão pronta: para os testes de menu e acesso por papel.
