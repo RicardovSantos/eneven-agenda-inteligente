@@ -8,6 +8,7 @@ import {
   restoreServiceAction,
   saveServiceAction,
 } from "@/app/painel/servicos/actions";
+import { PersonAvatar } from "@/components/media/person-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,6 @@ import { centsFromDigits, formatBRL, formatDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   CatalogLayout,
-  ColorDot,
   ConfirmDialog,
   EditPanel,
   EmptyState,
@@ -46,6 +46,7 @@ export type ProfessionalOption = {
   id: string;
   name: string;
   color: string | null;
+  photoUrl?: string | null;
   active: boolean;
 };
 
@@ -338,10 +339,7 @@ function WhoDoes({
     return (
       <span className="flex items-center gap-1.5">
         {pros.map((p) => (
-          <span key={p.id} className="inline-flex items-center gap-1">
-            <ColorDot color={p.color} size={7} />
-            {p.name}
-          </span>
+          <ProChip key={p.id} name={p.name} color={p.color} photoUrl={p.photoUrl} />
         ))}
       </span>
     );
@@ -349,7 +347,7 @@ function WhoDoes({
   return (
     <span className="flex flex-wrap gap-1.5">
       {pros.map((p) => (
-        <ProChip key={p.id} name={p.name} color={p.color} />
+        <ProChip key={p.id} name={p.name} color={p.color} photoUrl={p.photoUrl} />
       ))}
     </span>
   );
@@ -561,7 +559,7 @@ function ServiceForm({
                   onChange={(e) => toggle(p.id, e.target.checked)}
                   className="size-[18px] accent-primary"
                 />
-                <ColorDot color={p.color} />
+                <PersonAvatar name={p.name} color={p.color} photoUrl={p.photoUrl} size={26} />
                 <span className="min-w-0 truncate">{p.name}</span>
                 {!p.active ? <span className="text-[0.8125rem] text-ink-muted">inativo</span> : null}
               </label>

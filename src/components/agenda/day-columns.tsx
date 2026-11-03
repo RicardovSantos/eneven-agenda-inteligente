@@ -3,13 +3,14 @@
 import { formatTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import type { DayAgenda } from "@/server/agenda/panel-queries";
-import { Dot, STATUS_CARD, STATUS_LABEL } from "./shared";
+import { PersonAvatar } from "@/components/media/person-avatar";
+import { STATUS_CARD, STATUS_LABEL } from "./shared";
 
 const PX_PER_HOUR = 64;
 const PX_PER_MIN = PX_PER_HOUR / 60;
 const toMin = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
-export type ColumnPro = { id: string; name: string; color: string | null };
+export type ColumnPro = { id: string; name: string; color: string | null; photoUrl?: string | null };
 
 /**
  * Visão "Dia": uma coluna por profissional (ou só a do filtro), horas na
@@ -33,7 +34,7 @@ export function DayColumns({
   const professionals = [...activeProfessionals];
   for (const item of day.items) {
     if (item.kind === "booking" && item.status !== "canceled" && !professionals.some((p) => p.id === item.professional.id)) {
-      professionals.push({ id: item.professional.id, name: `${item.professional.name} (inativo)`, color: item.professional.color });
+      professionals.push({ id: item.professional.id, name: `${item.professional.name} (inativo)`, color: item.professional.color, photoUrl: null });
     }
   }
   const bookings = day.items.filter((i) => i.kind === "booking" && i.status !== "canceled");
@@ -67,8 +68,8 @@ export function DayColumns({
             key={pro.id}
             className="flex items-center gap-2 border-b border-l border-line px-3 py-3 text-sm font-semibold"
           >
-            <Dot color={pro.color} size={8} />
-            {pro.name}
+            <PersonAvatar name={pro.name} color={pro.color} photoUrl={pro.photoUrl} size={26} />
+            <span className="truncate">{pro.name}</span>
           </div>
         ))}
 

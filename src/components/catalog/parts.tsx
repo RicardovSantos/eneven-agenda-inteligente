@@ -2,6 +2,7 @@
 
 import { ArrowLeft, X } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
+import { PersonAvatar } from "@/components/media/person-avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -17,10 +18,10 @@ export function ColorDot({ color, size = 8 }: { color: string | null; size?: num
 }
 
 /** Etiqueta com bolinha: "Bia", "Léo". */
-export function ProChip({ name, color }: { name: string; color: string | null }) {
+export function ProChip({ name, color, photoUrl }: { name: string; color: string | null; photoUrl?: string | null }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-2.5 py-1 text-[0.8125rem] font-medium">
-      <ColorDot color={color} size={7} />
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-canvas py-1 pr-2.5 pl-1.5 text-[0.8125rem] font-medium">
+      <PersonAvatar name={name} color={color} photoUrl={photoUrl} size={22} />
       {name}
     </span>
   );

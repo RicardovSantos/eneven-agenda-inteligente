@@ -1,3 +1,4 @@
+import { ExportDataButton } from "@/components/settings/export-data-button";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -85,7 +86,7 @@ export default async function ConfiguracoesPage() {
       <Link href="/painel/configuracoes/mensagens" className="rounded-card border border-line bg-surface p-5 font-semibold text-primary">Configurar mensagens WhatsApp →</Link>
       <Link href="/painel/configuracoes/assinatura" className="rounded-card border border-line bg-surface p-5 font-semibold text-primary">Plano e faturas →</Link>
       <Link href="/painel/configuracoes/notificacoes" className="rounded-card border border-line bg-surface p-5 font-semibold text-primary">Configurar notificações do dispositivo →</Link>
-      {!session.support && <a href="/api/painel/exportar-agenda" download className="rounded-card border border-line bg-surface p-5 font-semibold text-primary">Baixar dados do estabelecimento →</a>}
+      {!session.support && <ExportDataButton />}
       <TeamAccessCard
         members={team.map((row) =>
           row.kind === "member"

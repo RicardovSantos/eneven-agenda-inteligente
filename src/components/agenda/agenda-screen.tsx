@@ -96,6 +96,7 @@ export function AgendaScreen({
 
   const filtered = professionals.find((p) => p.id === pro) ?? null;
   const columns = filtered ? [filtered] : professionals;
+  const photos = Object.fromEntries(professionals.map((p) => [p.id, p.photoUrl ?? null]));
   const longDate = formatLongDate(date);
   const summary =
     day.count === 0
@@ -295,6 +296,7 @@ export function AgendaScreen({
               onOpen={setSelectedId}
               canDeleteBlock={canDeleteBlock}
               onDeleteBlock={setBlockToRemove}
+              photos={photos}
             />
           )}
         </div>
@@ -303,6 +305,7 @@ export function AgendaScreen({
           <BookingDetail
             key={detail.id}
             booking={detail}
+            photoUrl={photos[detail.professional.id] ?? null}
             today={today}
             timezone={day.timezone}
             readOnly={readOnly}

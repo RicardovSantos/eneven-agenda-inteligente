@@ -36,3 +36,25 @@ export function PersonAvatar({
     </span>
   );
 }
+
+/** Foto (ou inicial) com anel na cor do profissional e o nome ao lado. */
+export function PersonLabel({
+  name,
+  color,
+  photoUrl,
+  size = 22,
+  className,
+}: {
+  name: string;
+  color: string | null;
+  photoUrl?: string | null;
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <span className={`inline-flex min-w-0 items-center gap-1.5 ${className ?? ""}`}>
+      <PersonAvatar name={name} color={color} photoUrl={photoUrl} size={size} />
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}

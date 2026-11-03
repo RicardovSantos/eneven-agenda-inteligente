@@ -5,7 +5,8 @@ import { Fragment } from "react";
 import { cn } from "@/lib/utils";
 import type { DayAgenda, DayBlock, DayBooking } from "@/server/agenda/panel-queries";
 import { NowLine } from "./now-line";
-import { Dot, STATUS_CARD, StatusPill } from "./shared";
+import { PersonLabel } from "@/components/media/person-avatar";
+import { STATUS_CARD, StatusPill } from "./shared";
 
 /**
  * Lista do dia (coluna da direita no computador, corpo da tela no celular):
@@ -19,7 +20,9 @@ export function DayList({
   onOpen,
   canDeleteBlock,
   onDeleteBlock,
+  photos,
 }: {
+  photos: Record<string, string | null>;
   day: DayAgenda;
   isToday: boolean;
   nowMs: number;
@@ -38,7 +41,7 @@ export function DayList({
           {index === lineIndex ? <NowLine nowMs={nowMs} timezone={day.timezone} /> : null}
           <li>
             {item.kind === "booking" ? (
-              <BookingRow booking={item} onOpen={onOpen} />
+              <BookingRow booking={item} onOpen={onOpen} photoUrl={photos[item.professional.id] ?? null} />
             ) : (
               <BlockRow block={item} onDelete={canDeleteBlock(item.professionalId) ? onDeleteBlock : null} />
             )}
@@ -50,7 +53,7 @@ export function DayList({
   );
 }
 
-function BookingRow({ booking, onOpen }: { booking: DayBooking; onOpen: (id: string) => void }) {
+function BookingRow({ booking, onOpen, photoUrl }: { booking: DayBooking; onOpen: (id: string) => void; photoUrl: string | null }) {
   const canceled = booking.status === "canceled";
   return (
     <button
@@ -76,10 +79,15 @@ function BookingRow({ booking, onOpen }: { booking: DayBooking; onOpen: (id: str
         >
           {booking.customer.name}
         </span>
-        <span className="flex items-center gap-1.5 text-[13px] text-ink-muted">
+        <span className="flex items-center gap-2 text-[13px] text-ink-muted">
           <span className="truncate">{booking.services.map((s) => s.name).join(" + ")}</span>
-          <Dot color={booking.professional.color} />
-          <span className="shrink-0">{booking.professional.name}</span>
+          <PersonLabel
+            name={booking.professional.name}
+            color={booking.professional.color}
+            photoUrl={photoUrl}
+            size={22}
+            className="shrink-0"
+          />
         </span>
       </span>
       <StatusPill status={booking.status} />

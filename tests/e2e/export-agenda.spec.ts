@@ -8,7 +8,7 @@ test("dono baixa seus dados e a equipe não acessa a exportação", async ({ pag
   await loginAs(page, request, slug);
   await open(page, "/painel/configuracoes");
   const downloaded = page.waitForEvent("download");
-  await page.getByRole("link", { name: /Baixar dados do estabelecimento/ }).click();
+  await page.getByRole("button", { name: /Baixar dados do estabelecimento/ }).click();
   const download = await downloaded;
   expect(download.suggestedFilename()).toBe("eneven-agenda.json");
   const filePath = await download.path();
