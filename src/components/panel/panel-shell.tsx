@@ -1,4 +1,5 @@
-import { LogOut } from "lucide-react";
+import { Building2, LogOut } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/brand/logo";
 import { SidebarLink } from "./copy-link-button";
@@ -14,6 +15,24 @@ function LogoutForm({ children, className }: { children: ReactNode; className?: 
   );
 }
 
+/** Selo "SUPORTE": a conta aberta é a de um cliente, não a do próprio usuário. */
+function SupportTag() {
+  return (
+    <span className="mb-0.5 inline-block w-fit shrink-0 rounded-md bg-amber-400 px-1.5 py-0.5 text-[0.6875rem] font-bold uppercase leading-none tracking-wide text-neutral-900">
+      Suporte
+    </span>
+  );
+}
+
+/** Para o super-admin: esta tela é do estabelecimento dele (a Plataforma, que vale para todos, é outra). */
+function OwnTenantTag() {
+  return (
+    <span className="mb-0.5 inline-block w-fit shrink-0 rounded-md bg-primary-soft px-1.5 py-0.5 text-[0.6875rem] font-bold uppercase leading-none tracking-wide text-primary">
+      Meu estabelecimento
+    </span>
+  );
+}
+
 /**
  * Casca definitiva do painel: barra lateral de 232px em telas largas; topo
  * com o nome do estabelecimento e navegação inferior no celular.
@@ -25,8 +44,11 @@ export function PanelShell({
   role,
   isSuperAdmin,
   notice,
+  support = false,
   children,
 }: {
+  /** Super-admin dentro do estabelecimento ("entrou como"): mostra o rótulo SUPORTE no menu e no topo. */
+  support?: boolean;
   userName: string;
   tenantName: string;
   /** Link público do salão quando liberado (e-mail confirmado e conta ativa/em teste); senão `null`. */
@@ -50,6 +72,7 @@ export function PanelShell({
         <div className="flex flex-col gap-3 border-t border-line p-4">
           <SidebarLink label={publicLink?.label ?? ""} url={publicLink?.url ?? null} />
           <div className="min-w-0 pt-1">
+            {support ? <SupportTag /> : isSuperAdmin ? <OwnTenantTag /> : null}
             <p className="truncate font-semibold leading-snug">{userName}</p>
             <p className="truncate text-sm leading-snug text-ink-muted">{tenantName}</p>
           </div>
@@ -68,7 +91,21 @@ export function PanelShell({
       <div className="min-w-0 flex-1">
       {/* Topo (celular) */}
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-line bg-surface pl-4 pr-1 lg:hidden">
-        <p className="truncate font-display text-lg font-semibold">{tenantName}</p>
+        <p className="flex min-w-0 flex-col items-start justify-center font-display text-lg font-semibold leading-tight">
+          {support ? <SupportTag /> : isSuperAdmin ? <OwnTenantTag /> : null}
+          <span className="max-w-full truncate">{tenantName}</span>
+        </p>
+        <div className="flex shrink-0 items-center">
+        {isSuperAdmin && !support ? (
+          <Link
+            href="/admin"
+            aria-label="Ir para a Plataforma"
+            title="Ir para a Plataforma (vale para todos os estabelecimentos)"
+            className="flex size-11 items-center justify-center rounded-field text-primary hover:bg-primary-soft/60"
+          >
+            <Building2 className="size-5" aria-hidden="true" />
+          </Link>
+        ) : null}
         <LogoutForm>
           <button
             type="submit"
@@ -79,6 +116,7 @@ export function PanelShell({
             <LogOut className="size-5" aria-hidden="true" />
           </button>
         </LogoutForm>
+        </div>
       </header>
 
       {notice}

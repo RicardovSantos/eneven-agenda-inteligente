@@ -235,6 +235,17 @@ describe("ações de /admin: super-admin", () => {
     expect(row.supportStartedAt).toBeNull();
   });
 
+  it("'Voltar' numa tela velha, com o suporte já encerrado, segue para a plataforma sem erro", async () => {
+    await asAdmin();
+    const a = await actions();
+    const { tenant } = await seedPlatformTenant(db);
+
+    expect(await redirectOf(a.enterSupportAction(tenant.id))).toBe("NEXT_REDIRECT:/painel");
+    expect(await redirectOf(a.leaveSupportAction())).toBe(`NEXT_REDIRECT:/admin/estabelecimentos/${tenant.id}`);
+    // A segunda aba ainda mostra a faixa e toca em "Voltar" de novo.
+    expect(await redirectOf(a.leaveSupportAction())).toBe("NEXT_REDIRECT:/admin");
+  });
+
   it("'Entrar como' num estabelecimento que não existe devolve o erro, sem redirecionar", async () => {
     await asAdmin();
     const a = await actions();

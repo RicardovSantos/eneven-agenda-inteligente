@@ -142,3 +142,7 @@ export async function loginAsSuperAdmin(page: Page, request: APIRequestContext) 
   });
   await page.context().addCookies([{ name: cookieName, value: token, url: baseUrl() }]);
 }
+
+/** Faz o dono do estabelecimento também ser super-admin (a conta do Ricardo é assim). */
+export const promoteToSuperAdmin = (request: APIRequestContext, slug: string) =>
+  seed<{ ok: true }>(request, { action: "promote-super-admin", slug });

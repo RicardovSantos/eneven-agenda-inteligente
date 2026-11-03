@@ -22,6 +22,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/app/admin/actions", () => ({ leaveSupportAction: vi.fn() }));
 
 import { ReadOnlyBanner, READ_ONLY_TEXT } from "@/components/panel/read-only-banner";
+import { SessionContextWatcher } from "@/components/panel/session-context-watcher";
 import { SupportBanner } from "@/components/panel/support-banner";
 import { ToastProvider } from "@/components/ui/toast";
 
@@ -57,6 +58,20 @@ describe("faixa do modo suporte", () => {
     expect(html).toContain("data-support-banner");
     expect(html).toContain('role="region"');
     expect(html).not.toContain('role="status"');
+    expect(html).toContain("O que você mudar");
+    expect(html).toContain("bg-amber-400");
+  });
+
+  it("o vigia da conta desenha o contorno só em modo suporte", () => {
+    const withSupport = renderToStaticMarkup(
+      h(SessionContextWatcher, { tenantId: "t-1", support: true, tenantName: "Studio Aurora" }),
+    );
+    expect(withSupport).toContain("data-support-frame");
+    const own = renderToStaticMarkup(
+      h(SessionContextWatcher, { tenantId: "t-1", support: false, tenantName: "Meu Salão" }),
+    );
+    expect(own).not.toContain("data-support-frame");
+    expect(own).not.toContain("alertdialog");
   });
 });
 

@@ -10,6 +10,7 @@ import {
   seedE2eSuperAdmin,
   seedE2eTenant,
   verifyE2eOwnerEmail,
+  promoteE2eOwnerToSuperAdmin,
   type SeedBlockOptions,
   type SeedBookingOptions,
   type SeedInviteOptions,
@@ -56,6 +57,8 @@ export async function POST(request: Request): Promise<Response> {
     }
     case "verify-email":
       return Response.json(await verifyE2eOwnerEmail(db, String(body.slug)));
+    case "promote-super-admin":
+      return Response.json(await promoteE2eOwnerToSuperAdmin(db, String(body.slug)));
     case "bookings":
       return Response.json(await listE2eBookings(db, String(body.slug)));
     default:

@@ -158,6 +158,9 @@ export async function leaveSupportAction(): Promise<AdminActionResult> {
   try {
     await endSupport(ctx.db, ctx.token, ctx.actor);
   } catch (error) {
+    // Já fora do suporte (saiu em outra aba, por exemplo, e esta tela ficou velha): o destino
+    // é o mesmo, então segue para a plataforma em vez de mostrar erro.
+    if (error instanceof PlatformError && error.code === "invalid_state") redirect("/admin");
     return failure(error, "voltar à plataforma");
   }
   redirect(ctx.tenantId ? `/admin/estabelecimentos/${ctx.tenantId}` : "/admin");
