@@ -226,7 +226,7 @@ export function ServicesScreen({
                       <span className="truncate font-semibold">{s.name}</span>
                       <span className="shrink-0 text-sm tabular-nums">{formatBRL(s.priceCents)}</span>
                     </span>
-                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
+                    <span className="flex flex-col items-start gap-1.5 text-sm text-ink-muted">
                       <span className="tabular-nums">{formatDuration(s.durationMin)}</span>
                       <WhoDoes ids={s.professionalIds} byId={byId} compact />
                     </span>
@@ -337,7 +337,7 @@ function WhoDoes({
   }
   if (compact) {
     return (
-      <span className="flex items-center gap-1.5">
+      <span className="flex flex-wrap items-center gap-1.5">
         {pros.map((p) => (
           <ProChip key={p.id} name={p.name} color={p.color} photoUrl={p.photoUrl} />
         ))}
