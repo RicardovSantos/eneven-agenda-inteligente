@@ -24,20 +24,22 @@ export function SidebarNav({ role, isSuperAdmin }: { role: PanelRole; isSuperAdm
   return (
     <nav aria-label="Principal">
       <ul className="flex flex-col gap-1">
-        {sidebar.map(({ label, icon: Icon, href }) => {
+        {sidebar.map(({ label, icon: Icon, href, admin }) => {
           const active = isActive(pathname, href);
           const base =
             "flex h-11 items-center gap-3 rounded-field px-3 text-base";
           return (
-            <li key={label}>
+            <li key={label} className={admin ? "mt-3 border-t border-line pt-4" : undefined}>
               <Link
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   base,
-                  active
-                    ? "bg-primary-soft font-semibold text-primary"
-                    : "font-medium text-ink hover:bg-primary-soft/60",
+                  admin
+                    ? "border border-primary/50 bg-primary-soft font-semibold text-primary hover:bg-primary-soft/70"
+                    : active
+                      ? "bg-primary-soft font-semibold text-primary"
+                      : "font-medium text-ink hover:bg-primary-soft/60",
                 )}
               >
                 <Icon className="size-5" aria-hidden="true" />

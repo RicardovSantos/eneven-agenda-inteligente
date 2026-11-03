@@ -1,4 +1,4 @@
-import { Building2, LogOut } from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/brand/logo";
@@ -24,7 +24,7 @@ function SupportTag() {
   );
 }
 
-/** Para o super-admin: esta tela é do estabelecimento dele (a Plataforma, que vale para todos, é outra). */
+/** Para o super-admin: esta tela é do estabelecimento dele (a Administração Eneven, que vale para todos, é outra). */
 function OwnTenantTag() {
   return (
     <span className="mb-0.5 inline-block w-fit shrink-0 rounded-md bg-primary-soft px-1.5 py-0.5 text-[0.6875rem] font-bold uppercase leading-none tracking-wide text-primary">
@@ -99,11 +99,11 @@ export function PanelShell({
         {isSuperAdmin && !support ? (
           <Link
             href="/admin"
-            aria-label="Ir para a Plataforma"
-            title="Ir para a Plataforma (vale para todos os estabelecimentos)"
+            aria-label="Ir para a Administração Eneven"
+            title="Administração Eneven (vale para todos os estabelecimentos)"
             className="flex size-11 items-center justify-center rounded-field text-primary hover:bg-primary-soft/60"
           >
-            <Building2 className="size-5" aria-hidden="true" />
+            <ShieldCheck className="size-5" aria-hidden="true" />
           </Link>
         ) : null}
         <LogoutForm>

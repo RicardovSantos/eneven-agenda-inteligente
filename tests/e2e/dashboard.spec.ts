@@ -125,7 +125,7 @@ test.describe("menu e acesso por papel", () => {
     for (const label of ["Agenda", "Clientes", "Serviços", "Equipe"]) {
       await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
-    for (const label of ["Painel", "Configurações", "Plataforma"]) {
+    for (const label of ["Painel", "Configurações", "Administração Eneven"]) {
       await expect(nav.getByRole("link", { name: label, exact: true })).toHaveCount(0);
     }
     await open(page, "/painel/configuracoes");

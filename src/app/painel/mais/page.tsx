@@ -1,4 +1,4 @@
-import { ChevronRight, LogOut, type LucideIcon } from "lucide-react";
+import { ChevronRight, LogOut, ShieldCheck, type LucideIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CopyLinkButton } from "@/components/panel/copy-link-button";
@@ -24,7 +24,9 @@ function NavRow({ href, icon: Icon, label }: { href: string; icon: LucideIcon; l
 
 export default async function MaisPage() {
   const data = await requireOnboarded();
-  const items = moreItemsFor(data.session.role!, data.session.isSuperAdmin);
+  const allItems = moreItemsFor(data.session.role!, data.session.isSuperAdmin);
+  const items = allItems.filter((item) => !item.admin);
+  const adminItem = allItems.find((item) => item.admin);
   const released = isTenantReleased({
     status: data.tenantStatus,
     trialEndsAt: data.trialEndsAt,
@@ -45,6 +47,24 @@ export default async function MaisPage() {
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {adminItem ? (
+        <section aria-label="Administração" className="flex flex-col gap-2">
+          <Link
+            href={adminItem.href}
+            className="flex items-center gap-3.5 rounded-panel border border-primary bg-primary-soft p-4 no-underline transition-colors hover:bg-primary-soft/70"
+          >
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground" aria-hidden="true">
+              <ShieldCheck className="size-6" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-base font-semibold text-primary">{adminItem.label}</span>
+              <span className="text-[0.8125rem] leading-snug text-ink-muted">Painel administrativo · vale para todos os estabelecimentos</span>
+            </span>
+            <ChevronRight className="size-5 shrink-0 text-primary" aria-hidden="true" />
+          </Link>
+        </section>
       ) : null}
 
       <section
