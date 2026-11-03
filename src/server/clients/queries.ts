@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { bookingServices, bookings, customers, professionals, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { customerMatch } from "@/server/agenda/customer-search";
@@ -139,7 +139,9 @@ export async function listClients(
       query ? customerMatch(query) : undefined,
       own ? isNotNull(agg.customerId) : undefined,
       input.filter === "upcoming" ? isNotNull(agg.nextBookingAt) : undefined,
-      input.filter === "lapsed" ? and(lt(agg.lastVisitAt, lapsedBefore), isNull(agg.nextBookingAt)) : undefined,
+      // A data vai como texto com `::timestamptz`: o driver do PostgreSQL em produção recusa um `Date` cru
+      // comparado a uma coluna agregada (o PGlite dos testes aceita), e o filtro dava erro de servidor.
+      input.filter === "lapsed" ? and(sql`${agg.lastVisitAt} < ${lapsedBefore.toISOString()}::timestamptz`, isNull(agg.nextBookingAt)) : undefined,
     );
     const join = eq(agg.customerId, customers.id);
 
