@@ -2,6 +2,7 @@ import { RegisterSw } from "@/components/pwa/register-sw";
 import { InstallHint } from "@/components/pwa/install-hint";
 import { PanelShell } from "@/components/panel/panel-shell";
 import { ReadOnlyBanner } from "@/components/panel/read-only-banner";
+import { SessionContextWatcher } from "@/components/panel/session-context-watcher";
 import { SupportBanner } from "@/components/panel/support-banner";
 import { ToastProvider } from "@/components/ui/toast";
 import { PUBLIC_HOST } from "@/lib/brand";
@@ -20,6 +21,8 @@ export default async function PainelLayout({
     await getPanelData();
 
   const supportBanner = session.support ? <SupportBanner tenantName={tenantName} /> : null;
+  // Confere se a conta desta aba ainda é a da sessão (outra aba pode ter trocado).
+  const watcher = <SessionContextWatcher tenantId={session.tenantId} support={session.support} tenantName={tenantName} />;
 
   // Enquanto o proprietário não conclui (ou pula) os primeiros passos, só a
   // tela do assistente existe, sem menu: as demais páginas redirecionam para
@@ -28,6 +31,7 @@ export default async function PainelLayout({
     return (
       <ToastProvider>
         {supportBanner}
+        {watcher}
         {children}
         <RegisterSw />
       </ToastProvider>
@@ -52,7 +56,9 @@ export default async function PainelLayout({
   return (
     <ToastProvider>
       {supportBanner}
+      {watcher}
       <PanelShell
+        support={session.support}
         userName={userName}
         tenantName={tenantName}
         publicLink={released ? { label, url: `https://${label}` } : null}
