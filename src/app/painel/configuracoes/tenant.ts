@@ -2,13 +2,14 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { tenants } from "@/db/schema";
-import { requirePanelRole } from "@/server/panel/roles";
 
-/** Sessão do proprietário e o estabelecimento dele, para as telas de configuração. */
-export async function loadOwnerTenant() {
-  const { session } = await requirePanelRole(["owner"]);
+/**
+ * O estabelecimento do proprietário, para as telas de configuração. Cada `page.tsx`
+ * chama `requirePanelRole(["owner"])` antes, por escrito (uma guarda de teste confere isso).
+ */
+export async function loadTenant(tenantId: string) {
   const db = await getDb();
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, session.tenantId)).limit(1);
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
   if (!tenant) redirect("/entrar");
-  return { session, db, tenant };
+  return { db, tenant };
 }

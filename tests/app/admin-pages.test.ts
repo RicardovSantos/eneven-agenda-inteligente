@@ -22,6 +22,7 @@ describe("guarda: páginas da plataforma (/admin)", () => {
       "dados/page.tsx",
       "estabelecimentos/[id]/page.tsx",
       "estabelecimentos/novo/page.tsx",
+      "gerenciar/page.tsx",
       "notificacoes/page.tsx",
       "page.tsx",
       "planos/page.tsx",
