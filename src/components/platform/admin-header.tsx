@@ -9,6 +9,11 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/admin", label: "Estabelecimentos", match: (p: string) => p === "/admin" || p.startsWith("/admin/estabelecimentos") },
   { href: "/admin/planos", label: "Planos", match: (p: string) => p.startsWith("/admin/planos") },
+  {
+    href: "/admin/gerenciar",
+    label: "Gerenciar",
+    match: (p: string) => ["/admin/gerenciar", "/admin/whatsapp", "/admin/cobranca", "/admin/dados", "/admin/notificacoes"].some((base) => p.startsWith(base)),
+  },
 ] as const;
 
 const LINK =
@@ -16,7 +21,7 @@ const LINK =
 
 /**
  * Topo da plataforma (`docs/design/plano-3/Admin.dc.html`): logo, abas
- * Estabelecimentos / Planos, "Meu estabelecimento" (só para quem tem um) e Sair.
+ * Estabelecimentos / Planos / Gerenciar, "Meu estabelecimento" (só para quem tem um) e Sair.
  */
 export function AdminHeader({ hasOwnTenant }: { hasOwnTenant: boolean }) {
   const pathname = usePathname();

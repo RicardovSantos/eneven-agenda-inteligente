@@ -18,7 +18,7 @@ export default async function TestPushReviewPage() {
     .where(or(eq(pushDeliveries.status, "uncertain"), and(eq(pushDeliveries.status, "processing"), lte(pushDeliveries.claimedAt, stale)), and(eq(pushDeliveries.status, "expired"), eq(pushDeliveries.expirationReason, "subscription_gone"))))
     .orderBy(asc(pushDeliveries.createdAt)).limit(100);
   return <main className="mx-auto flex w-full max-w-[900px] flex-col gap-5 p-6">
-    <Link href="/admin" className="text-primary">‹ Plataforma</Link><h1 className="text-2xl font-semibold">Revisar notificações de teste</h1>
+    <Link href="/admin/gerenciar" className="text-primary">‹ Gerenciar</Link><h1 className="text-2xl font-semibold">Revisar notificações de teste</h1>
     <p>O resultado pode ser incerto. Só confirme uma entrega que você verificou. Repetir pode gerar uma notificação duplicada; avisos com mais de cinco minutos expiram.</p>
     {rows.length === 0 && <p>Nenhuma ocorrência para revisar.</p>}
     {rows.map((row) => <section key={row.id} className="space-y-3 rounded-card border border-line bg-surface p-4">

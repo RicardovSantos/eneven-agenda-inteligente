@@ -11,7 +11,7 @@ export default async function DataReviewPage({ searchParams }: { searchParams: P
   const { items: rows, hasMore } = await listRetentionReview(await getDb(), new Date(), page);
   const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" });
   return <main className="mx-auto flex w-full max-w-[900px] flex-col gap-5 p-6">
-    <Link href="/admin" className="text-primary">‹ Plataforma</Link>
+    <Link href="/admin/gerenciar" className="text-primary">‹ Gerenciar</Link>
     <h1 className="text-2xl font-semibold">Revisão de dados inativos</h1>
     <p>Esta lista mostra estabelecimentos com teste vencido ou cancelamento há pelo menos 90 dias, além de cancelamentos sem data comprovada. Ela serve para revisão: nenhum dado é apagado automaticamente.</p>
     <p className="text-sm text-ink-muted">Antes de qualquer exclusão, confirme a data, os avisos, a possibilidade de exportação e as obrigações de preservação aplicáveis.</p>
