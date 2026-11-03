@@ -17,7 +17,7 @@ describe("fila WhatsApp no PostgreSQL", () => {
     const now = new Date();
     const start = new Date(now.getTime() + 86_400_000);
     const booking = await seedBooking(pg.db, tenant.id, { startsAt: start, endsAt: new Date(start.getTime() + 1_800_000), blockedUntil: new Date(start.getTime() + 1_800_000) });
-    await withTenant(pg.db, tenant.id, (tx) => tx.insert(whatsappQueue).values({ tenantId: tenant.id, bookingId: booking.id, templateType: "booking_created", eventKey: "created", scheduledFor: now }));
+    await withTenant(pg.db, tenant.id, (tx) => tx.insert(whatsappQueue).values({ tenantId: tenant.id, bookingId: booking.id, templateType: "canceled", eventKey: "canceled", scheduledFor: now }));
     const fake = new FakeWhatsAppChannel();
     setWhatsAppChannelForTests(fake);
     const results = await Promise.all(Array.from({ length: 3 }, () => processQueue(pg.db, 1, now)));
