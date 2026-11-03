@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 const FILE_NAME = "eneven-agenda.json";
-const CLASSES = "rounded-card border border-line bg-surface p-5 text-left font-semibold text-primary disabled:opacity-60";
+const CLASSES = "flex min-h-11 w-full items-center justify-center rounded-field bg-primary px-5 text-center font-semibold text-primary-foreground disabled:opacity-60 sm:w-auto";
 
 /**
  * Baixa os dados do estabelecimento sem sair do app. Um link `download` abre o
@@ -47,7 +47,7 @@ export function ExportDataButton() {
   return (
     <div className="flex flex-col gap-2">
       <button type="button" onClick={run} disabled={state === "loading"} className={CLASSES}>
-        {state === "loading" ? "Preparando o arquivo…" : "Baixar dados do estabelecimento →"}
+        {state === "loading" ? "Preparando o arquivo…" : "Baixar dados do estabelecimento"}
       </button>
       {state === "error" ? (
         <p role="alert" className="m-0 text-sm text-danger">

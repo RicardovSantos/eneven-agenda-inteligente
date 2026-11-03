@@ -32,8 +32,8 @@ export function ThemeForm() {
 
   return (
     <SettingsSection
-      id="geral"
-      title="Configuração geral"
+      id="tema"
+      title="Tema"
       description="Escolha o tema do painel. A escolha fica salva neste aparelho."
     >
       <div role="radiogroup" aria-label="Tema" className="grid gap-2.5 sm:grid-cols-3">

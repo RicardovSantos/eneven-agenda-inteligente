@@ -8,8 +8,6 @@ import { buttonVariants } from "@/components/ui/button";
 import { parsePage, parseQuery, parseSituation } from "@/lib/platform-format";
 import { cn } from "@/lib/utils";
 import { requireSuperAdminSession } from "@/server/auth/guard";
-import { liveBillingEnabled } from "@/server/billing/mode";
-import { pushAvailable } from "@/server/push/mode";
 import { getPlatformMetrics } from "@/server/platform/metrics";
 import { listPlatformTenants } from "@/server/platform/tenants";
 import { getWhatsAppMetrics } from "@/server/platform/whatsapp-metrics";
@@ -53,19 +51,17 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       </div>
 
       <MetricsCards metrics={metrics} />
-      <Link href="/admin/dados" className="text-primary">Revisar dados inativos →</Link>
-      {process.env.NODE_ENV !== "production" || liveBillingEnabled() ? <Link href="/admin/cobranca" className="text-primary">Revisar assinaturas e avisos →</Link> : null}
-
-      <section className="rounded-panel border border-line bg-surface p-5">
-        <h2 className="font-semibold">WhatsApp da plataforma</h2>
-        <p>{whatsapp.daily.count} de 250 destinatários nas últimas 24 horas.</p>
-        <progress aria-label="Uso do limite diário da Meta" className="w-full" max={250} value={Math.min(whatsapp.daily.count, 250)} />
-        <p className={whatsapp.daily.count > 225 ? "text-danger" : whatsapp.daily.count >= 175 ? "text-amber-700" : "text-green-700"}>{whatsapp.daily.count > 225 ? "Limite diário próximo" : whatsapp.daily.count >= 175 ? "Atenção ao limite diário" : "Limite diário disponível"}</p>
-        {whatsapp.daily.warnSuperAdmin ? <p>70% do limite diário atingido.</p> : null}
-        <p>{whatsapp.monthlySent} mensagens enviadas no mês · custo estimado {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(whatsapp.estimatedCents / 100)}.</p>
-        <Link href="/admin/whatsapp" className="text-primary">Revisar ocorrências WhatsApp →</Link>
-        {pushAvailable() && <p><Link href="/admin/notificacoes" className="text-primary">Revisar notificações de teste →</Link></p>}
-      </section>
+      {whatsapp.daily.count >= 175 ? (
+        <Link
+          href="/admin/whatsapp"
+          className={cn(
+            "rounded-panel border p-4 text-sm font-semibold no-underline",
+            whatsapp.daily.count > 225 ? "border-danger text-danger" : "border-line text-foreground",
+          )}
+        >
+          {whatsapp.daily.count > 225 ? "Limite diário do WhatsApp próximo" : "Atenção ao limite diário do WhatsApp"}: {whatsapp.daily.count} de 250 destinatários nas últimas 24 horas →
+        </Link>
+      ) : null}
 
       <TenantFilters state={state} counts={list.counts} />
 

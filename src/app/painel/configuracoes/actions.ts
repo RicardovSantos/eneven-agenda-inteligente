@@ -283,6 +283,7 @@ async function runTeam(
     };
     const result = await work({ db: await getDb(), actor });
     revalidatePath("/painel/configuracoes");
+    revalidatePath("/painel/configuracoes/acessos");
     revalidatePath("/painel/equipe");
     return { ok: true, ...result, at: Date.now() };
   } catch (error) {

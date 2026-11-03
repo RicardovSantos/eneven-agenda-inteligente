@@ -6,7 +6,7 @@ test("dono baixa seus dados e a equipe não acessa a exportação", async ({ pag
   const { slug } = await seedTenant(request);
   const booking = await seedBooking(request, slug);
   await loginAs(page, request, slug);
-  await open(page, "/painel/configuracoes");
+  await open(page, "/painel/configuracoes/dados");
   const downloaded = page.waitForEvent("download");
   await page.getByRole("button", { name: /Baixar dados do estabelecimento/ }).click();
   const download = await downloaded;

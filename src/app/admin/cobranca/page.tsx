@@ -25,7 +25,7 @@ export default async function BillingRecoveryPage() {
     .orderBy(billingNotices.createdAt).limit(100);
   const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
   return <main className="mx-auto flex w-full max-w-[900px] flex-col gap-5 p-6">
-    <Link href="/admin" className="text-primary">‹ Plataforma</Link>
+    <Link href="/admin/gerenciar" className="text-primary">‹ Gerenciar</Link>
     <h1 className="text-2xl font-semibold">Revisar assinaturas de teste</h1>
     <p>Localize no Mercado Pago a assinatura pendente com a referência abaixo e informe o ID dela. Só confirme ausência depois de conferir no provedor; uma busca sem resultado não libera outra tentativa automaticamente.</p>
     {rows.length === 0 ? <p>Nenhuma ocorrência para revisar.</p> : null}

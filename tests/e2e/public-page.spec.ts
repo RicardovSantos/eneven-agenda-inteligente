@@ -21,13 +21,14 @@ test.describe("página pública com fotos, equipe e informações", () => {
 
     // Painel: configurações (imagens do carrossel, Facebook e Instagram).
     await loginAs(page, request, slug);
-    await open(page, "/painel/configuracoes");
+    await open(page, "/painel/configuracoes/estabelecimento");
 
     await page.getByLabel("Facebook (opcional)").fill("https://facebook.com/studio.defendi");
     await page.getByLabel("Instagram (opcional)").fill("@studio.defendi");
     await page.locator('section[aria-labelledby="info-title"]').getByRole("button", { name: "Salvar" }).click();
     await expect(page.getByText("Alterações salvas")).toBeVisible();
 
+    await open(page, "/painel/configuracoes/pagina");
     const hero = page.locator('section[aria-labelledby="public-page-title"]');
     for (const [index, color] of ["#336699", "#993366"].entries()) {
       await hero.getByLabel(`Imagem ${index + 1}`).setInputFiles({
