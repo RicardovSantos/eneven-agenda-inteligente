@@ -1,5 +1,6 @@
 "use client";
 
+import { PersonLabel } from "@/components/media/person-avatar";
 import { Loader2, Search, UserPlus, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { createBookingAction, searchCustomersAction } from "@/app/painel/actions";
@@ -16,7 +17,6 @@ import { localDateOf } from "@/server/agenda/time";
 import type { CustomerHit } from "@/server/agenda/panel-ops";
 import { PanelDialog } from "./panel-dialog";
 import { SlotField, type SlotSelection } from "./slot-field";
-import { Dot } from "./shared";
 
 export type PanelService = {
   id: string;
@@ -310,8 +310,12 @@ function NewBookingForm({
         </h3>
         {lockedProfessionalId ? (
           <p className="flex min-h-11 items-center gap-2 text-[0.9375rem] font-medium">
-            <Dot color={professionals.find((p) => p.id === lockedProfessionalId)?.color ?? null} size={8} />
-            {professionals.find((p) => p.id === lockedProfessionalId)?.name}
+            {(() => {
+              const locked = professionals.find((p) => p.id === lockedProfessionalId);
+              return locked ? (
+                <PersonLabel name={locked.name} color={locked.color} photoUrl={locked.photoUrl} size={26} className="gap-2" />
+              ) : null;
+            })()}
           </p>
         ) : (
           <Select

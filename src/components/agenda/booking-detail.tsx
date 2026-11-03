@@ -23,7 +23,8 @@ import { cn } from "@/lib/utils";
 import type { DayBooking } from "@/server/agenda/panel-queries";
 import { localDateOf } from "@/server/agenda/time";
 import { SlotField, type SlotSelection } from "./slot-field";
-import { Dot, StatusPill } from "./shared";
+import { PersonLabel } from "@/components/media/person-avatar";
+import { StatusPill } from "./shared";
 
 const DESKTOP_QUERY = "(min-width: 1024px)";
 const FOCUSABLE =
@@ -56,12 +57,14 @@ const TILE =
  */
 export function BookingDetail({
   booking,
+  photoUrl = null,
   today,
   timezone,
   readOnly = false,
   onClose,
 }: {
   booking: DayBooking;
+  photoUrl?: string | null;
   today: string;
   timezone: string;
   /** Estabelecimento sem plano ativo: "Remarcar" fica desabilitado. */
@@ -208,10 +211,13 @@ export function BookingDetail({
             {formatShortDate(date)} · {booking.time} às {booking.endTime}
           </Row>
           <Row label="Profissional">
-            <span className="flex items-center gap-2">
-              <Dot color={booking.professional.color} size={8} />
-              {booking.professional.name}
-            </span>
+            <PersonLabel
+              name={booking.professional.name}
+              color={booking.professional.color}
+              photoUrl={photoUrl}
+              size={28}
+              className="gap-2"
+            />
           </Row>
           <Row label="Valor" tabular>
             {formatBRL(booking.totalCents)}
