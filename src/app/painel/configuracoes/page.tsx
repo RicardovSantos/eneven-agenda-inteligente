@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { tenants } from "@/db/schema";
+import { ThemeForm } from "@/components/settings/theme-form";
 import { BrandForm } from "@/components/settings/brand-form";
 import { BusinessInfoForm } from "@/components/settings/business-info-form";
 import { PublicPageForm } from "@/components/settings/public-page-form";
@@ -46,6 +47,7 @@ export default async function ConfiguracoesPage() {
         </p>
       </div>
 
+      <ThemeForm />
       <BusinessInfoForm
         initial={{
           name: tenant.name,
