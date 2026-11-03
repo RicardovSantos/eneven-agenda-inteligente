@@ -122,7 +122,7 @@ export function PlansScreen({ plans }: { plans: PlanItem[] }) {
         <EditPanel
           title="Editar plano"
           titleId="titulo-editar-plano"
-          stickyClass="lg:top-24 lg:h-[calc(100dvh-6rem)]"
+          stickyClass="lg:top-22 lg:h-[calc(100dvh-5.5rem)]"
           onClose={() => setSelectedId(null)}
         >
           <PlanForm key={editing.id} plan={editing} onClose={() => setSelectedId(null)} />

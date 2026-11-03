@@ -41,8 +41,8 @@ describe("navItemsFor", () => {
   it("super-admin ganha Plataforma no fim do menu lateral, apontando para /admin", () => {
     for (const role of ["owner", "reception", "staff"] as const) {
       const { sidebar } = navItemsFor(role, true);
-      expect(sidebar.at(-1)).toMatchObject({ label: "Plataforma", href: "/admin" });
-      expect(navItemsFor(role, false).sidebar.some((i) => i.label === "Plataforma")).toBe(false);
+      expect(sidebar.at(-1)).toMatchObject({ label: "Administração Eneven", href: "/admin" });
+      expect(navItemsFor(role, false).sidebar.some((i) => i.label === "Administração Eneven")).toBe(false);
     }
   });
 });
