@@ -79,16 +79,16 @@ function BookingRow({ booking, onOpen, photoUrl }: { booking: DayBooking; onOpen
         >
           {booking.customer.name}
         </span>
-        <span className="flex items-center gap-2 text-[13px] text-ink-muted">
-          <span className="truncate">{booking.services.map((s) => s.name).join(" + ")}</span>
-          <PersonLabel
-            name={booking.professional.name}
-            color={booking.professional.color}
-            photoUrl={photoUrl}
-            size={22}
-            className="shrink-0"
-          />
+        <span className="truncate text-[13px] text-ink-muted">
+          {booking.services.map((s) => s.name).join(" + ")}
         </span>
+        <PersonLabel
+          name={booking.professional.name}
+          color={booking.professional.color}
+          photoUrl={photoUrl}
+          size={22}
+          className="mt-0.5 text-[13px] text-ink-muted"
+        />
       </span>
       <StatusPill status={booking.status} />
     </button>
