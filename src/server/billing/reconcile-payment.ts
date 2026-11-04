@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, between, eq, isNull, notExists } from "drizzle-orm";
 import { billingInvoicePaymentLinks, billingInvoices, billingPaymentAttempts } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { fetchMercadoPagoResource } from "./mercado-pago-client";
@@ -6,6 +6,34 @@ import { verifyPaymentOwnership } from "./verify-payment";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATES = new Set(["pending", "in_process", "approved", "rejected", "cancelled", "refunded", "charged_back"]);
+/** Folga entre o vencimento da fatura e a criação do pagamento da mesma tentativa de cobrança. */
+const ADOPT_WINDOW_MS = 15 * 60_000;
+
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/**
+ * A Mercado Pago às vezes avisa da cobrança antes de anexar o pagamento a ela; a fatura então
+ * nasce sem ligação com o pagamento e o aviso do pagamento (cuja referência é a assinatura)
+ * não achava a que fatura pertence. Aqui, e só quando não há ligação nem fatura com esse id,
+ * aceita a ÚNICA fatura da mesma assinatura, do mesmo valor, ainda sem pagamento ligado e com
+ * vencimento a até 15 minutos da criação do pagamento. Zero ou mais de uma: não adivinha.
+ */
+async function findUnlinkedInvoice(tx: Tx, subscriptionId: string, payment: Record<string, unknown>) {
+  if (typeof payment.date_created !== "string" || typeof payment.transaction_amount !== "number") return null;
+  const created = new Date(payment.date_created);
+  const cents = Math.round(payment.transaction_amount * 100);
+  if (!Number.isFinite(created.getTime()) || !Number.isSafeInteger(cents) || cents <= 0) return null;
+  const candidates = await tx.select().from(billingInvoices)
+    .where(and(
+      eq(billingInvoices.subscriptionId, subscriptionId),
+      eq(billingInvoices.amountCents, cents),
+      isNull(billingInvoices.paymentId),
+      between(billingInvoices.dueAt, new Date(created.getTime() - ADOPT_WINDOW_MS), new Date(created.getTime() + ADOPT_WINDOW_MS)),
+      notExists(tx.select({ id: billingInvoicePaymentLinks.paymentId }).from(billingInvoicePaymentLinks).where(eq(billingInvoicePaymentLinks.invoiceId, billingInvoices.id))),
+    ))
+    .limit(2).for("update");
+  return candidates.length === 1 ? candidates[0] : null;
+}
 
 /** Concilia somente faturas já criadas na plataforma; não altera o acesso do tenant. */
 export async function reconcilePayment(db: Db, paymentId: string, config: {
@@ -26,8 +54,14 @@ export async function reconcilePayment(db: Db, paymentId: string, config: {
   }
   return db.transaction(async (tx) => {
     const [link] = await tx.select().from(billingInvoicePaymentLinks).where(eq(billingInvoicePaymentLinks.paymentId, paymentId)).limit(1);
-    const [invoice] = await tx.select().from(billingInvoices).where(eq(billingInvoices.id, link?.invoiceId ?? reference)).limit(1).for("update");
+    let [invoice] = await tx.select().from(billingInvoices).where(eq(billingInvoices.id, link?.invoiceId ?? reference)).limit(1).for("update");
+    let adopted = false;
+    if (!link && !invoice) {
+      const found = await findUnlinkedInvoice(tx, reference, payment);
+      if (found) { invoice = found; adopted = true; }
+    }
     if (link && (!invoice || link.tenantId !== invoice.tenantId || (reference !== invoice.id && reference !== invoice.subscriptionId))) throw new Error("Pagamento não corresponde à fatura.");
+    if (adopted && invoice.subscriptionId !== reference) throw new Error("Pagamento não corresponde à fatura.");
     if (!invoice || !verifyPaymentOwnership(payment, {
       paymentId, externalReference: reference, collectorId: config.collectorId, amountCents: invoice.amountCents, liveMode: config.liveMode,
     })) throw new Error("Pagamento não corresponde à fatura.");
@@ -37,6 +71,7 @@ export async function reconcilePayment(db: Db, paymentId: string, config: {
       if (prior.providerUpdatedAt.getTime() === updatedAt.getTime() && (prior.status !== payment.status || (prior.paidAt?.getTime() ?? null) !== (paidAt?.getTime() ?? null))) throw new Error("Atualização de pagamento ambígua.");
       return "unchanged";
     }
+    if (adopted) await tx.insert(billingInvoicePaymentLinks).values({ paymentId, tenantId: invoice.tenantId, invoiceId: invoice.id }).onConflictDoNothing();
     const values = { status: payment.status as string, providerUpdatedAt: updatedAt, paidAt };
     if (prior) await tx.update(billingPaymentAttempts).set(values).where(eq(billingPaymentAttempts.paymentId, paymentId));
     else await tx.insert(billingPaymentAttempts).values({ paymentId, tenantId: invoice.tenantId, invoiceId: invoice.id, ...values });
