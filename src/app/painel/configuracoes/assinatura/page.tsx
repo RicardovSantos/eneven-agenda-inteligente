@@ -4,6 +4,7 @@ import { getDb } from "@/db/client";
 import { users } from "@/db/schema";
 import { ChargePanel, type OpenCharge } from "@/components/settings/charge-panel";
 import { formatBRL } from "@/lib/format";
+import { refreshOpenCharge } from "@/server/billing/charges";
 import { billingConfig } from "@/server/billing/mode";
 import { getBillingOverview } from "@/server/billing/queries";
 import { refreshPendingSubscriptions } from "@/server/billing/refresh-pending";
@@ -35,8 +36,10 @@ export default async function AssinaturaPage() {
     } catch {
       // Sem resposta da Mercado Pago a tela abre com o que já se sabe.
     }
+    // Pix ou boleto em aberto: confere o pagamento agora, sem esperar o aviso nem o relógio do servidor.
+    if (config.live) await refreshOpenCharge(db, session.tenantId, { accessToken: config.accessToken, collectorId: config.collectorId, liveMode: true });
   }
-  const { current, available, invoices, pendingCheckoutUrl, subscription, activeProfessionals, charges, paidUntil } = await getBillingOverview(db, session.tenantId);
+  const { current, available, invoices, pendingCheckoutUrl, subscription, activeProfessionals, charges, paidUntil, paidActive: paidNow, justPaid } = await getBillingOverview(db, session.tenantId);
   const [loginUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, session.userId)).limit(1);
   const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: timezone });
   const live = config?.live === true;
@@ -44,19 +47,21 @@ export default async function AssinaturaPage() {
   const plan = available.find((item) => item.id === current.id);
   const subscribed = subscription?.providerStatus === "authorized";
   const cancelled = subscription?.providerStatus === "cancelled" || subscription?.providerStatus === "canceled";
+  const paidByCharge = Boolean(paidUntil) && !subscribed;
+  const paidActive = paidByCharge && paidNow;
   // Cancelada sem nada pago e com cobrança recusada: foi a tentativa de assinar que não passou.
-  const refused = cancelled && !subscription?.accessUntil && invoices.some((invoice) => invoice.status === "rejected") && !invoices.some((invoice) => invoice.status === "approved" || invoice.status === "paid");
+  const refused = cancelled && !subscription?.accessUntil && !paidActive && invoices.some((invoice) => invoice.status === "rejected") && !invoices.some((invoice) => invoice.status === "approved" || invoice.status === "paid");
   const scheduled = subscribed && subscription?.scheduledPlanId ? available.find((item) => item.id === subscription.scheduledPlanId) : undefined;
   const dayText = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: timezone });
   const openRow = charges.find((item) => ["pending", "uncertain", "creating"].includes(item.status));
   const openCharge: OpenCharge | null = openRow && openRow.status === "pending" && (openRow.method === "pix" || openRow.method === "boleto")
     ? { id: openRow.id, method: openRow.method, amountLabel: formatBRL(openRow.amountCents), qrCode: openRow.qrCode, qrCodeBase64: openRow.qrCodeBase64, ticketUrl: openRow.ticketUrl, barcode: openRow.barcode, validity: openRow.expiresAt ? `vale até ${dayText.format(openRow.expiresAt)}` : null }
     : null;
-  const paidByCharge = Boolean(paidUntil) && !subscribed && !subscription;
   const canCharge = live && canCheckout && !subscribed && !pendingCheckoutUrl && !openRow && !(subscription && ["creating", "uncertain", "pending", "paused"].includes(subscription.providerStatus));
   const canChangePlan = !session.support && ["trial", "active", "past_due"].includes(current.status) && !(subscription && ["paused", "creating", "uncertain"].includes(subscription.providerStatus));
   const currentPlan = plan;
-  const statusBadge = current.status === "trial" ? { text: "Período de teste", tone: "bg-primary-soft text-primary" }
+  const statusBadge = paidActive ? { text: "Plano pago", tone: "bg-[#E8F7EF] text-[#0B7A44] dark:bg-[#12301f] dark:text-[#3dd68c]" }
+    : current.status === "trial" ? { text: "Período de teste", tone: "bg-primary-soft text-primary" }
     : current.status === "past_due" ? { text: "Pagamento pendente", tone: "bg-[#FFF4ED] text-[#9A3412] dark:bg-danger-soft dark:text-[#fb923c]" }
     : refused ? { text: "Pagamento recusado", tone: "bg-[#FFF4ED] text-[#9A3412] dark:bg-danger-soft dark:text-[#fb923c]" }
     : cancelled ? { text: "Cancelada", tone: "bg-line text-ink-muted" }
@@ -77,12 +82,13 @@ export default async function AssinaturaPage() {
         {statusBadge ? <span className={`${badgeBase} ${statusBadge.tone}`}>{statusBadge.text}</span> : null}
       </header>
       {plan ? <p className="m-0 text-ink-muted"><span className="text-xl font-semibold text-foreground">{formatBRL(plan.priceCents)}</span>/mês</p> : null}
-      {current.status === "trial" ? <p className="m-0 text-sm text-ink-muted">Você está no período de teste. Assine quando quiser para continuar depois dele.</p> : null}
+      {current.status === "trial" && !paidActive ? <p className="m-0 text-sm text-ink-muted">Você está no período de teste. Assine quando quiser para continuar depois dele.</p> : null}
       {current.status === "past_due" ? <p className="m-0 text-sm text-danger">Não conseguimos confirmar o pagamento. Regularize para continuar recebendo agendamentos.</p> : null}
       {subscribed ? <p className="m-0 text-sm text-ink-muted">Cobrada todo mês no cartão pela Mercado Pago.</p> : null}
-      {paidByCharge && paidUntil ? <p className="m-0 text-sm text-ink-muted">Pago por Pix ou boleto até <strong className="text-foreground">{date.format(paidUntil)}</strong>.</p> : null}
+      {justPaid && paidUntil ? <p role="status" className="m-0 rounded-field bg-[#E8F7EF] p-3 text-sm font-semibold text-[#0B7A44] dark:bg-[#12301f] dark:text-[#3dd68c]">Pagamento confirmado! Seu plano está pago até {date.format(paidUntil)}.</p> : null}
+      {paidByCharge && paidUntil && !justPaid ? <p className="m-0 text-sm text-ink-muted">Pago por Pix ou boleto até <strong className="text-foreground">{date.format(paidUntil)}</strong>.</p> : null}
       {refused ? <p role="status" className="m-0 rounded-field bg-[#FFF4ED] p-3 text-sm text-[#9A3412] dark:bg-danger-soft dark:text-[#fb923c]">O pagamento não foi aprovado e o Mercado Pago encerrou essa tentativa. Você pode assinar de novo logo abaixo, de preferência com outro cartão.</p> : null}
-      {cancelled && !refused ? <p className="m-0 text-sm text-ink-muted">Assinatura cancelada.{subscription?.accessUntil ? ` Seu acesso vai até ${date.format(subscription.accessUntil)}.` : ""}</p> : null}
+      {cancelled && !refused && !paidActive ? <p className="m-0 text-sm text-ink-muted">Assinatura cancelada.{subscription?.accessUntil ? ` Seu acesso vai até ${date.format(subscription.accessUntil)}.` : ""}</p> : null}
     </section>
 
     <section aria-labelledby="planos" className="flex flex-col gap-3">

@@ -77,7 +77,47 @@ function OpenChargeView({ charge }: { charge: OpenCharge }) {
   );
 }
 
+function maskZip(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  return digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+}
+
+/** Endereço do boleto. O CEP preenche rua, bairro, cidade e estado pelo ViaCEP (gratuito); tudo continua editável. */
 function BoletoFields({ errors }: { errors: Record<string, string> }) {
+  const [zip, setZip] = useState("");
+  const [address, setAddress] = useState({ street: "", neighborhood: "", city: "", state: "" });
+  const [lookup, setLookup] = useState<"idle" | "loading" | "notfound" | "failed">("idle");
+
+  async function onZip(value: string) {
+    const masked = maskZip(value);
+    setZip(masked);
+    const digits = masked.replace(/\D/g, "");
+    if (digits.length !== 8) {
+      setLookup("idle");
+      return;
+    }
+    setLookup("loading");
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`, { signal: AbortSignal.timeout(6000) });
+      if (!response.ok) throw new Error("falha");
+      const data = (await response.json()) as { erro?: unknown; logradouro?: string; bairro?: string; localidade?: string; uf?: string };
+      if (data.erro) {
+        setLookup("notfound");
+        return;
+      }
+      // Só preenche o que o ViaCEP trouxe; CEP geral de cidade vem sem rua e sem bairro.
+      setAddress((current) => ({
+        street: data.logradouro || current.street,
+        neighborhood: data.bairro || current.neighborhood,
+        city: data.localidade || current.city,
+        state: data.uf && STATES.includes(data.uf) ? data.uf : current.state,
+      }));
+      setLookup("idle");
+    } catch {
+      setLookup("failed");
+    }
+  }
+
   const input = (name: string, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
     <label className="flex flex-col gap-1 text-sm font-medium">
       {label}
@@ -85,24 +125,30 @@ function BoletoFields({ errors }: { errors: Record<string, string> }) {
       {errors[name] ? <span className="text-xs font-normal text-danger">{errors[name]}</span> : null}
     </label>
   );
+  const bound = (key: keyof typeof address) => ({ value: address[key], onChange: (e: React.ChangeEvent<HTMLInputElement>) => setAddress((current) => ({ ...current, [key]: e.target.value })) });
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="sm:col-span-2">{input("name", "Nome completo", { autoComplete: "name", maxLength: 80 })}</div>
       {input("document", "CPF ou CNPJ", { inputMode: "numeric", maxLength: 18 })}
-      {input("zipCode", "CEP", { inputMode: "numeric", autoComplete: "postal-code", maxLength: 9 })}
-      <div className="sm:col-span-2">{input("street", "Rua", { autoComplete: "address-line1", maxLength: 80 })}</div>
+      <div className="flex flex-col gap-1">
+        {input("zipCode", "CEP", { inputMode: "numeric", autoComplete: "postal-code", maxLength: 9, value: zip, onChange: (e) => void onZip(e.target.value) })}
+        <span role="status" className="text-xs text-ink-muted">
+          {lookup === "loading" ? "Buscando o endereço…" : lookup === "notfound" ? "CEP não encontrado. Preencha o endereço abaixo." : lookup === "failed" ? "Não foi possível buscar o CEP agora. Preencha o endereço abaixo." : "Digite o CEP e o endereço é preenchido."}
+        </span>
+      </div>
+      <div className="sm:col-span-2">{input("street", "Rua", { autoComplete: "address-line1", maxLength: 80, ...bound("street") })}</div>
       {input("number", "Número", { maxLength: 10 })}
-      {input("neighborhood", "Bairro", { maxLength: 60 })}
-      {input("city", "Cidade", { maxLength: 60 })}
+      {input("neighborhood", "Bairro", { maxLength: 60, ...bound("neighborhood") })}
+      {input("city", "Cidade", { maxLength: 60, ...bound("city") })}
       <label className="flex flex-col gap-1 text-sm font-medium">
         Estado
-        <select name="state" required defaultValue="" aria-invalid={errors.state ? true : undefined} className={field}>
+        <select name="state" required value={address.state} onChange={(e) => setAddress((current) => ({ ...current, state: e.target.value }))} aria-invalid={errors.state ? true : undefined} className={field}>
           <option value="" disabled>Escolha</option>
           {STATES.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
         </select>
         {errors.state ? <span className="text-xs font-normal text-danger">{errors.state}</span> : null}
       </label>
-      <p className="m-0 text-xs text-ink-muted sm:col-span-2">A Mercado Pago exige esses dados para emitir o boleto. Eles vão direto para ela e não ficam guardados aqui.</p>
+      <p className="m-0 text-xs text-ink-muted sm:col-span-2">A Mercado Pago exige esses dados para emitir o boleto. Eles vão direto para ela e não ficam guardados aqui. A busca do CEP usa o ViaCEP, que só recebe o número do CEP.</p>
     </div>
   );
 }

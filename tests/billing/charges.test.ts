@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { expect, it, vi } from "vitest";
 import { billingCharges, billingSubscriptions, billingWebhookEvents, memberships, tenants, users } from "@/db/schema";
-import { ChargeError, createCharge, reconcileCharge } from "@/server/billing/charges";
+import { ChargeError, createCharge, reconcileCharge, refreshOpenCharge } from "@/server/billing/charges";
 import { parseBoletoPayer } from "@/server/billing/charge-payer";
 import { processPaymentEvents } from "@/server/billing/process-events";
 import { seedTenant } from "../helpers/agenda-fixtures";
@@ -150,4 +150,21 @@ it("valida CPF, CNPJ e estado do pagador do boleto", () => {
   expect(parseBoletoPayer({ ...boletoPayer, document: "11.222.333/0001-81" })).toMatchObject({ ok: true, payer: { documentType: "CNPJ" } });
   expect(parseBoletoPayer({ ...boletoPayer, document: "11.222.333/0001-82" }).ok).toBe(false);
   expect(parseBoletoPayer({ ...boletoPayer, name: "Maria", state: "XX" })).toMatchObject({ ok: false, errors: { name: expect.any(String), state: expect.any(String) } });
+});
+
+it("a tela confere o pagamento na Mercado Pago na hora e libera o mês sem esperar o aviso", async () => {
+  const { db, tenant, owner } = await setup();
+  const create = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => Response.json(providerPayment(JSON.parse(String(init?.body)))));
+  const { id } = await createCharge(db, { tenantId: tenant.id, ownerUserId: owner.id, method: "pix" }, config(create));
+  const config2 = (payment: object) => ({ accessToken: "TEST-example", collectorId: "42", liveMode: false, fetcher: (async () => Response.json(payment)) as typeof fetch });
+  const pending = providerPayment({ external_reference: `charge:${id}`, transaction_amount: 39.9, payment_method_id: "pix" });
+  // Ainda não pago: só registra a consulta; o acesso não muda.
+  expect(await refreshOpenCharge(db, tenant.id, config2(pending))).toBe("updated");
+  expect(await refreshOpenCharge(db, tenant.id, config2(pending))).toBe("unchanged");
+  expect((await db.select().from(tenants).where(eq(tenants.id, tenant.id)))[0].paidUntil).toBeNull();
+  // Pago: libera o mês; sem cobrança em aberto, não consulta de novo.
+  const approved = { ...pending, status: "approved", date_approved: "2030-01-02T00:00:00Z", date_last_updated: "2030-01-02T00:00:00Z" };
+  expect(await refreshOpenCharge(db, tenant.id, config2(approved))).toBe("updated");
+  expect((await db.select().from(tenants).where(eq(tenants.id, tenant.id)))[0].status).toBe("active");
+  expect(await refreshOpenCharge(db, tenant.id, config2(approved))).toBe("none");
 });

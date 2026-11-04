@@ -25,5 +25,10 @@ export async function getBillingOverview(db: Db, tenantId: string) {
     expiresAt: billingCharges.expiresAt, paidAt: billingCharges.paidAt, periodEnd: billingCharges.periodEnd, createdAt: billingCharges.createdAt,
   }).from(billingCharges).where(eq(billingCharges.tenantId, tenantId)).orderBy(desc(billingCharges.createdAt)).limit(24));
   const [paid] = await db.select({ paidUntil: tenants.paidUntil }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
-  return { charges, paidUntil: paid?.paidUntil ?? null, current, available, invoices, pendingCheckoutUrl: pending?.checkoutUrl ?? null, subscription: subscription ?? null, activeProfessionals: Number(professionalCount?.n ?? 0) };
+  const now = Date.now();
+  const paidUntil = paid?.paidUntil ?? null;
+  const paidActive = paidUntil !== null && paidUntil.getTime() > now;
+  // Última cobrança paga há menos de uma hora: a tela mostra o aviso de "Pagamento confirmado".
+  const justPaid = charges[0]?.status === "approved" && charges[0].paidAt !== null && now - charges[0].paidAt.getTime() < 60 * 60_000;
+  return { charges, paidUntil, paidActive, justPaid, current, available, invoices, pendingCheckoutUrl: pending?.checkoutUrl ?? null, subscription: subscription ?? null, activeProfessionals: Number(professionalCount?.n ?? 0) };
 }

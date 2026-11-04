@@ -211,3 +211,24 @@ export async function reconcileCharge(
     return "updated";
   });
 }
+
+/**
+ * Consulta na Mercado Pago a cobrança avulsa em aberto do estabelecimento e aplica o resultado
+ * (a tela do dono chama isso a cada atualização, para mostrar o pagamento sem esperar o relógio
+ * do servidor). É a mesma conciliação do aviso: idempotente, e um aviso que chegar depois não soma de novo.
+ */
+export async function refreshOpenCharge(
+  db: Db,
+  tenantId: string,
+  config: { accessToken: string; collectorId: string; liveMode: boolean; fetcher?: typeof fetch },
+): Promise<"updated" | "unchanged" | "none"> {
+  const [open] = await db.select({ paymentId: billingCharges.providerPaymentId }).from(billingCharges)
+    .where(and(eq(billingCharges.tenantId, tenantId), eq(billingCharges.status, "pending"))).limit(1);
+  if (!open?.paymentId) return "none";
+  try {
+    return await reconcileCharge(db, open.paymentId, config);
+  } catch (error) {
+    console.warn(`Cobrança avulsa não atualizada (${open.paymentId}): ${error instanceof Error ? error.message : "erro"}`);
+    return "unchanged";
+  }
+}
