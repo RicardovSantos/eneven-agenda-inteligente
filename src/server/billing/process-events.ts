@@ -45,8 +45,10 @@ export async function processPaymentEvents(db: Db, config: {
         .where(and(eq(billingWebhookEvents.requestId, event.requestId), isNull(billingWebhookEvents.processedAt)))
         .returning({ id: billingWebhookEvents.requestId });
       if (updated.length) result.processed++;
-    } catch {
-      // Permanece pendente para revisão e nova tentativa; nenhum payload é registrado no log.
+    } catch (error) {
+      // Permanece pendente para revisão e nova tentativa. Só o tipo, o identificador e a mensagem
+      // vão para o log (nenhum conteúdo do aviso), para dar para saber por que ficou travado.
+      console.warn(`Aviso da cobrança não processado (${event.topic} ${event.resourceId}, tentativa ${event.attempts + 1}): ${error instanceof Error ? error.message : "erro"}`);
       const delay = Math.min(60 * 60_000, 60_000 * 2 ** Math.min(event.attempts, 6));
       await db.update(billingWebhookEvents).set({ attempts: sql`${billingWebhookEvents.attempts} + 1`, nextAttemptAt: new Date(Date.now() + delay) })
         .where(and(eq(billingWebhookEvents.requestId, event.requestId), isNull(billingWebhookEvents.processedAt)));
