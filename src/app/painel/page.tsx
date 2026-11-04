@@ -4,7 +4,7 @@ import { AgendaScreen } from "@/components/agenda/agenda-screen";
 import { ResendVerification } from "@/components/panel/resend-verification";
 import { PUBLIC_HOST } from "@/lib/brand";
 import { formatDayMonth, trialDaysLeft } from "@/lib/trial";
-import { findStaffProfessional, getDayAgenda, getMonthOverview, listPanelProfessionals } from "@/server/agenda/panel-queries";
+import { findStaffProfessional, getDayAgenda, getMonthAgenda, getMonthOverview, listPanelProfessionals } from "@/server/agenda/panel-queries";
 import { panelBookingOptions } from "@/server/agenda/booking-options";
 import { addDaysToDate, localDateOf, weekdayOf } from "@/server/agenda/time";
 import { requireOnboarded } from "@/server/panel/onboarding-gate";
@@ -67,11 +67,12 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
   const weekEnd = addDaysToDate(weekStart, 6);
   const otherMonth = [weekStart, weekEnd].map((d) => d.slice(0, 7)).find((m) => m !== month);
 
-  const [monthDays, otherDays, day, catalog] = await Promise.all([
+  const [monthDays, otherDays, day, catalog, monthList] = await Promise.all([
     getMonthOverview(db, session.tenantId, month, professionalId),
     otherMonth ? getMonthOverview(db, session.tenantId, otherMonth, professionalId) : Promise.resolve([]),
     getDayAgenda(db, session.tenantId, date, professionalId),
     listServices(db, session.tenantId),
+    view === "mes" ? getMonthAgenda(db, session.tenantId, date, professionalId) : Promise.resolve(null),
   ]);
 
   const { professionals, services } = panelBookingOptions(allPros, catalog, own);
@@ -88,6 +89,7 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
       today={today}
       date={date}
       view={view}
+      monthList={monthList}
       professionalFilter={filter}
       monthDays={monthDays}
       stripDays={[...monthDays, ...otherDays]}

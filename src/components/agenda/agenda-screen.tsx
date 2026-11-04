@@ -17,6 +17,7 @@ import { BlockDialog } from "./block-dialog";
 import { BookingDetail } from "./booking-detail";
 import { DayColumns } from "./day-columns";
 import { DayList } from "./day-list";
+import { MonthList } from "./month-list";
 import { MonthView } from "./month-view";
 import { NewBookingDialog, type PanelPro, type PanelService } from "./new-booking-dialog";
 import { PersonAvatar } from "@/components/media/person-avatar";
@@ -38,6 +39,8 @@ export type AgendaScreenProps = {
   today: string;
   date: string;
   view: "mes" | "dia";
+  /** Do dia escolhido até o fim do mês; só vem preenchido na visão "Mês". */
+  monthList: DayAgenda | null;
   /** "todos" ou o id do profissional filtrado. */
   professionalFilter: string;
   monthDays: MonthDay[];
@@ -65,6 +68,7 @@ export function AgendaScreen({
   today,
   date,
   view,
+  monthList,
   professionalFilter,
   monthDays,
   stripDays,
@@ -97,17 +101,20 @@ export function AgendaScreen({
   const isToday = date === today;
 
   const stripInfo = new Map(stripDays.map((d) => [d.date, d]));
-  const selected = day.items.find((i) => i.kind === "booking" && i.id === selectedId);
+  const monthMode = view === "mes" && monthList !== null;
+  const listed = monthMode && monthList ? monthList : day;
+  const selected = listed.items.find((i) => i.kind === "booking" && i.id === selectedId);
   const detail = selected && selected.kind === "booking" ? selected : null;
 
   const filtered = professionals.find((p) => p.id === pro) ?? null;
   const columns = filtered ? [filtered] : professionals;
   const photos = Object.fromEntries(professionals.map((p) => [p.id, p.photoUrl ?? null]));
   const longDate = formatLongDate(date);
+  const shownCount = listed.count;
   const summary =
-    day.count === 0
+    shownCount === 0
       ? "Nenhum agendamento"
-      : `${day.count} ${day.count === 1 ? "agendamento" : "agendamentos"} · ${formatBRL(day.totalCents)} previstos`;
+      : `${shownCount} ${shownCount === 1 ? "agendamento" : "agendamentos"} · ${formatBRL(listed.totalCents)} previstos${monthMode ? " até o fim do mês" : ""}`;
 
   async function removeBlock() {
     if (!blockToRemove || removing) return;
@@ -127,6 +134,21 @@ export function AgendaScreen({
   // Profissional só remove bloqueio do próprio profissional (nunca o do estabelecimento todo).
   const canDeleteBlock = (professionalId: string | null) =>
     !lockedProfessionalId || professionalId === lockedProfessionalId;
+
+  const emptyList = (text: string) => (
+    <div className="flex flex-col items-center gap-3 rounded-panel border border-line bg-surface px-5 py-10 text-center lg:border-0 lg:bg-transparent">
+      <div className="fio w-24" aria-hidden="true" />
+      <p className="max-w-[16rem] text-[0.9375rem] leading-snug text-ink-muted">
+        {text} Compartilhe seu link para receber reservas.
+      </p>
+      {publicUrl ? (
+        <Button type="button" variant="outline" onClick={copyLink} className="gap-2">
+          <Copy className="size-4" aria-hidden="true" />
+          Copiar link
+        </Button>
+      ) : null}
+    </div>
+  );
 
   async function copyLink() {
     if (!publicUrl) return;
@@ -287,30 +309,35 @@ export function AgendaScreen({
             </Button>
           </div>
 
-          {day.items.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 rounded-panel border border-line bg-surface px-5 py-10 text-center lg:border-0 lg:bg-transparent">
-              <div className="fio w-24" aria-hidden="true" />
-              <p className="max-w-[16rem] text-[0.9375rem] leading-snug text-ink-muted">
-                Nenhum agendamento neste dia. Compartilhe seu link para receber reservas.
-              </p>
-              {publicUrl ? (
-                <Button type="button" variant="outline" onClick={copyLink} className="gap-2">
-                  <Copy className="size-4" aria-hidden="true" />
-                  Copiar link
-                </Button>
-              ) : null}
+          {monthMode && monthList ? (
+            <div className="hidden lg:block">
+              {monthList.items.length === 0 ? emptyList("Nenhum agendamento daqui até o fim do mês.") : (
+                <MonthList
+                  month={monthList}
+                  focusDate={date}
+                  onOpen={setSelectedId}
+                  canDeleteBlock={canDeleteBlock}
+                  onDeleteBlock={setBlockToRemove}
+                  photos={photos}
+                />
+              )}
             </div>
-          ) : (
-            <DayList
-              day={day}
-              isToday={isToday}
-              nowMs={now}
-              onOpen={setSelectedId}
-              canDeleteBlock={canDeleteBlock}
-              onDeleteBlock={setBlockToRemove}
-              photos={photos}
-            />
-          )}
+          ) : null}
+          <div className={cn(monthMode && "lg:hidden")}>
+            {day.items.length === 0 ? (
+              emptyList("Nenhum agendamento neste dia.")
+            ) : (
+              <DayList
+                day={day}
+                isToday={isToday}
+                nowMs={now}
+                onOpen={setSelectedId}
+                canDeleteBlock={canDeleteBlock}
+                onDeleteBlock={setBlockToRemove}
+                photos={photos}
+              />
+            )}
+          </div>
         </div>
 
         {detail ? (

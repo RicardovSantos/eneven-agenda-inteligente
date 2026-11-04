@@ -1,5 +1,5 @@
 import { and, asc, count, desc, eq, notInArray } from "drizzle-orm";
-import { billingInvoices, billingSubscriptions, plans, professionals, tenants } from "@/db/schema";
+import { billingCharges, billingInvoices, billingSubscriptions, plans, professionals, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { withTenant } from "@/server/tenant-db";
 
@@ -19,5 +19,11 @@ export async function getBillingOverview(db: Db, tenantId: string) {
     .where(and(eq(billingSubscriptions.tenantId, tenantId), notInArray(billingSubscriptions.providerStatus, ["abandoned", "creating", "uncertain"])))
     .orderBy(desc(billingSubscriptions.createdAt)).limit(1));
   const [professionalCount] = await withTenant(db, tenantId, (tx) => tx.select({ n: count() }).from(professionals).where(and(eq(professionals.tenantId, tenantId), eq(professionals.active, true))));
-  return { current, available, invoices, pendingCheckoutUrl: pending?.checkoutUrl ?? null, subscription: subscription ?? null, activeProfessionals: Number(professionalCount?.n ?? 0) };
+  const charges = await withTenant(db, tenantId, (tx) => tx.select({
+    id: billingCharges.id, method: billingCharges.method, status: billingCharges.status, amountCents: billingCharges.amountCents,
+    qrCode: billingCharges.qrCode, qrCodeBase64: billingCharges.qrCodeBase64, ticketUrl: billingCharges.ticketUrl, barcode: billingCharges.barcode,
+    expiresAt: billingCharges.expiresAt, paidAt: billingCharges.paidAt, periodEnd: billingCharges.periodEnd, createdAt: billingCharges.createdAt,
+  }).from(billingCharges).where(eq(billingCharges.tenantId, tenantId)).orderBy(desc(billingCharges.createdAt)).limit(24));
+  const [paid] = await db.select({ paidUntil: tenants.paidUntil }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  return { charges, paidUntil: paid?.paidUntil ?? null, current, available, invoices, pendingCheckoutUrl: pending?.checkoutUrl ?? null, subscription: subscription ?? null, activeProfessionals: Number(professionalCount?.n ?? 0) };
 }

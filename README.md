@@ -2,7 +2,7 @@
 
 SaaS de agendamento multiempresa para negócios que trabalham com hora marcada (salões de beleza, estúdios de piercing, estética). Cada estabelecimento ganha um link público próprio, onde o cliente final agenda sozinho, um painel com agenda, clientes, faturamento e indicadores, e lembretes automáticos no WhatsApp que reduzem faltas. É vendido por assinatura barata e configurado pelo próprio estabelecimento, sem código novo por cliente.
 
-### WhatsApp automático (Plano 4 em desenvolvimento)
+### WhatsApp automático (no ar pela Meta desde 02/11/2026)
 
 Configure `WHATSAPP_API_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_API_VERSION` e `CRON_SECRET` no servidor. Configure o webhook da Meta e os modelos aprovados antes de ativar o envio. O app tem um relógio interno (`src/instrumentation.ts`, `src/server/whatsapp/timer.ts`) que roda um ciclo a cada 5 minutos (enfileira os lembretes e envia a fila) sozinho em produção, assim que `WHATSAPP_API_TOKEN` e `WHATSAPP_PHONE_NUMBER_ID` existem; ele supõe uma única réplica do serviço e pode ser desligado com `WHATSAPP_INTERNAL_TIMER=off`. A rota `POST /api/cron/whatsapp` (cabeçalho `Authorization: Bearer <CRON_SECRET>`) faz o mesmo ciclo e serve para teste manual ou para um agendador externo. Guarde os segredos fora do repositório.
 
@@ -13,6 +13,7 @@ O processamento reserva a franquia antes de enviar. Uma falha com resultado ince
 - Cadastro (senha ou Google), confirmação de e-mail e assistente de primeiros passos (estabelecimento, horário, serviços e equipe).
 - Página pública de agendamento em `/{slug}` (serviço, profissional, dia e horário, confirmação, calendário `.ics`, remarcar e cancelar por link) com prévia de compartilhamento.
 - Painel: agenda (mês e dia, detalhe do agendamento, novo agendamento, bloqueios, confirmar, remarcar, atendido, faltou e cancelar), serviços, equipe e configurações (dados, marca, horário, regras e link).
+- Agenda: a lista da direita acompanha a visão. Em **Mês** mostra os agendamentos do dia escolhido até o fim do mês (sem cancelados, agrupados por dia, `getMonthAgenda`); em **Dia**, só o dia. O filtro de profissional vale para as duas. O botão "Hoje" mostra "Indo…" enquanto carrega e fica apagado quando já é hoje.
 - Menu com o link de agendamento para copiar, liberado quando o e-mail está confirmado e a conta está ativa ou em teste.
 - Clientes, Visão geral (indicadores do mês), acessos da equipe por convite e a Plataforma (`/admin`) do dono da Eneven, descritos abaixo.
 
@@ -20,13 +21,15 @@ O processamento reserva a franquia antes de enviar. Uma falha com resultado ince
 
 Em Configurações, "Página de agendamento" aceita até 3 imagens (ambiente, fachada, um trabalho) que passam sozinhas no topo da página, com título e frase editáveis; "Seu estabelecimento" ganhou o Facebook. Em Equipe, cada profissional tem cargo e foto. Toda imagem enviada, em qualquer formato, é convertida para WebP no navegador (para pesar pouco no envio) e de novo no servidor com `sharp` (`src/server/media/`), que é quem vale: carrossel 1600×920, profissional 480×480. A barra de progresso aparece só no envio das fotos pelo painel (convertendo e enviando). As imagens ficam no banco (`tenant_photos`, `professional_photos`, com RLS) e saem por `/api/midia/{slug}/capa/{0-2}` e `/api/midia/{slug}/profissional/{id}`, com cache longo e versão no endereço. O logo continua em PNG (ícones, e-mails e prévia de link dependem disso).
 
-Na página pública, "Nossa equipe" leva cada cartão a `/{slug}/profissional/{id}`: o profissional já vem escolhido, a lista mostra só os serviços dele e o passo seguinte é a data. "Informações do estúdio" mostra o endereço (o toque em "Ver no mapa" oferece Waze, Google Maps ou Mapas da Apple), o horário de funcionamento agrupado por dias e os links do Instagram e do Facebook. A lista de serviços tem busca e, se o estabelecimento usar categorias, vira grupos que abrem e fecham (o primeiro vem aberto, o contador mostra quantos serviços do grupo foram escolhidos e a busca abre todos).
+Na página pública, "Nossa equipe" é uma fileira sem barra de rolagem que anda sozinha a cada 2 s, para com o mouse em cima (a roda do mouse rola os cartões de lado, mais rápido) e rola com o dedo no celular; o carrossel de fotos do topo também troca a cada 2 s. A seção leva cada cartão a `/{slug}/profissional/{id}`: o profissional já vem escolhido, a lista mostra só os serviços dele e o passo seguinte é a data. "Informações do estúdio" mostra o endereço (o toque em "Ver no mapa" oferece Waze, Google Maps ou Mapas da Apple), o horário de funcionamento agrupado por dias e os links do Instagram e do Facebook. A lista de serviços tem busca e, se o estabelecimento usar categorias, vira grupos que abrem e fecham (o primeiro vem aberto, o contador mostra quantos serviços do grupo foram escolhidos e a busca abre todos).
 
 Categorias de serviço: em Serviços, o campo "Categoria" aceita um nome novo ou um já existente (sem diferenciar maiúsculas); a categoria nasce ao salvar o serviço e some quando fica sem serviços. Serviços sem categoria entram em "Outros serviços". Sem nenhuma categoria cadastrada, a lista continua sem grupos.
 
 ### Cobrança (Mercado Pago)
 
 Assinatura mensal no cartão pela API de assinaturas da Mercado Pago (que só aceita cartão de crédito, débito e saldo em conta: Pix recorrente não existe nela). O dono assina e cancela em `/painel/configuracoes/assinatura`; o cancelamento mantém o acesso até o fim do período já pago, sem reembolso do mês. Reembolsos e contestações não mudam o acesso sozinhos: pedem revisão em `/admin/cobranca`.
+
+Pix e boleto: pagamento avulso, um mês por vez (a Mercado Pago não renova Pix sozinha). Em `/painel/configuracoes/assinatura` o dono gera o Pix (QR e copia e cola, valem 7 dias) ou o boleto (10 dias; pede CPF/CNPJ e endereço, que vão direto para a Mercado Pago e não ficam guardados). Pagamento aprovado soma um mês em `tenants.paid_until` (depois do que já estava pago e do fim do teste grátis). O ciclo diário avisa o dono por e-mail 10 dias antes do fim do mês pago e, vencido, entra a carência de 7 dias. Quem tem assinatura de cartão não usa Pix nem boleto ao mesmo tempo. Reembolsos e contestações ficam em `/admin/cobranca` para revisão. Desenho em `docs/superpowers/specs/2026-11-04-pix-mensal-design.md`.
 
 Variáveis: `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_COLLECTOR_ID` (ID numérico do vendedor, o final do token), `MERCADO_PAGO_WEBHOOK_SECRET` e `MERCADO_PAGO_LIVE_MODE`. A cobrança real **só liga em produção** com `MERCADO_PAGO_LIVE_MODE=true`, token `APP_USR-` e vendedor numérico (`src/server/billing/mode.ts`); sem isso o webhook (`/api/webhooks/mercado-pago`) e o cron respondem 503. Um relógio interno (`src/instrumentation.ts`) roda a cada 10 minutos: processa os avisos, concilia vencimentos, encerra o acesso de assinaturas canceladas e avisa por e-mail os donos com fatura em atraso (carência de 7 dias). Webhook de produção: `https://agenda.eneven.com.br/api/webhooks/mercado-pago`, com os eventos de pagamentos e de assinaturas.
 
@@ -57,6 +60,14 @@ A casca das telas de entrada (`AuthShell`: entrar, cadastro, recuperar senha, co
 ### Visão geral
 
 "Painel" no menu abre `/painel/visao-geral` (só o proprietário): faturamento realizado do mês e comparação com o anterior, ticket médio, previsto para os próximos 30 dias, taxa de faltas, agendamentos por dia (gráfico com tooltip por mouse, toque ou teclado, e tabela para leitores de tela), serviços mais vendidos e faturamento por profissional. Atendimentos que já terminaram sem resultado aparecem num aviso com "Revisar agora", que marca atendido ou faltou ali mesmo. O mês fica na URL (`?mes=2026-10`).
+
+### Equipe: desativar e remover
+
+Em Equipe há o filtro Ativos / Inativos / Todos. **Desativar** tira a pessoa da página pública e dos serviços (o vínculo com os serviços continua e volta ao reativar). **Remover da equipe** (`archived_at`, migração 0032) a esconde de todas as telas e mantém o histórico de agendamentos. Nos dois casos, com agendamentos futuros (agendado ou confirmado) o app só segue se o dono aceitar **cancelar todos** (`cancelFuture`): cada cliente recebe a mensagem de cancelamento do WhatsApp, se ela estiver ligada. Quem tinha acesso ao painel perde o vínculo e as sessões na hora (o proprietário nunca perde o acesso); para voltar, só com novo convite.
+
+### Mensagens e regras de agendamento
+
+Em Configurações > Mensagens, cada cartão liga ou desliga e **salva na hora** (`setWhatsAppOptionAction`), sem botão. Padrão: cancelamento, remarcação e lembrete do dia anterior ligados; confirmação do agendamento e lembrete de 2 h desligados (o de 2 h exige plano Profissional ou Studio). Quando a Meta recusa um envio, o código e o motivo (sem dados pessoais) ficam em `whatsapp_messages.failure_code` e `failure_reason`. Em Regras, o intervalo entre horários aceita "Sem intervalo" (cada horário começa quando o serviço anterior termina) e 5 a 30 min, e a antecedência mínima vai de "Sem antecedência" e 5 min até 1 dia.
 
 ### Acessos da equipe
 

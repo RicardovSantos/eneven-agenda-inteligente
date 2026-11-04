@@ -2,7 +2,8 @@ import type { Db } from "@/db/types";
 import { applyCancelledExpiry } from "./cancel-expiry";
 import { applyScheduledPlanChanges } from "./change-plan";
 import { billingAccessEnabled, billingConfig } from "./mode";
-import { sendOwnerBillingNotice, sendTrialNotice } from "./owner-notice";
+import { runChargeCycle } from "./charge-cycle";
+import { sendChargeOverdueNotice, sendOwnerBillingNotice, sendRenewalNotice, sendTrialNotice } from "./owner-notice";
 import { processPaymentEvents } from "./process-events";
 import { reconcileDueBillingAccess } from "./reconcile-due-access";
 import { refreshPendingSubscriptions } from "./refresh-pending";
@@ -27,5 +28,9 @@ export async function runBillingCycle(db: Db, now = new Date()) {
   const notices = await processBillingNotices(db, (tenantId) => sendOwnerBillingNotice(db, tenantId), { now, requireUnpaidInvoice: true });
   const plans = await applyScheduledPlanChanges(db, config, now);
   const trial = await processTrialNotices(db, (tenantId, kind, endsAt) => sendTrialNotice(db, tenantId, kind, endsAt), { now });
-  return { pending, events, due, cancelled, notices, trial, plans };
+  const charges = await runChargeCycle(db, {
+    renewal: (tenantId, periodEnd) => sendRenewalNotice(db, tenantId, periodEnd),
+    overdue: (tenantId) => sendChargeOverdueNotice(db, tenantId),
+  }, now);
+  return { pending, events, due, cancelled, notices, trial, plans, charges };
 }

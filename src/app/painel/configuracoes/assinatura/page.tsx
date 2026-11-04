@@ -2,6 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { users } from "@/db/schema";
+import { ChargePanel, type OpenCharge } from "@/components/settings/charge-panel";
 import { formatBRL } from "@/lib/format";
 import { billingConfig } from "@/server/billing/mode";
 import { getBillingOverview } from "@/server/billing/queries";
@@ -10,6 +11,7 @@ import { requirePanelRole } from "@/server/panel/roles";
 import { cancelSubscriptionAction, changePlanAction, startCheckout, undoPlanChangeAction } from "./actions";
 
 const statusLabel: Record<string, string> = { pending: "Pendente", approved: "Paga", paid: "Paga", rejected: "Não aprovada", cancelled: "Cancelada", canceled: "Cancelada", refunded: "Reembolsada" };
+const chargeLabel: Record<string, string> = { pending: "Aguardando pagamento", approved: "Pago", expired: "Vencido", cancelled: "Não aprovado", refunded: "Reembolsado", charged_back: "Contestado", uncertain: "Em confirmação", creating: "Gerando" };
 const primaryButton = "flex min-h-12 w-full items-center justify-center rounded-field bg-primary px-5 text-center font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90";
 const secondaryButton = "flex min-h-11 w-full items-center justify-center rounded-field border border-line bg-canvas px-4 text-center text-sm font-semibold transition-colors hover:bg-primary-soft disabled:opacity-50";
 const card = "flex flex-col gap-4 rounded-panel border border-line bg-surface p-5 sm:p-6";
@@ -34,7 +36,7 @@ export default async function AssinaturaPage() {
       // Sem resposta da Mercado Pago a tela abre com o que já se sabe.
     }
   }
-  const { current, available, invoices, pendingCheckoutUrl, subscription, activeProfessionals } = await getBillingOverview(db, session.tenantId);
+  const { current, available, invoices, pendingCheckoutUrl, subscription, activeProfessionals, charges, paidUntil } = await getBillingOverview(db, session.tenantId);
   const [loginUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, session.userId)).limit(1);
   const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: timezone });
   const live = config?.live === true;
@@ -45,6 +47,13 @@ export default async function AssinaturaPage() {
   // Cancelada sem nada pago e com cobrança recusada: foi a tentativa de assinar que não passou.
   const refused = cancelled && !subscription?.accessUntil && invoices.some((invoice) => invoice.status === "rejected") && !invoices.some((invoice) => invoice.status === "approved" || invoice.status === "paid");
   const scheduled = subscribed && subscription?.scheduledPlanId ? available.find((item) => item.id === subscription.scheduledPlanId) : undefined;
+  const dayText = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: timezone });
+  const openRow = charges.find((item) => ["pending", "uncertain", "creating"].includes(item.status));
+  const openCharge: OpenCharge | null = openRow && openRow.status === "pending" && (openRow.method === "pix" || openRow.method === "boleto")
+    ? { id: openRow.id, method: openRow.method, amountLabel: formatBRL(openRow.amountCents), qrCode: openRow.qrCode, qrCodeBase64: openRow.qrCodeBase64, ticketUrl: openRow.ticketUrl, barcode: openRow.barcode, validity: openRow.expiresAt ? `vale até ${dayText.format(openRow.expiresAt)}` : null }
+    : null;
+  const paidByCharge = Boolean(paidUntil) && !subscribed && !subscription;
+  const canCharge = live && canCheckout && !subscribed && !pendingCheckoutUrl && !openRow && !(subscription && ["creating", "uncertain", "pending", "paused"].includes(subscription.providerStatus));
   const canChangePlan = !session.support && ["trial", "active", "past_due"].includes(current.status) && !(subscription && ["paused", "creating", "uncertain"].includes(subscription.providerStatus));
   const currentPlan = plan;
   const statusBadge = current.status === "trial" ? { text: "Período de teste", tone: "bg-primary-soft text-primary" }
@@ -71,6 +80,7 @@ export default async function AssinaturaPage() {
       {current.status === "trial" ? <p className="m-0 text-sm text-ink-muted">Você está no período de teste. Assine quando quiser para continuar depois dele.</p> : null}
       {current.status === "past_due" ? <p className="m-0 text-sm text-danger">Não conseguimos confirmar o pagamento. Regularize para continuar recebendo agendamentos.</p> : null}
       {subscribed ? <p className="m-0 text-sm text-ink-muted">Cobrada todo mês no cartão pela Mercado Pago.</p> : null}
+      {paidByCharge && paidUntil ? <p className="m-0 text-sm text-ink-muted">Pago por Pix ou boleto até <strong className="text-foreground">{date.format(paidUntil)}</strong>.</p> : null}
       {refused ? <p role="status" className="m-0 rounded-field bg-[#FFF4ED] p-3 text-sm text-[#9A3412] dark:bg-danger-soft dark:text-[#fb923c]">O pagamento não foi aprovado e o Mercado Pago encerrou essa tentativa. Você pode assinar de novo logo abaixo, de preferência com outro cartão.</p> : null}
       {cancelled && !refused ? <p className="m-0 text-sm text-ink-muted">Assinatura cancelada.{subscription?.accessUntil ? ` Seu acesso vai até ${date.format(subscription.accessUntil)}.` : ""}</p> : null}
     </section>
@@ -132,6 +142,23 @@ export default async function AssinaturaPage() {
         </form>
       </details> : null}
     </section>
+
+    {live && (openCharge || canCharge) ? <section aria-labelledby="pix-boleto" className={card}>
+      <h2 id="pix-boleto" className="text-xl font-semibold">Pagar por Pix ou boleto</h2>
+      {openRow && !openCharge ? <p className="m-0 text-sm text-ink-muted">Estamos confirmando o pagamento anterior. Em alguns minutos você poderá gerar outro, se precisar.</p> : null}
+      <ChargePanel open={openCharge} canCreate={canCharge} priceLabel={plan ? formatBRL(plan.priceCents) : ""} />
+    </section> : null}
+
+    {charges.length > 0 ? <section aria-labelledby="pagamentos" className={card}>
+      <h2 id="pagamentos" className="text-xl font-semibold">Pagamentos por Pix e boleto</h2>
+      <ul className="m-0 flex list-none flex-col p-0">{charges.map((charge) => <li key={charge.id} className="flex items-start justify-between gap-3 border-t border-line py-3 first:border-t-0 first:pt-0">
+        <div className="flex flex-col gap-0.5">
+          <span className="font-semibold">{formatBRL(charge.amountCents)} · {charge.method === "pix" ? "Pix" : "Boleto"}</span>
+          <span className="text-sm text-ink-muted">{charge.paidAt ? `Pago em ${date.format(charge.paidAt)}${charge.periodEnd ? ` · vale até ${date.format(charge.periodEnd)}` : ""}` : `Gerado em ${date.format(charge.createdAt)}`}</span>
+        </div>
+        <span className={`${badgeBase} ${charge.status === "approved" ? invoiceBadge.approved : charge.status === "pending" ? "bg-primary-soft text-primary" : "bg-line text-ink-muted"}`}>{chargeLabel[charge.status] ?? "Em processamento"}</span>
+      </li>)}</ul>
+    </section> : null}
 
     <section aria-labelledby="faturas" className={card}>
       <h2 id="faturas" className="text-xl font-semibold">Faturas</h2>

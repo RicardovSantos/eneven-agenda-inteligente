@@ -53,7 +53,7 @@ export function DayList({
   );
 }
 
-function BookingRow({ booking, onOpen, photoUrl }: { booking: DayBooking; onOpen: (id: string) => void; photoUrl: string | null }) {
+export function BookingRow({ booking, onOpen, photoUrl }: { booking: DayBooking; onOpen: (id: string) => void; photoUrl: string | null }) {
   const canceled = booking.status === "canceled";
   return (
     <button
@@ -95,7 +95,7 @@ function BookingRow({ booking, onOpen, photoUrl }: { booking: DayBooking; onOpen
   );
 }
 
-function BlockRow({ block, onDelete }: { block: DayBlock; onDelete: ((id: string) => void) | null }) {
+export function BlockRow({ block, onDelete }: { block: DayBlock; onDelete: ((id: string) => void) | null }) {
   const who = block.professionalName ?? "Todo o estabelecimento";
   return (
     <div

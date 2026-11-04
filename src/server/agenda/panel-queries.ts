@@ -266,6 +266,8 @@ export async function getDayAgenda(
   tenantId: string,
   date: string,
   professionalId?: string,
+  /** Fim (exclusivo, "yyyy-MM-dd") de um intervalo maior que um dia; o padrão é só o dia. */
+  untilDate?: string,
 ): Promise<DayAgenda> {
   return withTenant(db, tenantId, async (tx) => {
     const [tenant] = await tx
@@ -276,7 +278,7 @@ export async function getDayAgenda(
     if (!tenant) throw new Error("Estabelecimento não encontrado");
     const tz = tenant.timezone;
     const dayStart = zonedInstant(date, 0, tz);
-    const dayEnd = zonedInstant(addDaysToDate(date, 1), 0, tz);
+    const dayEnd = zonedInstant(untilDate ?? addDaysToDate(date, 1), 0, tz);
 
     const rows = await tx
       .select({
@@ -421,4 +423,19 @@ export async function getDayAgenda(
       totalCents: active.reduce((sum, b) => sum + b.totalCents, 0),
     };
   });
+}
+
+/**
+ * Agendamentos e bloqueios do dia `fromDate` até o fim do mês (com o filtro de profissional),
+ * para a lista da direita quando a agenda está na visão "Mês".
+ */
+export function getMonthAgenda(
+  db: Db,
+  tenantId: string,
+  fromDate: string,
+  professionalId?: string,
+): Promise<DayAgenda> {
+  const dates = monthDates(fromDate.slice(0, 7));
+  const next = addDaysToDate(dates[dates.length - 1], 1);
+  return getDayAgenda(db, tenantId, fromDate, professionalId, next);
 }

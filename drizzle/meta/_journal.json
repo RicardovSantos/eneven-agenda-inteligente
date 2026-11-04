@@ -232,6 +232,20 @@
       "when": 1793821084337,
       "tag": "0032_profissional_removido",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793830080601,
+      "tag": "0033_cobrancas_avulsas",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793833693622,
+      "tag": "0034_aviso_renovacao",
+      "breakpoints": true
     }
   ]
 }

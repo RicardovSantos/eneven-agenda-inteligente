@@ -16,6 +16,7 @@ import {
   time,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -110,6 +111,8 @@ export const tenants = pgTable("tenants", {
   status: tenantStatus("status").notNull().default("trial"),
   trialEndsAt: timestamptz("trial_ends_at").notNull(),
   pastDueAt: timestamptz("past_due_at"),
+  /** Até quando o plano está pago por Pix ou boleto (nulo: só cartão ou nunca pagou assim). */
+  paidUntil: timestamptz("paid_until"),
   timezone: text("timezone").notNull().default("America/Sao_Paulo"),
   brandColor: text("brand_color"),
   logoUrl: text("logo_url"),
@@ -911,3 +914,47 @@ export const billingPaymentAttempts = pgTable("billing_payment_attempts", {
 ]);
 
 
+
+/** Cobranças avulsas do plano (Pix ou boleto): um QR code ou boleto por mês de acesso. */
+export const billingCharges = pgTable("billing_charges", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  planId: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "restrict" }),
+  method: text("method").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  /** `creating` e `uncertain` cobrem a criação no provedor (um tempo esgotado pode ter criado o pagamento). */
+  status: text("status").notNull().default("creating"),
+  providerPaymentId: text("provider_payment_id").unique(),
+  qrCode: text("qr_code"),
+  qrCodeBase64: text("qr_code_base64"),
+  ticketUrl: text("ticket_url"),
+  barcode: text("barcode"),
+  expiresAt: timestamptz("expires_at"),
+  providerUpdatedAt: timestamptz("provider_updated_at"),
+  paidAt: timestamptz("paid_at"),
+  /** Mês de acesso que este pagamento compra (preenchido ao aprovar). */
+  periodStart: timestamptz("period_start"),
+  periodEnd: timestamptz("period_end"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  unique("billing_charges_tenant_id_id_unique").on(t.tenantId, t.id),
+  index("billing_charges_tenant_idx").on(t.tenantId, t.createdAt),
+  check("billing_charges_method_check", sql`${t.method} in ('pix', 'boleto')`),
+  check("billing_charges_status_check", sql`${t.status} in ('creating', 'uncertain', 'pending', 'approved', 'expired', 'cancelled', 'refunded', 'charged_back')`),
+  check("billing_charges_amount_check", sql`${t.amountCents} > 0`),
+  // Uma cobrança em aberto por estabelecimento.
+  uniqueIndex("billing_charges_one_open_idx").on(t.tenantId).where(sql`${t.status} in ('creating', 'uncertain', 'pending')`),
+]);
+
+/** Reserva idempotente do aviso "seu plano vence em breve" (um por estabelecimento e fim de período pago). */
+export const billingRenewalNotices = pgTable("billing_renewal_notices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  periodEnd: timestamptz("period_end").notNull(),
+  state: text("state").notNull().default("sending"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  completedAt: timestamptz("completed_at"),
+}, (t) => [
+  unique("billing_renewal_notices_tenant_period_unique").on(t.tenantId, t.periodEnd),
+  check("billing_renewal_notices_state_check", sql`${t.state} in ('sending', 'sent', 'uncertain')`),
+]);

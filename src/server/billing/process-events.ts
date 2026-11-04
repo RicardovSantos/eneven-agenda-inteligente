@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
-import { billingInvoices, billingPaymentAttempts, billingSubscriptions, billingWebhookEvents } from "@/db/schema";
+import { billingCharges, billingInvoices, billingPaymentAttempts, billingSubscriptions, billingWebhookEvents } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { reconcileCharge } from "./charges";
 import { reconcilePayment } from "./reconcile-payment";
 import { reconcileSubscription } from "./reconcile-subscription";
 import { reconcileAuthorizedInvoice } from "./reconcile-invoice";
@@ -21,6 +22,18 @@ export async function processPaymentEvents(db: Db, config: {
   const result = { processed: 0, failed: 0 };
   for (const event of events) {
     try {
+      // Pix e boleto avulsos têm caminho próprio: não passam pela conciliação da assinatura de cartão.
+      if (event.topic === "payment") {
+        const [charge] = await db.select({ id: billingCharges.id }).from(billingCharges).where(eq(billingCharges.providerPaymentId, event.resourceId)).limit(1);
+        if (charge) {
+          await reconcileCharge(db, event.resourceId, config);
+          const updated = await db.update(billingWebhookEvents).set({ processedAt: new Date() })
+            .where(and(eq(billingWebhookEvents.requestId, event.requestId), isNull(billingWebhookEvents.processedAt)))
+            .returning({ id: billingWebhookEvents.requestId });
+          if (updated.length) result.processed++;
+          continue;
+        }
+      }
       if (event.topic === "payment") await reconcilePayment(db, event.resourceId, config);
       else if (event.topic === "subscription_preapproval") await reconcileSubscription(db, event.resourceId, config);
       else {

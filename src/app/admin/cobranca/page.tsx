@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { and, eq, lte, or } from "drizzle-orm";
+import { and, eq, inArray, lte, or } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
-import { billingNotices, billingSubscriptions, tenants } from "@/db/schema";
+import { billingCharges, billingNotices, billingSubscriptions, tenants } from "@/db/schema";
 import { formatBRL } from "@/lib/format";
 import { requireSuperAdminSession } from "@/server/auth/guard";
 import { liveBillingEnabled } from "@/server/billing/mode";
 import { BillingRecoveryForm } from "@/components/platform/billing-recovery-form";
-import { reviewNoticeAction } from "./actions";
+import { releaseChargeAction, reviewNoticeAction } from "./actions";
 
 function staleThreshold() { return new Date(Date.now() - 5 * 60_000); }
 
@@ -23,6 +23,10 @@ export default async function BillingRecoveryPage() {
     .from(billingNotices).innerJoin(tenants, eq(tenants.id, billingNotices.tenantId))
     .where(or(eq(billingNotices.state, "uncertain"), and(eq(billingNotices.state, "sending"), lte(billingNotices.createdAt, staleThreshold()))))
     .orderBy(billingNotices.createdAt).limit(100);
+  const chargeRows = await db.select({ id: billingCharges.id, tenantName: tenants.name, method: billingCharges.method, status: billingCharges.status, amount: billingCharges.amountCents, paymentId: billingCharges.providerPaymentId, createdAt: billingCharges.createdAt })
+    .from(billingCharges).innerJoin(tenants, eq(tenants.id, billingCharges.tenantId))
+    .where(or(inArray(billingCharges.status, ["uncertain", "refunded", "charged_back"]), and(eq(billingCharges.status, "creating"), lte(billingCharges.createdAt, staleThreshold()))))
+    .orderBy(billingCharges.createdAt).limit(100);
   const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
   return <main className="mx-auto flex w-full max-w-[900px] flex-col gap-5 p-6">
     <Link href="/admin/gerenciar" className="text-primary">‹ Gerenciar</Link>
@@ -33,6 +37,14 @@ export default async function BillingRecoveryPage() {
       <p>{row.tenantName} · {row.price === null ? "Valor indisponível" : formatBRL(row.price)} · {date.format(row.createdAt)}</p>
       <p className="break-all text-sm">Referência: {row.id} · {row.status === "uncertain" ? "Resultado incerto" : "Processamento interrompido"}</p>
       {row.price !== null ? <BillingRecoveryForm subscriptionId={row.id} /> : null}
+    </section>)}
+    <h2 className="mt-4 text-xl font-semibold">Pix e boleto para revisar</h2>
+    <p>Reembolsos e contestações não mudam o acesso sozinhos. Para uma cobrança incerta, confira no painel da Mercado Pago (pelo ID do pagamento, ou pela referência charge:código) se algo foi gerado; só libere se nada existir.</p>
+    {chargeRows.length === 0 ? <p>Nenhuma cobrança para revisar.</p> : null}
+    {chargeRows.map((row) => <section key={row.id} className="flex flex-col gap-3 rounded-card border border-line bg-surface p-4">
+      <p>{row.tenantName} · {row.method === "pix" ? "Pix" : "Boleto"} · {formatBRL(row.amount)} · {date.format(row.createdAt)}</p>
+      <p className="break-all text-sm">Referência: charge:{row.id} · {row.paymentId ? `Pagamento ${row.paymentId} · ` : ""}{row.status === "uncertain" || row.status === "creating" ? "Resultado incerto" : row.status === "refunded" ? "Reembolsado" : "Contestado"}</p>
+      {row.status === "uncertain" || row.status === "creating" ? <form action={releaseChargeAction}><input type="hidden" name="chargeId" value={row.id} /><button type="submit" className="rounded-field border border-line px-4 py-2">Nada foi cobrado: liberar nova tentativa</button></form> : null}
     </section>)}
     <h2 className="mt-4 text-xl font-semibold">Avisos de teste</h2>
     <p>Confira no provedor de e-mail se o aviso foi entregue antes de confirmar. Uma nova tentativa pode gerar mensagem duplicada.</p>

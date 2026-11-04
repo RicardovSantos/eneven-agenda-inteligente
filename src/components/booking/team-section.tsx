@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SafeImage } from "@/components/media/safe-image";
 import { initialsOf } from "@/lib/initial";
+import { TeamCarousel } from "./team-carousel";
 
 export type TeamMember = {
   id: string;
@@ -70,10 +71,7 @@ export function TeamSection({ slug, team }: { slug: string; team: TeamMember[] }
         </h2>
         <p className="m-0 text-[13px] text-ink-muted">Escolha quem vai cuidar de você</p>
       </div>
-      <ul
-        aria-label="Equipe"
-        className="-mx-5 m-0 flex list-none snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
+      <TeamCarousel>
         {team.map((member) => (
           <li key={member.id} className="flex w-[152px] shrink-0 snap-start">
             <Link
@@ -90,7 +88,7 @@ export function TeamSection({ slug, team }: { slug: string; team: TeamMember[] }
             </Link>
           </li>
         ))}
-      </ul>
+      </TeamCarousel>
     </section>
   );
 }

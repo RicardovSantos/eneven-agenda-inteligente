@@ -17,7 +17,7 @@ import {
   undoBookingStatus,
   type PanelActor,
 } from "@/server/agenda/panel-ops";
-import { findStaffProfessional, getDayAgenda, getMonthOverview } from "@/server/agenda/panel-queries";
+import { findStaffProfessional, getDayAgenda, getMonthAgenda, getMonthOverview } from "@/server/agenda/panel-queries";
 import { withTenant } from "@/server/tenant-db";
 import { createTestDb } from "../helpers/test-db";
 import { seedBookable, type PublicSeed } from "../helpers/public-fixtures";
@@ -97,6 +97,25 @@ describe("getMonthOverview", () => {
       (d) => d.date === "2030-01-08",
     )!;
     expect(forPro0.count).toBe(0);
+  });
+});
+
+describe("getMonthAgenda", () => {
+  it("traz do dia escolhido até o fim do mês, em ordem, com o filtro de profissional, e deixa de fora outros meses", async () => {
+    await book(a, "2030-01-14", "10:00", { name: "Carla", phone: "(11) 92222-2222" });
+    await book(a, "2030-01-07", "09:00", { name: "Ana" });
+    await book(a, "2030-01-21", "09:00", { name: "Bia", pro: 1, phone: "(11) 93333-3333" });
+    await book(a, "2030-02-04", "09:00", { name: "Fora", phone: "(11) 94444-4444" });
+
+    const all = await getMonthAgenda(db, a.tenantId, "2030-01-01");
+    expect(all.items.map((i) => (i.kind === "booking" ? i.customer.name : "bloqueio"))).toEqual(["Ana", "Carla", "Bia"]);
+    expect(all.count).toBe(3);
+
+    const only = await getMonthAgenda(db, a.tenantId, "2030-01-01", a.proIds[1]);
+    expect(only.items.map((i) => (i.kind === "booking" ? i.customer.name : "bloqueio"))).toEqual(["Bia"]);
+
+    const fromTenth = await getMonthAgenda(db, a.tenantId, "2030-01-10");
+    expect(fromTenth.items.map((i) => (i.kind === "booking" ? i.customer.name : "bloqueio"))).toEqual(["Carla", "Bia"]);
   });
 });
 

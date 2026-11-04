@@ -63,3 +63,24 @@ export function sendTrialNotice(db: Db, tenantId: string, kind: "ending" | "ende
     };
   });
 }
+
+/** Pix e boleto: o mês pago acaba em breve. O dono gera o pagamento do próximo mês no painel. */
+export function sendRenewalNotice(db: Db, tenantId: string, periodEnd: Date): Promise<void> {
+  return sendToOwners(db, tenantId, ({ name, safeName, link, timezone }) => {
+    const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: timezone }).format(periodEnd);
+    return {
+      subject: `Seu plano vence em ${date}: ${name}`,
+      text: `Olá! O mês pago de ${name} vai até ${date}. Para continuar sem interrupção, gere o Pix ou o boleto do próximo mês (o boleto leva de 1 a 3 dias úteis para compensar, então vale gerar com antecedência): ${link}`,
+      html: `<p>Olá!</p><p>O mês pago de <strong>${safeName}</strong> vai até <strong>${date}</strong>. Para continuar sem interrupção, gere o Pix ou o boleto do próximo mês. O boleto leva de 1 a 3 dias úteis para compensar, então vale gerar com antecedência.</p><p><a href="${link}">Pagar o próximo mês</a></p>`,
+    };
+  });
+}
+
+/** Pix e boleto: o mês pago acabou e a carência de 7 dias começou. */
+export function sendChargeOverdueNotice(db: Db, tenantId: string): Promise<void> {
+  return sendToOwners(db, tenantId, ({ name, safeName, link }) => ({
+    subject: `Plano vencido: ${name}`,
+    text: `Olá! O mês pago de ${name} terminou. Você ainda tem 7 dias para pagar sem perder o acesso aos agendamentos. Gere o Pix ou o boleto aqui: ${link}`,
+    html: `<p>Olá!</p><p>O mês pago de <strong>${safeName}</strong> terminou. Você ainda tem 7 dias para pagar sem perder o acesso aos agendamentos.</p><p><a href="${link}">Gerar Pix ou boleto</a></p>`,
+  }));
+}
