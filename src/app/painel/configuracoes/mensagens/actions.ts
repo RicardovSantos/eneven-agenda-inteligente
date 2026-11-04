@@ -2,6 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db/client";
 import { plans, tenantNotificationSettings, tenants } from "@/db/schema";
 import { requireOwner } from "@/server/settings/access";
@@ -19,4 +20,22 @@ export async function saveWhatsAppSettings(form: FormData): Promise<void> {
     .onConflictDoUpdate({ target: tenantNotificationSettings.tenantId, set: values }));
   revalidatePath("/painel/configuracoes/mensagens");
   revalidatePath("/painel/visao-geral");
+}
+
+export type WhatsAppSettingsState = { message?: string; error?: string; at?: number };
+
+/**
+ * Versão do formulário da tela: devolve "Preferências salvas" ou o motivo do erro, para a tela
+ * mostrar o aviso (antes o botão não dava nenhum retorno e um erro caía numa página genérica).
+ */
+export async function saveWhatsAppSettingsAction(_previous: WhatsAppSettingsState, form: FormData): Promise<WhatsAppSettingsState> {
+  try {
+    await saveWhatsAppSettings(form);
+    return { message: "Preferências salvas", at: Date.now() };
+  } catch (error) {
+    // Redirecionamentos (sessão perdida, acesso negado) seguem o caminho normal do Next.
+    unstable_rethrow(error);
+    const text = error instanceof Error ? error.message : "";
+    return { error: /Profissional ou Studio/.test(text) ? text : "Não foi possível salvar agora. Tente novamente.", at: Date.now() };
+  }
 }

@@ -12,6 +12,8 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 
     await expect(page.getByLabel("Lembrete 2 horas antes")).toBeDisabled();
     await page.getByLabel("Lembrete na véspera").uncheck();
     await page.getByRole("button", { name: "Salvar preferências" }).click();
+    // O botão agora responde: aviso de salvo na tela.
+    await expect(page.getByRole("status").filter({ hasText: "Preferências salvas" })).toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Lembrete na véspera")).not.toBeChecked();
   });
