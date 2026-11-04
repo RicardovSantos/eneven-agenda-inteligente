@@ -7,7 +7,14 @@ import { validatePendingSubscription } from "./subscription-validation";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** O chamador deve autenticar o dono e obter o e-mail no servidor. `live` é a cobrança real (só em produção). */
+/**
+ * O chamador deve autenticar o dono. `payerEmail` é a conta do Mercado Pago que vai pagar (a
+ * Mercado Pago exige um e-mail nesse tipo de assinatura) e pode ser diferente do e-mail de
+ * login: quem liga o pagamento ao estabelecimento é a referência (`external_reference` = id da
+ * assinatura aqui dentro) e o id da assinatura na Mercado Pago, nunca o e-mail. O título leva
+ * o link do estabelecimento para identificar a assinatura no painel da Mercado Pago.
+ * `live` é a cobrança real (só em produção).
+ */
 export async function createSubscription(db: Db, input: {
   tenantId: string; planId: string; payerEmail: string; backUrl: string; ownerUserId?: string;
 }, config: { accessToken: string; collectorId: string; live?: boolean; fetcher?: typeof fetch }): Promise<{ checkoutUrl: string }> {
@@ -20,7 +27,7 @@ export async function createSubscription(db: Db, input: {
   if (back.protocol !== "https:" || back.username || back.password) throw new Error("Endereço de retorno inválido.");
   const reserved = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.tenantId}))`);
-    const [tenant] = await tx.select({ id: tenants.id, planId: tenants.planId, status: tenants.status }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1).for("update");
+    const [tenant] = await tx.select({ id: tenants.id, planId: tenants.planId, status: tenants.status, slug: tenants.slug }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1).for("update");
     if (input.ownerUserId) {
       const [member] = await tx.select({ role: memberships.role }).from(memberships).where(and(eq(memberships.tenantId, input.tenantId), eq(memberships.userId, input.ownerUserId))).limit(1).for("update");
       if (!member || member.role !== "owner") throw new Error("Acesso indisponível.");
@@ -31,13 +38,13 @@ export async function createSubscription(db: Db, input: {
       .where(and(eq(billingSubscriptions.tenantId, input.tenantId), inArray(billingSubscriptions.providerStatus, ["creating", "uncertain", "pending", "authorized", "paused"]))).limit(1);
     if (existing) throw new Error("Já existe uma assinatura ou tentativa em análise.");
     const [subscription] = await tx.insert(billingSubscriptions).values({ tenantId: input.tenantId, planId: plan.id, priceCents: plan.priceCents, providerStatus: "creating" }).returning({ id: billingSubscriptions.id });
-    return { id: subscription.id, priceCents: plan.priceCents, name: plan.name };
+    return { id: subscription.id, priceCents: plan.priceCents, name: plan.name, slug: tenant.slug };
   });
   try {
     const response = await (config.fetcher ?? fetch)("https://api.mercadopago.com/preapproval", {
       method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000),
       headers: { Authorization: `Bearer ${config.accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ reason: `Eneven - ${reserved.name}`, external_reference: reserved.id, payer_email: input.payerEmail, auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: reserved.priceCents / 100, currency_id: "BRL" }, back_url: back.toString(), status: "pending" }),
+      body: JSON.stringify({ reason: `Eneven - ${reserved.name} · ${reserved.slug}`, external_reference: reserved.id, payer_email: input.payerEmail, auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: reserved.priceCents / 100, currency_id: "BRL" }, back_url: back.toString(), status: "pending" }),
     });
     if (!response.ok) throw new Error("Falha ao criar assinatura.");
     const body: unknown = await response.json();

@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
+import { users } from "@/db/schema";
 import { formatBRL } from "@/lib/format";
 import { billingConfig } from "@/server/billing/mode";
 import { getBillingOverview } from "@/server/billing/queries";
@@ -33,6 +35,7 @@ export default async function AssinaturaPage() {
     }
   }
   const { current, available, invoices, pendingCheckoutUrl, subscription, activeProfessionals } = await getBillingOverview(db, session.tenantId);
+  const [loginUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, session.userId)).limit(1);
   const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: timezone });
   const live = config?.live === true;
   const canCheckout = Boolean(config) && !session.support && session.emailVerified && ["trial", "active", "past_due"].includes(current.status);
@@ -112,6 +115,11 @@ export default async function AssinaturaPage() {
       </> : null}
       {canCheckout && !pendingCheckoutUrl && !subscribed ? <form action={startCheckout} className="flex flex-col gap-2">
         <input type="hidden" name="planId" value={current.id} />
+        <label className="flex flex-col gap-1.5 text-sm font-medium">
+          E-mail da conta Mercado Pago
+          <input type="email" name="payerEmail" required defaultValue={loginUser?.email ?? ""} autoComplete="email" inputMode="email" maxLength={254} className="min-h-11 rounded-field border border-line bg-canvas px-3 text-base font-normal" />
+          <span className="text-xs font-normal text-ink-muted">Use o e-mail da conta com que você paga no Mercado Pago. Pode ser diferente do e-mail de login. A assinatura fica ligada ao seu estabelecimento pelo código dela, não pelo e-mail.</span>
+        </label>
         <button type="submit" className={primaryButton}>{live ? `${cancelled ? "Assinar novamente" : "Assinar"} o plano ${current.name}${plan ? ` · ${formatBRL(plan.priceCents)}/mês` : ""}` : "Testar assinatura do plano atual"}</button>
         <p className="m-0 text-sm text-ink-muted">{live ? "Cobrança mensal no cartão pela Mercado Pago. Você pode cancelar quando quiser e o acesso continua até o fim do período já pago." : "Somente ambiente de teste. Não altera seu plano nem ativa cobrança real."}</p>
       </form> : null}

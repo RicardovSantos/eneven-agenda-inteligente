@@ -28,7 +28,18 @@ it("aceita somente o dono verificado, plano atual e configuração de teste", as
   expect(state.create).not.toHaveBeenCalled();
   form.set("planId", tenant.planId);
   await expect(startCheckout(form)).rejects.toThrow("redirect:https://sandbox.mercadopago.com.br/checkout");
-  expect(state.create).toHaveBeenCalledWith(db, expect.objectContaining({ tenantId: tenant.id, planId: tenant.planId, ownerUserId: user.id, payerEmail: "dona@example.com", backUrl: "https://agenda.example/painel/configuracoes/assinatura" }), expect.any(Object));
+  expect(state.create).toHaveBeenCalledWith(db, expect.objectContaining({ tenantId: tenant.id, planId: tenant.planId, ownerUserId: user.id, payerEmail: "outro@example.com", backUrl: "https://agenda.example/painel/configuracoes/assinatura" }), expect.any(Object));
+  // Em branco: usa o e-mail do login do dono (nunca um valor vindo de outro lugar).
+  state.create.mockClear();
+  form.set("payerEmail", "   ");
+  await expect(startCheckout(form)).rejects.toThrow("redirect:");
+  expect(state.create).toHaveBeenCalledWith(db, expect.objectContaining({ payerEmail: "dona@example.com" }), expect.any(Object));
+  // Inválido: recusa antes de falar com o Mercado Pago.
+  state.create.mockClear();
+  form.set("payerEmail", "isso-nao-e-email");
+  await expect(startCheckout(form)).rejects.toThrow("inválido");
+  expect(state.create).not.toHaveBeenCalled();
   vi.stubEnv("NODE_ENV", "production");
+  form.set("payerEmail", "outro@example.com");
   await expect(startCheckout(form)).rejects.toThrow("não configurada");
 });

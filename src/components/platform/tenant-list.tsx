@@ -79,7 +79,7 @@ export function TenantFilters({
           name="q"
           defaultValue={state.query}
           maxLength={100}
-          placeholder="Nome, link ou e-mail do dono"
+          placeholder="Nome, link, e-mail ou código"
           className="min-w-0 flex-1 bg-transparent text-[0.9375rem] text-ink outline-none placeholder:text-ink-muted"
         />
       </form>

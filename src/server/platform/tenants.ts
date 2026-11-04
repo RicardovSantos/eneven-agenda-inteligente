@@ -85,6 +85,17 @@ export async function listPlatformTenants(
     ? or(
         sql`${tenants.name} ilike ${pattern} escape '\\'`,
         sql`${tenants.slug} ilike ${pattern} escape '\\'`,
+        // Por código: id do estabelecimento, referência e id da assinatura na Mercado Pago, e id de pagamento.
+        sql`${tenants.id}::text ilike ${pattern} escape '\\'`,
+        sql`exists (
+          select 1 from billing_subscriptions bs
+          where bs.tenant_id = ${tenants.id}
+            and (bs.id::text ilike ${pattern} escape '\\' or bs.provider_id ilike ${pattern} escape '\\')
+        )`,
+        sql`exists (
+          select 1 from billing_payment_attempts bpa
+          where bpa.tenant_id = ${tenants.id} and bpa.payment_id ilike ${pattern} escape '\\'
+        )`,
         sql`exists (
           select 1 from ${memberships} m
           inner join ${users} u on u.id = m.user_id

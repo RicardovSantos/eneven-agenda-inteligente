@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { EnterSupportButton } from "@/components/platform/enter-support-button";
+import { BillingIdsCard } from "@/components/platform/billing-ids-card";
 import { OwnerCard } from "@/components/platform/owner-card";
 import { SituationBadge } from "@/components/platform/situation-badge";
 import { SubscriptionCard } from "@/components/platform/subscription-card";
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { buildWhatsAppLink, firstName } from "@/lib/whatsapp";
 import { requireSuperAdminSession } from "@/server/auth/guard";
 import { listPlans } from "@/server/platform/plans";
+import { getTenantBillingIds } from "@/server/platform/billing-ids";
 import { getPlatformTenant } from "@/server/platform/tenants";
 
 export const metadata: Metadata = { title: "Estabelecimento" };
@@ -50,6 +52,7 @@ export default async function AdminTenantPage({ params }: PageProps<"/admin/esta
   const now = new Date();
   const [tenant, plans] = await Promise.all([getPlatformTenant(db, id, now), listPlans(db)]);
   if (!tenant) notFound();
+  const billingIds = await getTenantBillingIds(db, tenant.id);
 
   const publicPath = `${PUBLIC_HOST}/${tenant.slug}`;
   const wa = tenant.whatsapp ? normalizeBrazilPhone(tenant.whatsapp) : null;
@@ -149,6 +152,8 @@ export default async function AdminTenantPage({ params }: PageProps<"/admin/esta
           <UsageCard usage={tenant.usage} />
         </div>
       </div>
+
+      <BillingIdsCard tenantId={tenant.id} ids={billingIds} />
 
       <HistoryCard rows={tenant.audit} />
     </main>
