@@ -317,6 +317,8 @@ export const professionals = pgTable(
     userId: uuid("user_id").references(() => users.id, {
       onDelete: "set null",
     }),
+    /** Removido da equipe: some das telas, mas o histórico de agendamentos continua. */
+    archivedAt: timestamptz("archived_at"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [

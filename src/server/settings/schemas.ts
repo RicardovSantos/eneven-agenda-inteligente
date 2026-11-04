@@ -5,8 +5,9 @@ import { normalizeBrazilPhone } from "@/lib/phone";
 export const ABOUT_MAX = 160;
 
 /** Valores aceitos pela tela (docs/design/telas/plano-2.md § Configurações). */
-export const SLOT_INTERVAL_OPTIONS = [10, 15, 20, 30] as const;
-export const MIN_NOTICE_OPTIONS = [30, 60, 120, 240, 1440] as const;
+/** 0 = sem intervalo: cada horário começa quando o serviço anterior termina. */
+export const SLOT_INTERVAL_OPTIONS = [0, 5, 10, 15, 20, 30] as const;
+export const MIN_NOTICE_OPTIONS = [0, 5, 10, 15, 30, 60, 120, 240, 1440] as const;
 export const MAX_DAYS_AHEAD_OPTIONS = [15, 30, 60, 90] as const;
 export const CANCEL_WINDOW_OPTIONS = [60, 120, 720, 1440] as const;
 

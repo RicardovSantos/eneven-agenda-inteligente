@@ -39,3 +39,29 @@ export async function saveWhatsAppSettingsAction(_previous: WhatsAppSettingsStat
     return { error: /Profissional ou Studio/.test(text) ? text : "Não foi possível salvar agora. Tente novamente.", at: Date.now() };
   }
 }
+
+const OPTION_KEYS = ["bookingCreated", "reminderEve", "reminder2h", "rescheduled", "canceled"] as const;
+export type WhatsAppOptionKey = (typeof OPTION_KEYS)[number];
+
+/** Liga ou desliga uma mensagem e salva na hora; as outras preferências não mudam. */
+export async function setWhatsAppOptionAction(key: string, enabled: boolean): Promise<{ ok: boolean; error?: string }> {
+  try {
+    if (!(OPTION_KEYS as readonly string[]).includes(key)) return { ok: false, error: "Preferência inválida." };
+    const actor = await requireOwner();
+    const db = await getDb();
+    const [tenant] = await db.select({ code: plans.code }).from(tenants).innerJoin(plans, eq(plans.id, tenants.planId)).where(eq(tenants.id, actor.tenantId)).limit(1);
+    if (!tenant) return { ok: false, error: "Estabelecimento não encontrado." };
+    if (key === "reminder2h" && enabled && !["profissional", "studio"].includes(tenant.code)) {
+      return { ok: false, error: "Lembrete de 2 horas exige plano Profissional ou Studio." };
+    }
+    const values = { [key]: enabled, updatedAt: new Date() };
+    await withTenant(db, actor.tenantId, (tx) => tx.insert(tenantNotificationSettings).values({ tenantId: actor.tenantId, ...values })
+      .onConflictDoUpdate({ target: tenantNotificationSettings.tenantId, set: values }));
+    revalidatePath("/painel/configuracoes/mensagens");
+    revalidatePath("/painel/visao-geral");
+    return { ok: true };
+  } catch (error) {
+    unstable_rethrow(error);
+    return { ok: false, error: "Não foi possível salvar agora. Tente novamente." };
+  }
+}

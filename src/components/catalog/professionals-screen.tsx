@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   deactivateProfessionalAction,
+  removeProfessionalAction,
   removeProfessionalPhotoAction,
   saveProfessionalAction,
   uploadProfessionalPhotoAction,
@@ -67,6 +68,8 @@ export function ProfessionalsScreen({
 }) {
   const [selection, setSelection] = useState<Selection>(null);
   const [deactivating, setDeactivating] = useState<ProfessionalItem | null>(null);
+  const [removing, setRemoving] = useState<ProfessionalItem | null>(null);
+  const [filter, setFilter] = useState<"active" | "inactive" | "all">("active");
   const [pending, startTransition] = useTransition();
   const { show } = useToast();
 
@@ -79,11 +82,35 @@ export function ProfessionalsScreen({
     const target = deactivating;
     if (!target) return;
     startTransition(async () => {
-      const result = await deactivateProfessionalAction(target.id);
-      show(result.error ?? result.message ?? "Profissional desativado", result.ok ? "success" : "error");
+      const result = await deactivateProfessionalAction(target.id, target.futureBookings > 0);
+      show(result.fieldErrors?.deactivate ?? result.error ?? result.message ?? "Profissional desativado", result.ok ? "success" : "error");
       setDeactivating(null);
     });
   };
+
+  const confirmRemove = () => {
+    const target = removing;
+    if (!target) return;
+    startTransition(async () => {
+      const result = await removeProfessionalAction(target.id, target.futureBookings > 0);
+      show(
+        result.ok ? (result.message ?? "Profissional removido") : (result.fieldErrors?.remove ?? result.error ?? "Não foi possível remover agora."),
+        result.ok ? "success" : "error",
+      );
+      setRemoving(null);
+      if (result.ok) setSelection(null);
+    });
+  };
+
+  const inactiveCount = professionals.filter((p) => !p.active).length;
+  const visible = professionals.filter((p) =>
+    filter === "all" ? true : filter === "active" ? p.active : !p.active,
+  );
+  const filters = [
+    { key: "active", label: "Ativos" },
+    { key: "inactive", label: `Inativos${inactiveCount > 0 ? ` (${inactiveCount})` : ""}` },
+    { key: "all", label: "Todos" },
+  ] as const;
 
   const list = (
     <>
@@ -127,6 +154,29 @@ export function ProfessionalsScreen({
         />
       ) : (
         <>
+          <div role="group" aria-label="Filtrar equipe" className="flex flex-wrap gap-2">
+            {filters.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                aria-pressed={filter === f.key}
+                onClick={() => setFilter(f.key)}
+                className={cn(
+                  "min-h-9 rounded-full border px-3.5 text-sm font-medium outline-none focus-visible:outline-2 focus-visible:outline-accent",
+                  filter === f.key
+                    ? "border-primary bg-primary-soft text-primary"
+                    : "border-line text-ink-muted hover:bg-primary-soft/40",
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {visible.length === 0 ? (
+            <p className="rounded-panel border border-line bg-surface px-5 py-6 text-sm text-ink-muted">
+              {filter === "inactive" ? "Nenhum profissional inativo." : "Nenhum profissional ativo."}
+            </p>
+          ) : null}
           {/* Tabela (computador) */}
           <div className="hidden overflow-x-auto rounded-panel border border-line bg-surface lg:block">
             <table className="w-full min-w-[480px] border-collapse text-[0.9375rem]">
@@ -139,7 +189,7 @@ export function ProfessionalsScreen({
                 </tr>
               </thead>
               <tbody>
-                {professionals.map((p) => (
+                {visible.map((p) => (
                   <tr
                     key={p.id}
                     onClick={() => setSelection({ kind: "edit", id: p.id })}
@@ -179,7 +229,7 @@ export function ProfessionalsScreen({
 
           {/* Lista (celular) */}
           <ul className="flex flex-col overflow-hidden rounded-panel border border-line bg-surface lg:hidden">
-            {professionals.map((p) => (
+            {visible.map((p) => (
               <li key={p.id} className="border-b border-line/60 last:border-b-0">
                 <button
                   type="button"
@@ -231,6 +281,7 @@ export function ProfessionalsScreen({
           }}
           onClose={() => setSelection(null)}
           onDeactivate={() => editing && setDeactivating(editing)}
+          onRemove={() => editing && setRemoving(editing)}
         />
       )}
     </EditPanel>
@@ -243,7 +294,7 @@ export function ProfessionalsScreen({
       <ConfirmDialog
         open={deactivating !== null}
         title={`Desativar ${deactivating?.name ?? ""}?`}
-        confirmLabel="Desativar"
+        confirmLabel={n > 0 ? (n === 1 ? "Cancelar 1 agendamento e desativar" : `Cancelar ${n} agendamentos e desativar`) : "Desativar"}
         pending={pending}
         onConfirm={confirmDeactivate}
         onCancel={() => setDeactivating(null)}
@@ -252,10 +303,34 @@ export function ProfessionalsScreen({
         {n > 0 ? (
           <p className="mt-2 font-medium text-foreground">
             {n === 1
-              ? `1 agendamento futuro continua marcado com ${deactivating?.name}.`
-              : `${n} agendamentos futuros continuam marcados com ${deactivating?.name}.`}{" "}
-            Você pode remarcá-{n === 1 ? "lo" : "los"} pela agenda.
+              ? `${deactivating?.name} tem 1 agendamento futuro.`
+              : `${deactivating?.name} tem ${n} agendamentos futuros.`}{" "}
+            Para desativar, {n === 1 ? "ele será cancelado" : "todos serão cancelados"} e {n === 1 ? "o cliente é avisado" : "os clientes são avisados"} pelo WhatsApp, conforme suas preferências de mensagens. Se preferir, volte e remarque pela agenda.
           </p>
+        ) : null}
+        {deactivating?.hasAccess ? (
+          <p className="mt-2 font-medium text-foreground">
+            O acesso dele ao painel também é cancelado. Para voltar a entrar, será preciso um novo convite.
+          </p>
+        ) : null}
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={removing !== null}
+        titleId="remover-titulo"
+        title={`Remover ${removing?.name ?? ""} da equipe?`}
+        confirmLabel={(removing?.futureBookings ?? 0) > 0 ? `Cancelar ${removing?.futureBookings} e remover` : "Remover"}
+        pending={pending}
+        onConfirm={confirmRemove}
+        onCancel={() => setRemoving(null)}
+      >
+        <p>Ela sai da lista da equipe e da sua página. O histórico de agendamentos dela continua nos relatórios.</p>
+        {(removing?.futureBookings ?? 0) > 0 ? (
+          <p className="mt-2 font-medium text-foreground">
+            Há {removing?.futureBookings} {removing?.futureBookings === 1 ? "agendamento futuro" : "agendamentos futuros"} com essa pessoa. Para remover, {removing?.futureBookings === 1 ? "ele será cancelado" : "todos serão cancelados"} e os clientes são avisados pelo WhatsApp, conforme suas preferências de mensagens.
+          </p>
+        ) : null}
+        {removing?.hasAccess ? (
+          <p className="mt-2 font-medium text-foreground">O acesso dela ao painel também é cancelado.</p>
         ) : null}
       </ConfirmDialog>
     </>
@@ -307,6 +382,7 @@ function ProfessionalForm({
   onDone,
   onClose,
   onDeactivate,
+  onRemove,
 }: {
   professional?: ProfessionalItem;
   professionals: ProfessionalItem[];
@@ -316,6 +392,7 @@ function ProfessionalForm({
   onDone: (created: boolean) => void;
   onClose: () => void;
   onDeactivate: () => void;
+  onRemove: () => void;
 }) {
   const { show } = useToast();
   const [pending, startTransition] = useTransition();
@@ -545,6 +622,16 @@ function ProfessionalForm({
 
       {!canEdit ? (
         <p className="text-sm text-ink-muted">Só o proprietário pode alterar a equipe.</p>
+      ) : null}
+
+      {canEdit && professional ? (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="self-start text-sm font-semibold text-danger underline-offset-2 outline-none hover:underline focus-visible:underline"
+        >
+          Remover da equipe
+        </button>
       ) : null}
 
       {canEdit ? (

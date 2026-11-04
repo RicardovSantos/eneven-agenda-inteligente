@@ -1,9 +1,11 @@
-import { and, count, eq, gt, inArray, isNull, max, ne, sql } from "drizzle-orm";
+import { and, count, eq, gt, inArray, isNull, max, sql } from "drizzle-orm";
 import {
   bookings,
   businessHours,
+  memberships,
   professionalHours,
   professionalServices,
+  sessions,
   professionals,
   plans,
   services,
@@ -19,6 +21,7 @@ import {
   validateWeeklyHours,
   type WeeklyHours,
 } from "@/lib/weekly-hours";
+import { cancelBooking } from "@/server/agenda/bookings";
 import { withTenant, withTenantTx, type TenantTx } from "@/server/tenant-db";
 import { notFoundError, validationError } from "./errors";
 import { isUuid } from "./services";
@@ -74,7 +77,7 @@ async function futureCounts(tx: TenantTx, tenantId: string, now: Date) {
     .where(
       and(
         eq(bookings.tenantId, tenantId),
-        ne(bookings.status, "canceled"),
+        inArray(bookings.status, ["scheduled", "confirmed"]),
         gt(bookings.startsAt, now),
       ),
     )
@@ -92,7 +95,7 @@ export async function listProfessionals(
     const rows = await tx
       .select()
       .from(professionals)
-      .where(eq(professionals.tenantId, tenantId))
+      .where(and(eq(professionals.tenantId, tenantId), isNull(professionals.archivedAt)))
       .orderBy(professionals.sortOrder, professionals.createdAt, professionals.id);
     const links = await tx
       .select()
@@ -273,24 +276,124 @@ export async function saveProfessional(
   });
 }
 
+/** Cancela os agendamentos futuros do profissional (cada cliente é avisado). Devolve quantos. */
+async function cancelFutureBookings(db: Db, tenantId: string, id: string, now: Date): Promise<number> {
+  const ids = await withTenant(db, tenantId, (tx) =>
+    tx
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.tenantId, tenantId),
+          eq(bookings.professionalId, id),
+          inArray(bookings.status, ["scheduled", "confirmed"]),
+          gt(bookings.startsAt, now),
+        ),
+      ),
+  );
+  for (const row of ids) await cancelBooking(db, tenantId, row.id, "staff", now);
+  return ids.length;
+}
+
 /**
- * Desativa o profissional (não é oferecido para novos agendamentos). Os
- * agendamentos futuros continuam marcados; devolve quantos são, para o aviso.
+ * Desativa o profissional (não é oferecido para novos agendamentos). Com
+ * agendamento futuro a desativação é recusada, a menos que `cancelFuture` seja
+ * verdadeiro: aí cancela todos antes (cada cliente é avisado como num
+ * cancelamento comum) e desativa. Devolve quantos foram cancelados.
  */
 export async function deactivateProfessional(
   db: Db,
   tenantId: string,
   id: string,
   now: Date = new Date(),
-): Promise<{ futureBookings: number }> {
+  opts: { cancelFuture?: boolean } = {},
+): Promise<{ canceledBookings: number; accessRemoved: boolean }> {
   if (!isUuid(id)) throw notFoundError();
-  return withTenant(db, tenantId, async (tx) => {
-    const updated = await tx
+  const canceledBookings = opts.cancelFuture ? await cancelFutureBookings(db, tenantId, id, now) : 0;
+  return db.transaction(async (raw) => {
+    const result = await withTenantTx(raw, tenantId, async (tx) => {
+      const [row] = await tx
+        .select({ userId: professionals.userId })
+        .from(professionals)
+        .where(and(eq(professionals.tenantId, tenantId), eq(professionals.id, id), isNull(professionals.archivedAt)))
+        .for("update");
+      if (!row) throw notFoundError();
+      const n = (await futureCounts(tx, tenantId, now)).get(id) ?? 0;
+      if (n > 0) {
+        throw validationError({
+          deactivate: n === 1
+            ? "Há 1 agendamento futuro com este profissional. Cancele-os ou remarque antes de desativar."
+            : `Há ${n} agendamentos futuros com este profissional. Cancele-os ou remarque antes de desativar.`,
+        });
+      }
+      await tx
+        .update(professionals)
+        .set({ active: false })
+        .where(and(eq(professionals.tenantId, tenantId), eq(professionals.id, id)));
+      return row.userId;
+    });
+    return { canceledBookings, accessRemoved: await cutAccess(raw, tenantId, id, result) };
+  });
+}
+
+/**
+ * Tira o acesso ao painel de quem está ligado ao profissional (vínculo, sessões e
+ * `professionals.user_id`). O proprietário nunca perde o acesso. Devolve se tirou.
+ */
+async function cutAccess(raw: TenantTx, tenantId: string, professionalId: string, userId: string | null) {
+  if (!userId) return false;
+  const [member] = await raw
+    .select({ role: memberships.role })
+    .from(memberships)
+    .where(and(eq(memberships.userId, userId), eq(memberships.tenantId, tenantId)));
+  if (!member || member.role === "owner") return false;
+  await raw.delete(memberships).where(and(eq(memberships.userId, userId), eq(memberships.tenantId, tenantId)));
+  await raw.delete(sessions).where(and(eq(sessions.userId, userId), eq(sessions.tenantId, tenantId)));
+  await withTenantTx(raw, tenantId, (tx) =>
+    tx
       .update(professionals)
-      .set({ active: false })
-      .where(and(eq(professionals.tenantId, tenantId), eq(professionals.id, id)))
-      .returning({ id: professionals.id });
-    if (updated.length === 0) throw notFoundError();
-    return { futureBookings: (await futureCounts(tx, tenantId, now)).get(id) ?? 0 };
+      .set({ userId: null })
+      .where(and(eq(professionals.tenantId, tenantId), eq(professionals.id, professionalId))),
+  );
+  return true;
+}
+
+/**
+ * Remove o profissional da equipe: some das telas, fica inativo e perde o acesso,
+ * mas o histórico de agendamentos continua. Recusa se ainda houver agendamento
+ * futuro (o dono precisa remarcar ou cancelar antes).
+ */
+export async function removeProfessional(
+  db: Db,
+  tenantId: string,
+  id: string,
+  now: Date = new Date(),
+  opts: { cancelFuture?: boolean } = {},
+): Promise<{ canceledBookings: number; accessRemoved: boolean }> {
+  if (!isUuid(id)) throw notFoundError();
+  const canceledBookings = opts.cancelFuture ? await cancelFutureBookings(db, tenantId, id, now) : 0;
+  return db.transaction(async (raw) => {
+    const result = await withTenantTx(raw, tenantId, async (tx) => {
+      const [row] = await tx
+        .select({ userId: professionals.userId })
+        .from(professionals)
+        .where(and(eq(professionals.tenantId, tenantId), eq(professionals.id, id), isNull(professionals.archivedAt)))
+        .for("update");
+      if (!row) throw notFoundError();
+      const n = (await futureCounts(tx, tenantId, now)).get(id) ?? 0;
+      if (n > 0) {
+        throw validationError({
+          remove: n === 1
+            ? "Há 1 agendamento futuro com este profissional. Remarque ou cancele antes de remover."
+            : `Há ${n} agendamentos futuros com este profissional. Remarque ou cancele antes de remover.`,
+        });
+      }
+      await tx
+        .update(professionals)
+        .set({ active: false, archivedAt: now })
+        .where(and(eq(professionals.tenantId, tenantId), eq(professionals.id, id)));
+      return row.userId;
+    });
+    return { canceledBookings, accessRemoved: await cutAccess(raw, tenantId, id, result) };
   });
 }

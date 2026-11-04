@@ -379,8 +379,8 @@ export function BookingFlow({
                           return (
                             <li key={service.id}>
                               <label
-                                className={`flex cursor-pointer items-start gap-3.5 rounded-2xl border bg-canvas p-3.5 transition-colors ${
-                                  checked ? "border-(--brand)" : "border-line"
+                                className={`flex min-h-[72px] cursor-pointer items-center gap-3.5 rounded-2xl border bg-canvas px-4 py-3.5 transition-colors ${
+                                  checked ? "border-(--brand) bg-(--brand)/5" : "border-line"
                                 }`}
                               >
                                 <input
@@ -388,17 +388,17 @@ export function BookingFlow({
                                   checked={checked}
                                   onChange={() => toggleService(service.id)}
                                   aria-label={service.name}
-                                  className="m-0 mt-1 size-[22px] shrink-0 accent-(--brand)"
+                                  className="m-0 size-[22px] shrink-0 accent-(--brand)"
                                 />
-                                <span className="flex min-w-0 flex-1 flex-col gap-1">
-                                  <span className="text-base font-semibold">{service.name}</span>
-                                  <span className="text-[13px] text-ink-muted">
+                                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                  <span className="text-base leading-snug font-semibold [overflow-wrap:anywhere]">{service.name}</span>
+                                  <span className="text-[13px] leading-snug text-ink-muted">
                                     <span className="tabular-nums">{formatDuration(service.durationMin)}</span>
                                     {service.description ? ` · ${service.description}` : ""}
                                   </span>
-                                  <span className="mt-1 self-end text-base font-bold tabular-nums text-(--brand)">
-                                    {formatBRL(service.priceCents)}
-                                  </span>
+                                </span>
+                                <span className="shrink-0 text-right text-base font-bold tabular-nums text-(--brand)">
+                                  {formatBRL(service.priceCents)}
                                 </span>
                               </label>
                             </li>

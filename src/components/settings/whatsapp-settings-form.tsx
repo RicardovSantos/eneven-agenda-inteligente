@@ -1,11 +1,11 @@
 "use client";
 
 import { AlarmClock, Bell, CalendarCheck, CalendarClock, CalendarX, type LucideIcon } from "lucide-react";
-import { useActionState, useState } from "react";
-import { saveWhatsAppSettingsAction, type WhatsAppSettingsState } from "@/app/painel/configuracoes/mensagens/actions";
-import { useToastOnResult } from "@/components/ui/toast";
+import { useState, useTransition } from "react";
+import { setWhatsAppOptionAction } from "@/app/painel/configuracoes/mensagens/actions";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
-import { SaveRow, SettingsSection } from "./settings-section";
+import { SettingsSection } from "./settings-section";
 
 export type WhatsAppOption = { key: string; label: string; checked: boolean; disabled?: boolean };
 
@@ -20,6 +20,19 @@ const DETAILS: Record<string, { Icon: LucideIcon; text: string }> = {
 /** Cartão com interruptor "Ativado / Desativado". O campo de verdade (checkbox) cobre o cartão inteiro. */
 function ToggleCard({ option }: { option: WhatsAppOption }) {
   const [on, setOn] = useState(option.checked);
+  const [pending, startTransition] = useTransition();
+  const { show } = useToast();
+  const change = (next: boolean) => {
+    setOn(next);
+    startTransition(async () => {
+      const result = await setWhatsAppOptionAction(option.key, next);
+      if (result.ok) show(next ? `${option.label}: ativado` : `${option.label}: desativado`, "success");
+      else {
+        setOn(!next);
+        show(result.error ?? "Não foi possível salvar agora.", "error");
+      }
+    });
+  };
   const { Icon, text } = DETAILS[option.key] ?? { Icon: Bell, text: "" };
   return (
     <div
@@ -32,11 +45,10 @@ function ToggleCard({ option }: { option: WhatsAppOption }) {
       <input
         type="checkbox"
         role="switch"
-        name={option.key}
         aria-label={option.label}
         checked={on}
-        disabled={option.disabled}
-        onChange={(event) => setOn(event.target.checked)}
+        disabled={option.disabled || pending}
+        onChange={(event) => change(event.target.checked)}
         className="peer absolute inset-0 z-10 size-full cursor-pointer appearance-none rounded-panel opacity-0 disabled:cursor-not-allowed"
       />
       <span className="flex items-center justify-center gap-2.5 border-b border-line pb-3" aria-hidden="true">
@@ -55,19 +67,16 @@ function ToggleCard({ option }: { option: WhatsAppOption }) {
   );
 }
 
-/** Preferências das mensagens automáticas, com "Salvando…" no botão e aviso de salvo ou de erro. */
+/** Preferências das mensagens automáticas: cada cartão salva na hora, sem botão. */
 export function WhatsAppSettingsForm({ options, twoHours }: { options: WhatsAppOption[]; twoHours: boolean }) {
-  const [state, formAction, pending] = useActionState<WhatsAppSettingsState, FormData>(saveWhatsAppSettingsAction, {});
-  useToastOnResult(state);
   return (
-    <SettingsSection id="notificacoes-automaticas" title="Notificações automáticas" description="Toque num cartão para ligar ou desligar. As mensagens saem sozinhas pelo WhatsApp.">
-      <form action={formAction} className="flex flex-col gap-4">
+    <SettingsSection id="notificacoes-automaticas" title="Notificações automáticas" description="Toque num cartão para ligar ou desligar; a mudança é salva na hora. As mensagens saem sozinhas pelo WhatsApp.">
+      <div className="flex flex-col gap-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {options.map((option) => <ToggleCard key={option.key} option={option} />)}
         </div>
         {!twoHours ? <p className="m-0 text-sm text-ink-muted">O lembrete de 2 horas exige plano Profissional ou Studio.</p> : null}
-        <SaveRow pending={pending} error={state.error} label="Salvar preferências" />
-      </form>
+      </div>
     </SettingsSection>
   );
 }

@@ -243,11 +243,19 @@ describe("getAvailableSlots - vários profissionais", () => {
 });
 
 describe("getAvailableSlots - validação e fuso da máquina", () => {
-  it("duração <= 0 ou passo <= 0 lançam erro", () => {
+  it("passo 0 (sem intervalo) encadeia pela duração do serviço, com a folga", () => {
+    const rules = { slotIntervalMin: 0, minNoticeMin: 0, maxDaysAhead: 5 };
+    const list = starts(getAvailableSlots(base({ rules, durationMin: 40 })));
+    expect(list.slice(0, 3)).toEqual(["09:00", "09:40", "10:20"]);
+    const withBuffer = starts(getAvailableSlots(base({ rules, durationMin: 30, bufferAfterMin: 10 })));
+    expect(withBuffer.slice(0, 3)).toEqual(["09:00", "09:40", "10:20"]);
+  });
+
+  it("duração <= 0 ou passo negativo lançam erro", () => {
     expect(() => getAvailableSlots(base({ durationMin: 0 }))).toThrow();
     expect(() => getAvailableSlots(base({ durationMin: -5 }))).toThrow();
     expect(() =>
-      getAvailableSlots(base({ rules: { slotIntervalMin: 0, minNoticeMin: 0, maxDaysAhead: 5 } })),
+      getAvailableSlots(base({ rules: { slotIntervalMin: -5, minNoticeMin: 0, maxDaysAhead: 5 } })),
     ).toThrow();
   });
 

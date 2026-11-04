@@ -145,12 +145,15 @@ export function ConfirmDialog({
   title,
   confirmLabel,
   pending,
+  confirmDisabled,
   titleId = "confirm-title",
   onConfirm,
   onCancel,
   children,
 }: {
   open: boolean;
+  /** Bloqueia a confirmação (o texto do diálogo explica o motivo). */
+  confirmDisabled?: boolean;
   /** Diferente quando há mais de um diálogo de confirmação na mesma página. */
   titleId?: string;
   title: string;
@@ -190,7 +193,7 @@ export function ConfirmDialog({
           <Button
             type="button"
             onClick={onConfirm}
-            disabled={pending}
+            disabled={pending || confirmDisabled}
             className="flex-1 bg-[#C2410C] text-white hover:bg-[#9A3412] dark:bg-[#fb923c] dark:text-[#15131f] dark:hover:bg-[#fdba74]"
           >
             {confirmLabel}

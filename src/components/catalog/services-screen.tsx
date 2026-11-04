@@ -331,7 +331,9 @@ function WhoDoes({
   byId: Map<string, ProfessionalOption>;
   compact?: boolean;
 }) {
-  const pros = ids.map((id) => byId.get(id)).filter((p): p is ProfessionalOption => !!p);
+  const pros = ids
+    .map((id) => byId.get(id))
+    .filter((p): p is ProfessionalOption => !!p && p.active);
   if (pros.length === 0) {
     return <span className="text-[0.8125rem] font-medium text-danger">Sem profissional</span>;
   }
@@ -392,8 +394,10 @@ function ServiceForm({
   const [categoryName, setCategoryName] = useState(service?.categoryName ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Ativos, mais os inativos que já fazem este serviço (para poder desmarcar).
-  const shown = professionals.filter((p) => p.active || professionalIds.includes(p.id));
+  // Só quem está ativo é oferecido. Quem foi desativado mantém o vínculo (não sai de
+  // `professionalIds`) e volta marcado quando for reativado.
+  const shown = professionals.filter((p) => p.active);
+  const activeSelected = shown.some((p) => professionalIds.includes(p.id));
   const archived = service?.archived === true;
   const readOnly = !canEdit || archived;
 
@@ -561,11 +565,10 @@ function ServiceForm({
                 />
                 <PersonAvatar name={p.name} color={p.color} photoUrl={p.photoUrl} size={26} />
                 <span className="min-w-0 truncate">{p.name}</span>
-                {!p.active ? <span className="text-[0.8125rem] text-ink-muted">inativo</span> : null}
               </label>
             ))
           )}
-          {shown.length > 0 && professionalIds.length === 0 ? (
+          {shown.length > 0 && !activeSelected ? (
             <p className="text-[0.8125rem] leading-snug text-danger">
               Sem profissional, este serviço não aparece na página de agendamento.
             </p>

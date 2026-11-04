@@ -4,6 +4,7 @@ import { runCatalogAction, type CatalogActionResult } from "@/server/catalog/act
 import {
   CatalogError,
   deactivateProfessional,
+  removeProfessional,
   saveProfessional,
   type ProfessionalInput,
 } from "@/server/catalog";
@@ -29,9 +30,15 @@ export async function saveProfessionalAction(input: unknown): Promise<CatalogAct
   });
 }
 
-export async function deactivateProfessionalAction(id: unknown): Promise<CatalogActionResult> {
+export async function deactivateProfessionalAction(id: unknown, cancelFuture: unknown = false): Promise<CatalogActionResult> {
   return runCatalogAction("Profissional desativado", async ({ db, tenantId }) => {
-    await deactivateProfessional(db, tenantId, String(id));
+    await deactivateProfessional(db, tenantId, String(id), new Date(), { cancelFuture: cancelFuture === true });
+  });
+}
+
+export async function removeProfessionalAction(id: unknown, cancelFuture: unknown = false): Promise<CatalogActionResult> {
+  return runCatalogAction("Profissional removido da equipe", async ({ db, tenantId }) => {
+    await removeProfessional(db, tenantId, String(id), new Date(), { cancelFuture: cancelFuture === true });
   });
 }
 

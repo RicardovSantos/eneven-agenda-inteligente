@@ -64,7 +64,7 @@ function overlaps(aS: number, aE: number, bS: number, bE: number): boolean {
 export function getAvailableSlots(input: AvailabilityInput): Slot[] {
   const { date, timezone, now, rules, durationMin, bufferAfterMin } = input;
   if (!(durationMin > 0)) throw new Error("durationMin deve ser maior que zero");
-  if (!(rules.slotIntervalMin > 0)) throw new Error("slotIntervalMin deve ser maior que zero");
+  if (!(rules.slotIntervalMin >= 0)) throw new Error("slotIntervalMin não pode ser negativo");
   if (bufferAfterMin < 0) throw new Error("bufferAfterMin não pode ser negativo");
 
   const today = localDateOf(now, timezone);
@@ -76,6 +76,8 @@ export function getAvailableSlots(input: AvailabilityInput): Slot[] {
   if (business.length === 0) return [];
 
   const totalMin = durationMin + bufferAfterMin;
+  // 0 = sem intervalo: os horários se encadeiam pela duração do serviço (com a folga).
+  const step = rules.slotIntervalMin > 0 ? rules.slotIntervalMin : totalMin;
   const earliest = now.getTime() + rules.minNoticeMin * MIN_MS;
   const byStart = new Map<number, Slot>();
 
@@ -87,7 +89,7 @@ export function getAvailableSlots(input: AvailabilityInput): Slot[] {
     );
 
     for (const [winStart, winEnd] of windows) {
-      for (let m = winStart; m + totalMin <= winEnd; m += rules.slotIntervalMin) {
+      for (let m = winStart; m + totalMin <= winEnd; m += step) {
         const start = zonedInstant(date, m, timezone).getTime();
         if (start < earliest) continue;
         const end = start + durationMin * MIN_MS;

@@ -1,0 +1,1 @@
+ALTER TABLE "professionals" ADD COLUMN "archived_at" timestamp with time zone;

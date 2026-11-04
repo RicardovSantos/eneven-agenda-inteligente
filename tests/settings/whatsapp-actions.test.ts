@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({ db: undefined as unknown, session: undefined a
 vi.mock("@/db/client", () => ({ getDb: async () => state.db }));
 vi.mock("@/server/auth/guard", () => ({ requireTenantSession: async () => state.session }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
-import { saveWhatsAppSettings, saveWhatsAppSettingsAction } from "@/app/painel/configuracoes/mensagens/actions";
+import { saveWhatsAppSettings, saveWhatsAppSettingsAction, setWhatsAppOptionAction } from "@/app/painel/configuracoes/mensagens/actions";
 
 let db: Db;
 let tenantId: string;
@@ -66,5 +66,28 @@ describe("preferências de WhatsApp", () => {
       expect(result.error).toBe("Não foi possível salvar agora. Tente novamente.");
       expect(await withTenant(db, tenantId, (tx) => tx.select().from(tenantNotificationSettings))).toHaveLength(0);
     });
+  });
+});
+
+describe("liga e desliga na hora", () => {
+  const rows = () => withTenant(db, tenantId, (tx) => tx.select().from(tenantNotificationSettings));
+  it("grava só a preferência tocada e mantém os padrões das outras", async () => {
+    state.session = { tenantId, role: "owner" };
+    expect(await setWhatsAppOptionAction("canceled", false)).toEqual({ ok: true });
+    const [row] = await rows();
+    expect(row).toMatchObject({ canceled: false, rescheduled: true, reminderEve: true, bookingCreated: false, reminder2h: false });
+    expect(await setWhatsAppOptionAction("bookingCreated", true)).toEqual({ ok: true });
+    expect((await rows())[0]).toMatchObject({ canceled: false, bookingCreated: true });
+  });
+  it("recusa chave desconhecida e lembrete de 2h no plano Essencial", async () => {
+    state.session = { tenantId, role: "owner" };
+    expect((await setWhatsAppOptionAction("tenantId", true)).ok).toBe(false);
+    expect((await setWhatsAppOptionAction("reminder2h", true)).ok).toBe(false);
+    expect(await rows()).toHaveLength(0);
+  });
+  it("recusa quem não é proprietário", async () => {
+    state.session = { tenantId, role: "staff" };
+    expect((await setWhatsAppOptionAction("canceled", false)).ok).toBe(false);
+    expect(await rows()).toHaveLength(0);
   });
 });

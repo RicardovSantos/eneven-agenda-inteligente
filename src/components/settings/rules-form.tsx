@@ -19,8 +19,15 @@ export type RulesInitial = {
 
 type Option = { value: number; label: string };
 
-const SLOT: Option[] = [10, 15, 20, 30].map((v) => ({ value: v, label: `${v} min` }));
+const SLOT: Option[] = [
+  { value: 0, label: "Sem intervalo" },
+  ...[5, 10, 15, 20, 30].map((v) => ({ value: v, label: `${v} min` })),
+];
 const NOTICE: Option[] = [
+  { value: 0, label: "Sem antecedência" },
+  { value: 5, label: "5 min" },
+  { value: 10, label: "10 min" },
+  { value: 15, label: "15 min" },
   { value: 30, label: "30 min" },
   { value: 60, label: "1 h" },
   { value: 120, label: "2 h" },
@@ -104,7 +111,7 @@ export function RulesForm({ initial }: { initial: RulesInitial }) {
           <RuleSelect
             name="slotIntervalMin"
             label="Intervalo entre horários"
-            hint="De quanto em quanto tempo os horários aparecem."
+            hint="De quanto em quanto tempo os horários aparecem. “Sem intervalo” encadeia: cada horário começa quando o serviço anterior termina."
             options={SLOT}
             value={rules.slotIntervalMin}
             onChange={set("slotIntervalMin")}

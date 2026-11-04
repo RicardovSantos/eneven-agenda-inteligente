@@ -6,6 +6,7 @@ import {
   CatalogError,
   deactivateProfessional,
   listProfessionals,
+  removeProfessional,
   saveProfessional,
   saveService,
 } from "@/server/catalog";
@@ -261,22 +262,25 @@ describe("deactivateProfessional", () => {
     return id;
   }
 
-  it("desativa e informa quantos agendamentos futuros continuam marcados", async () => {
+  it("recusa desativar com agendamento futuro; com cancelFuture cancela todos e desativa", async () => {
     const id = await withBookings(["scheduled", "scheduled", "canceled"]);
     const [before] = await listProfessionals(db, tenantId, now);
     expect(before.futureBookings).toBe(2);
 
-    const result = await deactivateProfessional(db, tenantId, id, now);
-    expect(result).toEqual({ futureBookings: 2 });
+    await expectValidation(deactivateProfessional(db, tenantId, id, now), "deactivate");
+    expect((await listProfessionals(db, tenantId, now))[0].active).toBe(true);
+
+    const result = await deactivateProfessional(db, tenantId, id, now, { cancelFuture: true });
+    expect(result).toEqual({ canceledBookings: 2, accessRemoved: false });
     const [after] = await listProfessionals(db, tenantId, now);
     expect(after.active).toBe(false);
-    expect(after.futureBookings).toBe(2);
+    expect(after.futureBookings).toBe(0);
   });
 
   it("agendamentos passados não contam", async () => {
     const id = await withBookings(["scheduled"]);
     const later = new Date("2031-01-01T00:00:00.000Z");
-    expect(await deactivateProfessional(db, tenantId, id, later)).toEqual({ futureBookings: 0 });
+    expect(await deactivateProfessional(db, tenantId, id, later)).toEqual({ canceledBookings: 0, accessRemoved: false });
   });
 
   it("não desativa profissional de outro estabelecimento", async () => {
@@ -285,5 +289,46 @@ describe("deactivateProfessional", () => {
       code: "not_found",
     });
     expect((await listProfessionals(db, otherTenantId))[0].active).toBe(true);
+  });
+});
+
+describe("removeProfessional", () => {
+  const now = new Date("2030-01-01T00:00:00.000Z");
+
+  it("recusa remover com agendamento futuro e nada muda", async () => {
+    const { id } = await saveProfessional(db, tenantId, base);
+    const customer = await seedCustomer(db, tenantId);
+    const startsAt = new Date("2030-01-07T10:00:00.000Z");
+    const endsAt = new Date(startsAt.getTime() + 1_800_000);
+    await db
+      .insert(bookings)
+      .values(bookingValues(tenantId, id, customer.id, { status: "scheduled", startsAt, endsAt, blockedUntil: endsAt }));
+    await expectValidation(removeProfessional(db, tenantId, id, now), "remove");
+    expect((await listProfessionals(db, tenantId, now))[0].active).toBe(true);
+    expect(await removeProfessional(db, tenantId, id, now, { cancelFuture: true })).toEqual({ canceledBookings: 1, accessRemoved: false });
+    expect(await listProfessionals(db, tenantId, now)).toHaveLength(0);
+    const [saved] = await db.select().from(bookings);
+    expect(saved.status).toBe("canceled");
+  });
+
+  it("remove: some da lista, mas o histórico de agendamentos continua", async () => {
+    const { id } = await saveProfessional(db, tenantId, base);
+    const customer = await seedCustomer(db, tenantId);
+    const startsAt = new Date("2029-01-07T10:00:00.000Z");
+    const endsAt = new Date(startsAt.getTime() + 1_800_000);
+    await db
+      .insert(bookings)
+      .values(bookingValues(tenantId, id, customer.id, { status: "completed", startsAt, endsAt, blockedUntil: endsAt }));
+    expect(await removeProfessional(db, tenantId, id, now)).toEqual({ canceledBookings: 0, accessRemoved: false });
+    expect(await listProfessionals(db, tenantId, now)).toHaveLength(0);
+    expect(await db.select().from(bookings)).toHaveLength(1);
+  });
+
+  it("não remove duas vezes nem profissional de outro estabelecimento", async () => {
+    const { id } = await saveProfessional(db, tenantId, base);
+    await removeProfessional(db, tenantId, id, now);
+    await expect(removeProfessional(db, tenantId, id, now)).rejects.toMatchObject({ code: "not_found" });
+    const foreign = await seedProfessional(db, otherTenantId, "Alheia");
+    await expect(removeProfessional(db, tenantId, foreign.id)).rejects.toMatchObject({ code: "not_found" });
   });
 });

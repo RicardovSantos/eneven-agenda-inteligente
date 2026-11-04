@@ -208,6 +208,13 @@
     font-family: var(--font-display);
     line-height: 1.2;
   }
+  /* O reset do Tailwind deixa o ponteiro padrão nos botões: mão em tudo que clica. */
+  :is(button, [role="button"], summary, select, input:is([type="checkbox"], [type="radio"], [type="submit"], [type="button"], [type="file"])):not(:disabled) {
+    cursor: pointer;
+  }
+  :is(button, input, select, textarea):disabled {
+    cursor: not-allowed;
+  }
   /* Foco visível em tudo: anel de 2px em --accent, 2px afastado */
   :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
     outline: 2px solid var(--accent);

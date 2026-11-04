@@ -265,7 +265,9 @@ describe("updateBookingRules", () => {
   it("recusa valores fora das listas da tela", async () => {
     const ok = { slotIntervalMin: 15, minNoticeMin: 60, maxDaysAhead: 60, cancelWindowMin: 120 };
     await expectValidation(updateBookingRules(db, tenantId, { ...ok, slotIntervalMin: 25 }), "slotIntervalMin");
-    await expectValidation(updateBookingRules(db, tenantId, { ...ok, minNoticeMin: 0 }), "minNoticeMin");
+    await updateBookingRules(db, tenantId, { ...ok, slotIntervalMin: 0, minNoticeMin: 5 });
+    await updateBookingRules(db, tenantId, { ...ok, slotIntervalMin: 5, minNoticeMin: 0 });
+    await expectValidation(updateBookingRules(db, tenantId, { ...ok, minNoticeMin: 7 }), "minNoticeMin");
     await expectValidation(updateBookingRules(db, tenantId, { ...ok, maxDaysAhead: 365 }), "maxDaysAhead");
     await expectValidation(updateBookingRules(db, tenantId, { ...ok, cancelWindowMin: 5 }), "cancelWindowMin");
   });

@@ -225,6 +225,13 @@
       "when": 1793657577067,
       "tag": "0031_fixed_jamie_braddock",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793821084337,
+      "tag": "0032_profissional_removido",
+      "breakpoints": true
     }
   ]
 }

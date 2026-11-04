@@ -7,12 +7,13 @@ import { cn } from "@/lib/utils";
 export const DEFAULT_HERO_TITLE = "Seu cuidado começa aqui";
 export const DEFAULT_HERO_SUBTITLE = "Escolha o serviço e agende em poucos passos";
 
-const INTERVAL_MS = 5000;
+const INTERVAL_MS = 2000;
 
 /**
  * Carrossel da página pública: as imagens rolam sozinhas (e também no toque,
- * com encaixe) e os pontos mostram a posição. Pausa enquanto a pessoa toca,
- * passa o mouse ou foca nele, e não roda sozinho para quem pediu menos movimento.
+ * com encaixe) a cada 2 s e os pontos mostram a posição. Pausa só enquanto a
+ * pessoa está tocando nele. Para quem pediu menos movimento, a troca é direta,
+ * sem rolagem animada (mas continua trocando).
  */
 export function HeroCarousel({
   images,
@@ -36,12 +37,12 @@ export function HeroCarousel({
 
   useEffect(() => {
     if (count < 2 || paused) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const timer = setInterval(() => {
       const el = track.current;
       if (!el) return;
       const current = Math.round(el.scrollLeft / el.clientWidth);
-      el.scrollTo({ left: ((current + 1) % count) * el.clientWidth, behavior: "smooth" });
+      el.scrollTo({ left: ((current + 1) % count) * el.clientWidth, behavior: reduced ? "auto" : "smooth" });
     }, INTERVAL_MS);
     return () => clearInterval(timer);
   }, [count, paused]);
@@ -51,10 +52,6 @@ export function HeroCarousel({
       aria-roledescription="carrossel"
       aria-label="Fotos do estabelecimento"
       className="flex flex-col gap-2.5 px-5"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
       onTouchStart={() => setPaused(true)}
       onTouchEnd={() => setPaused(false)}
     >

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Copy, Lock, Plus } from "lucide-react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, type ReactNode } from "react";
 import { deleteBlockAction } from "@/app/painel/actions";
@@ -27,6 +27,12 @@ const NAV_BUTTON =
   "flex size-10 items-center justify-center rounded-field border border-line bg-surface text-foreground hover:bg-primary-soft";
 const TEXT_BUTTON =
   "flex h-10 items-center rounded-field border border-line bg-surface px-3.5 text-sm font-medium text-foreground hover:bg-primary-soft";
+
+/** Rótulo do "Hoje": avisa que a navegação está em andamento (o painel pode demorar alguns segundos). */
+function TodayLabel() {
+  const { pending } = useLinkStatus();
+  return <span className={cn(pending && "animate-pulse")}>{pending ? "Indo…" : "Hoje"}</span>;
+}
 
 export type AgendaScreenProps = {
   today: string;
@@ -178,9 +184,15 @@ export function AgendaScreen({
                   <ChevronRight className="size-[18px]" aria-hidden="true" />
                 </Link>
               </div>
-              <Link href={agendaHref({ pro, view })} scroll={false} className={TEXT_BUTTON}>
-                Hoje
-              </Link>
+              {isToday ? (
+                <span aria-disabled="true" className={cn(TEXT_BUTTON, "cursor-default opacity-50 hover:bg-surface")}>
+                  Hoje
+                </span>
+              ) : (
+                <Link href={agendaHref({ data: today, pro, view })} scroll={false} className={TEXT_BUTTON}>
+                  <TodayLabel />
+                </Link>
+              )}
             </div>
 
             <div

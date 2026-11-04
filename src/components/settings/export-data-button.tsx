@@ -9,7 +9,8 @@ const CLASSES = "flex min-h-11 w-full items-center justify-center rounded-field 
  * Baixa os dados do estabelecimento sem sair do app. Um link `download` abre o
  * JSON em tela cheia no iPhone (app instalado), sem botão de voltar. Aqui o arquivo
  * é buscado em segundo plano e entregue pela folha de compartilhar (Salvar em
- * Arquivos, AirDrop...) ou, onde ela não existe, pelo download normal do navegador.
+ * Arquivos, AirDrop...) no celular ou, no computador e quando ela falha, pelo download
+ * normal do navegador.
  */
 export function ExportDataButton() {
   const [state, setState] = useState<"idle" | "loading" | "error">("idle");
@@ -21,14 +22,20 @@ export function ExportDataButton() {
       if (!response.ok) throw new Error(String(response.status));
       const blob = await response.blob();
       const file = new File([blob], FILE_NAME, { type: "application/json" });
-      if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+      // A folha de compartilhar só vale no celular/tablet (toque). No computador o Chrome
+      // anuncia suporte, mas recusa depois da espera do arquivo: ali vale o download normal.
+      const touch = window.matchMedia("(pointer: coarse)").matches;
+      let shared = false;
+      if (touch && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({ files: [file], title: FILE_NAME });
+          shared = true;
         } catch (error) {
-          // Fechar a folha de compartilhar não é erro.
-          if (!(error instanceof DOMException && error.name === "AbortError")) throw error;
+          // Fechar a folha de compartilhar não é erro e não baixa de novo.
+          if (error instanceof DOMException && error.name === "AbortError") shared = true;
         }
-      } else {
+      }
+      if (!shared) {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = url;
