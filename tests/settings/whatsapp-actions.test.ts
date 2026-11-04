@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({ db: undefined as unknown, session: undefined a
 vi.mock("@/db/client", () => ({ getDb: async () => state.db }));
 vi.mock("@/server/auth/guard", () => ({ requireTenantSession: async () => state.session }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
-import { saveWhatsAppSettings } from "@/app/painel/configuracoes/mensagens/actions";
+import { saveWhatsAppSettings, saveWhatsAppSettingsAction } from "@/app/painel/configuracoes/mensagens/actions";
 
 let db: Db;
 let tenantId: string;
@@ -38,5 +38,33 @@ describe("preferências de WhatsApp", () => {
     await saveWhatsAppSettings(form);
     const [row] = await withTenant(db, tenantId, (tx) => tx.select().from(tenantNotificationSettings));
     expect(row).toMatchObject({ tenantId, reminderEve: true, bookingCreated: false });
+  });
+  describe("ação do formulário (com retorno para a tela)", () => {
+    it("salvou: devolve o aviso de sucesso e grava", async () => {
+      state.session = { tenantId, role: "owner" };
+      const form = new FormData();
+      form.set("canceled", "on");
+      const result = await saveWhatsAppSettingsAction({}, form);
+      expect(result).toMatchObject({ message: "Preferências salvas" });
+      expect(result.error).toBeUndefined();
+      expect(typeof result.at).toBe("number");
+      const [row] = await withTenant(db, tenantId, (tx) => tx.select().from(tenantNotificationSettings));
+      expect(row).toMatchObject({ canceled: true, reminderEve: false });
+    });
+    it("lembrete de 2 horas no Essencial: devolve o motivo, sem gravar", async () => {
+      state.session = { tenantId, role: "owner" };
+      const form = new FormData();
+      form.set("reminder2h", "on");
+      const result = await saveWhatsAppSettingsAction({}, form);
+      expect(result.error).toMatch(/Profissional ou Studio/);
+      expect(result.message).toBeUndefined();
+      expect(await withTenant(db, tenantId, (tx) => tx.select().from(tenantNotificationSettings))).toHaveLength(0);
+    });
+    it("quem não é dono não grava e recebe um erro genérico", async () => {
+      state.session = { tenantId, role: "staff" };
+      const result = await saveWhatsAppSettingsAction({}, new FormData());
+      expect(result.error).toBe("Não foi possível salvar agora. Tente novamente.");
+      expect(await withTenant(db, tenantId, (tx) => tx.select().from(tenantNotificationSettings))).toHaveLength(0);
+    });
   });
 });
