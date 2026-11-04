@@ -11,9 +11,13 @@ it("reserva assinatura antes da chamada e bloqueia tentativas duplicadas", async
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(String(init?.body));
     expect(body.auto_recurring).toMatchObject({ frequency: 1, frequency_type: "months", transaction_amount: 39.9, currency_id: "BRL" });
+    // A assinatura se identifica no painel da Mercado Pago pelo link do estabelecimento e leva a referência própria.
+    expect(body.reason).toMatch(/^Eneven - .+ · .+/);
+    expect(body.reason).toContain(tenant.slug);
+    expect(body.payer_email).toBe("outro-email@example.com");
     return Response.json({ id: "sub-1", external_reference: body.external_reference, collector_id: 42, status: "pending", init_point: "https://www.mercadopago.com.br/subscriptions/checkout?id=sub-1", auto_recurring: body.auto_recurring });
   });
-  const input = { tenantId: tenant.id, planId: tenant.planId, payerEmail: "owner@example.com", backUrl: "https://agenda.eneven.com.br/painel" };
+  const input = { tenantId: tenant.id, planId: tenant.planId, payerEmail: "outro-email@example.com", backUrl: "https://agenda.eneven.com.br/painel" };
   const config = { accessToken: "TEST-example", collectorId: "42", fetcher };
   expect((await createSubscription(db, input, config)).checkoutUrl).toContain("mercadopago.com.br");
   await expect(createSubscription(db, input, config)).rejects.toThrow(/já existe/i);

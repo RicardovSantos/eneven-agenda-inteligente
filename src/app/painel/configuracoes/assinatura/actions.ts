@@ -23,7 +23,11 @@ export async function startCheckout(form: FormData): Promise<void> {
   const [tenant] = await db.select({ planId: tenants.planId, status: tenants.status }).from(tenants).where(eq(tenants.id, actor.tenantId)).limit(1);
   const [payer] = await db.select({ email: users.email }).from(users).where(and(eq(users.id, actor.userId), isNotNull(users.emailVerifiedAt))).limit(1);
   if (!tenant || !payer || !["trial", "active", "past_due"].includes(tenant.status) || tenant.planId !== planId) throw new Error("Contratação indisponível.");
-  const { checkoutUrl } = await createSubscription(db, { tenantId: actor.tenantId, planId: tenant.planId, payerEmail: payer.email, backUrl: config.backUrl, ownerUserId: actor.userId }, config);
+  // E-mail da conta do Mercado Pago que vai pagar: o digitado, ou o do login se vier em branco.
+  const typed = form.get("payerEmail");
+  const payerEmail = typeof typed === "string" && typed.trim() ? typed.trim().toLowerCase() : payer.email;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail) || payerEmail.length > 254) throw new Error("E-mail da conta Mercado Pago inválido.");
+  const { checkoutUrl } = await createSubscription(db, { tenantId: actor.tenantId, planId: tenant.planId, payerEmail, backUrl: config.backUrl, ownerUserId: actor.userId }, config);
   redirect(checkoutUrl);
 }
 
