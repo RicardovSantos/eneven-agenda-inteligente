@@ -20,7 +20,8 @@ test("Plataforma: Pagamentos mostra o provedor padrão de cada forma e a Stripe 
   const stripe = card.getByRole("radio", { name: /Stripe/ });
   await expect(stripe).toBeDisabled();
   await expect(card.getByText(/Faltam a chave secreta e o segredo do webhook da Stripe/)).toBeVisible();
-  await expect(card.getByRole("button", { name: "Salvar" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Salvar" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Todas as formas" })).toBeVisible();
 
   // Pix e boleto: só a Mercado Pago.
   for (const nome of ["Pix", "Boleto"]) {

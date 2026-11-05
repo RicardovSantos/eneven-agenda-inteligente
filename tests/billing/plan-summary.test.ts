@@ -98,3 +98,12 @@ describe("histórico de pagamentos: uma lista só, com as mesmas palavras", () =
     expect(buildPaymentHistory([], [])).toEqual([]);
   });
 });
+
+describe("provedor no aviso do cartão", () => {
+  it("diz Stripe para assinatura da Stripe e Mercado Pago nas demais", () => {
+    const stripe = summarizePlan({ ...base, tenantStatus: "active", subscriptionStatus: "authorized", provider: "stripe" }).notices.find((n) => n.key === "card");
+    const mp = summarizePlan({ ...base, tenantStatus: "active", subscriptionStatus: "authorized" }).notices.find((n) => n.key === "card");
+    expect(stripe?.text).toBe("Cobrada todo mês no cartão pela Stripe.");
+    expect(mp?.text).toBe("Cobrada todo mês no cartão pela Mercado Pago.");
+  });
+});
