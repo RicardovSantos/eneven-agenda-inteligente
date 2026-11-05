@@ -10,7 +10,7 @@ export async function getBillingOverview(db: Db, tenantId: string) {
   if (!current) throw new Error("Estabelecimento não encontrado.");
   const available = await db.select({ id: plans.id, name: plans.name, priceCents: plans.priceCents, maxProfessionals: plans.maxProfessionals, monthlyMessages: plans.monthlyMessages })
     .from(plans).where(eq(plans.active, true)).orderBy(asc(plans.sortOrder));
-  const invoices = await withTenant(db, tenantId, (tx) => tx.select({ id: billingInvoices.id, amountCents: billingInvoices.amountCents, status: billingInvoices.providerStatus, dueAt: billingInvoices.dueAt, paidAt: billingInvoices.paidAt })
+  const invoices = await withTenant(db, tenantId, (tx) => tx.select({ id: billingInvoices.id, amountCents: billingInvoices.amountCents, status: billingInvoices.providerStatus, dueAt: billingInvoices.dueAt, paidAt: billingInvoices.paidAt, createdAt: billingInvoices.createdAt })
     .from(billingInvoices).where(eq(billingInvoices.tenantId, tenantId)).orderBy(desc(billingInvoices.createdAt), desc(billingInvoices.id)).limit(100));
   const [pending] = await withTenant(db, tenantId, (tx) => tx.select({ checkoutUrl: billingSubscriptions.checkoutUrl }).from(billingSubscriptions)
     .where(and(eq(billingSubscriptions.tenantId, tenantId), eq(billingSubscriptions.providerStatus, "pending")))
