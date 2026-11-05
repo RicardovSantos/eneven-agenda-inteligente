@@ -80,6 +80,7 @@ export default async function AssinaturaPage() {
     subscriptionAccessUntil: subscription?.accessUntil ?? null,
     paidUntil,
     cardRejected: invoices.some((invoice) => invoice.status === "rejected"),
+    provider: subscription?.provider ?? null,
     cardPaid: invoices.some((invoice) => invoice.status === "approved" || invoice.status === "paid"),
     now: new Date(),
     formatDate: (value) => date.format(value),

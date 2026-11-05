@@ -19,6 +19,8 @@ export type PlanSummaryInput = {
   /** Alguma fatura do cartão foi recusada / alguma foi paga. */
   cardRejected: boolean;
   cardPaid: boolean;
+  /** Provedor em que a assinatura nasceu (`mercadopago` se não informado). */
+  provider?: string | null;
   now: Date;
   /** Formata uma data para o texto ("04/11/2026"). */
   formatDate: (date: Date) => string;
@@ -48,7 +50,7 @@ export function summarizePlan(input: PlanSummaryInput): PlanSummary {
   if (input.tenantStatus === "past_due" && !paidActive) {
     notices.push({ key: "past-due", tone: "warn", text: "Não conseguimos confirmar o pagamento. Regularize para continuar recebendo agendamentos." });
   }
-  if (subscribed) notices.push({ key: "card", tone: "muted", text: "Cobrada todo mês no cartão pela Mercado Pago." });
+  if (subscribed) notices.push({ key: "card", tone: "muted", text: `Cobrada todo mês no cartão pela ${input.provider === "stripe" ? "Stripe" : "Mercado Pago"}.` });
   if (paidByCharge && input.paidUntil) {
     notices.push({ key: "paid", tone: "ok", text: `Pago por Pix ou boleto até ${input.formatDate(input.paidUntil)}.` });
   }
