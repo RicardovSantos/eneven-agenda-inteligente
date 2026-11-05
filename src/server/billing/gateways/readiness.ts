@@ -1,5 +1,5 @@
 import { billingConfig } from "../mode";
-import { stripeConfig } from "../stripe/config";
+import { stripeConfig, stripeLiveEnabled } from "../stripe/config";
 import { CAPABILITIES, type Gateway, type PaymentMethod } from "./types";
 
 type Env = Record<string, string | undefined>;
@@ -23,5 +23,10 @@ export function gatewayCredentials(gateway: Gateway, env: Env = process.env): Ga
 /** Pronto para esta forma de pagamento: o provedor sabe fazê-la e tem credenciais. */
 export function gatewayReadiness(gateway: Gateway, method: PaymentMethod, env: Env = process.env): GatewayReadiness {
   if (!CAPABILITIES[gateway][method]) return { ready: false, status: "unavailable", reason: "Indisponível para esta forma de pagamento." };
-  return gatewayCredentials(gateway, env);
+  const base = gatewayCredentials(gateway, env);
+  // Pix e boleto avulsos liberam o mês de acesso ao serem pagos: em produção só valem com a Stripe em modo real.
+  if (base.ready && gateway === "stripe" && method !== "card" && env.NODE_ENV === "production" && !stripeLiveEnabled(env)) {
+    return { ready: false, status: "unavailable", reason: "A Stripe está em modo de teste; Pix e boleto só funcionam no modo real." };
+  }
+  return base;
 }

@@ -9,6 +9,7 @@ import { GatewayUnavailableError, type Gateway } from "@/server/billing/gateways
 import { resolveGateway } from "@/server/billing/gateways/router";
 import { billingConfig } from "@/server/billing/mode";
 import { getStripe } from "@/server/billing/stripe/client";
+import { refreshOpenStripeCharge } from "@/server/billing/stripe/charges";
 import { stripeConfig } from "@/server/billing/stripe/config";
 import { PAYMENT_KIND_LABEL, PAYMENT_STATE_LABEL, buildPaymentHistory, type PaymentState } from "@/server/billing/payment-history";
 import { summarizePlan, type SummaryTone } from "@/server/billing/plan-summary";
@@ -58,10 +59,21 @@ export default async function AssinaturaPage() {
   } catch (error) {
     if (!(error instanceof GatewayUnavailableError)) throw error;
   }
+  // Pix e boleto: cada forma tem o seu provedor padrão; só aparecem as que estão prontas agora.
+  const chargeMethods: Array<"pix" | "boleto"> = [];
+  for (const method of ["pix", "boleto"] as const) {
+    try {
+      await resolveGateway(db, method);
+      chargeMethods.push(method);
+    } catch (error) {
+      if (!(error instanceof GatewayUnavailableError)) throw error;
+    }
+  }
   const stripe = stripeConfig();
   if (stripe) {
     try {
       await refreshPendingStripeSubscriptions(db, getStripe(stripe), { tenantId: session.tenantId, limit: 5 });
+      await refreshOpenStripeCharge(db, session.tenantId, getStripe(stripe));
     } catch {
       // Sem resposta da Stripe a tela abre com o que já se sabe.
     }
@@ -99,7 +111,7 @@ export default async function AssinaturaPage() {
   const confirmed: ConfirmedCharge | null = justPaid && !openRow && lastCharge && (lastCharge.method === "pix" || lastCharge.method === "boleto")
     ? { method: lastCharge.method, paidUntilLabel: paidUntil ? date.format(paidUntil) : null }
     : null;
-  const canCharge = config?.live === true && canCheckout && !subscribed && !pendingCheckoutUrl && !openRow && !confirmed && !(subscription && ["creating", "uncertain", "pending", "paused"].includes(subscription.providerStatus));
+  const canCharge = chargeMethods.length > 0 && canCheckout && !subscribed && !pendingCheckoutUrl && !openRow && !confirmed && !(subscription && ["creating", "uncertain", "pending", "paused"].includes(subscription.providerStatus));
   const canChangePlan = !session.support && ["trial", "active", "past_due"].includes(current.status) && !(subscription && ["paused", "creating", "uncertain"].includes(subscription.providerStatus));
   const currentPlan = plan;
   const statusBadge = summary.badge;
@@ -180,10 +192,10 @@ export default async function AssinaturaPage() {
       </details> : null}
     </section>
 
-    {config?.live === true && (openCharge || canCharge || confirmed) ? <section aria-labelledby="pix-boleto" className={card}>
+    {(openCharge || canCharge || confirmed) ? <section aria-labelledby="pix-boleto" className={card}>
       <h2 id="pix-boleto" className="text-xl font-semibold">Pagar por Pix ou boleto</h2>
       {openRow && !openCharge ? <p className="m-0 text-sm text-ink-muted">Estamos confirmando o pagamento anterior. Em alguns minutos você poderá gerar outro, se precisar.</p> : null}
-      <ChargePanel open={openCharge} canCreate={canCharge} confirmed={confirmed} priceLabel={plan ? formatBRL(plan.priceCents) : ""} />
+      <ChargePanel open={openCharge} methods={chargeMethods} canCreate={canCharge} confirmed={confirmed} priceLabel={plan ? formatBRL(plan.priceCents) : ""} />
     </section> : null}
 
     <section aria-labelledby="historico" className={card}>

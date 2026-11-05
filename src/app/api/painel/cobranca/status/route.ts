@@ -2,6 +2,9 @@ import { getDb } from "@/db/client";
 import { getCurrentSession } from "@/server/auth/guard";
 import { getChargeStatus } from "@/server/billing/charge-status";
 import { billingConfig } from "@/server/billing/mode";
+import { getStripe } from "@/server/billing/stripe/client";
+import { reconcileStripePayment } from "@/server/billing/stripe/charges";
+import { stripeConfig } from "@/server/billing/stripe/config";
 
 export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" };
@@ -18,8 +21,12 @@ export async function GET(request: Request): Promise<Response> {
   }
   const id = new URL(request.url).searchParams.get("id") ?? "";
   const config = billingConfig();
-  const result = await getChargeStatus(await getDb(), session.tenantId, id, {
+  const db = await getDb();
+  const stripeSettings = stripeConfig();
+  const stripe = stripeSettings ? getStripe(stripeSettings) : null;
+  const result = await getChargeStatus(db, session.tenantId, id, {
     config: config?.live ? { accessToken: config.accessToken, collectorId: config.collectorId, liveMode: true } : null,
+    stripe: stripe ? (paymentIntentId) => reconcileStripePayment(db, stripe, paymentIntentId) : null,
   });
   return Response.json({ ok: true, ...result }, { headers });
 }

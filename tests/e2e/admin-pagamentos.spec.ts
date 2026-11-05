@@ -7,7 +7,7 @@ test.use({
   extraHTTPHeaders: { "x-forwarded-for": randomIp() },
 });
 
-test("Plataforma: Pagamentos mostra o provedor padrão de cada forma e a Stripe só aparece no cartão, indisponível sem credenciais", async ({ page, request }) => {
+test("Plataforma: Pagamentos mostra o provedor padrão de cada forma e a Stripe aparece em todas, indisponível sem credenciais", async ({ page, request }) => {
   await loginAsSuperAdmin(page, request);
   await open(page, "/admin/gerenciar");
   await page.getByRole("link", { name: /^Pagamentos/ }).click();
@@ -23,10 +23,10 @@ test("Plataforma: Pagamentos mostra o provedor padrão de cada forma e a Stripe 
   await expect(page.getByRole("button", { name: "Salvar" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Todas as formas" })).toBeVisible();
 
-  // Pix e boleto: só a Mercado Pago.
+  // Pix e boleto também têm a Stripe como opção, indisponível sem credenciais.
   for (const nome of ["Pix", "Boleto"]) {
     const region = page.getByRole("region", { name: nome });
-    await expect(region.getByRole("radio", { name: /Stripe/ })).toHaveCount(0);
+    await expect(region.getByRole("radio", { name: /Stripe/ })).toBeDisabled();
   }
 });
 

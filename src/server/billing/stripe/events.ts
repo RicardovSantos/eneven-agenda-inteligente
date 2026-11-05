@@ -4,6 +4,7 @@ import { billingWebhookEvents } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { reconcileBillingAccess } from "../reconcile-access";
 import { stripeLiveEnabled, type StripeConfig } from "./config";
+import { reconcileStripePayment } from "./charges";
 import { reconcileStripeCharge, reconcileStripeCheckout, reconcileStripeInvoice, reconcileStripeSubscription, type Reconciled } from "./reconcile";
 
 /** Eventos que a Agenda usa; os demais são aceitos (200) e ignorados, sem guardar nada. */
@@ -21,6 +22,10 @@ export const STRIPE_EVENT_TYPES = new Set([
   "invoice.voided",
   "charge.refunded",
   "charge.dispute.created",
+  "payment_intent.succeeded",
+  "payment_intent.processing",
+  "payment_intent.payment_failed",
+  "payment_intent.canceled",
 ]);
 
 /** Que recurso consultar na Stripe para este evento (a disputa aponta para a cobrança). */
@@ -60,6 +65,11 @@ async function reconcileEvent(db: Db, stripe: Stripe, type: string, target: stri
   if (type.startsWith("checkout.session.")) return reconcileStripeCheckout(db, stripe, target);
   if (type.startsWith("customer.subscription.")) return reconcileStripeSubscription(db, stripe, target);
   if (type.startsWith("invoice.")) return reconcileStripeInvoice(db, stripe, target);
+  if (type.startsWith("payment_intent.")) {
+    // Pix e boleto avulsos; pagamentos de fatura de assinatura passam por aqui e são ignorados (null).
+    const paid = await reconcileStripePayment(db, stripe, target);
+    return paid ? { tenantId: paid.tenantId, subscriptionId: "" } : null;
+  }
   if (type.startsWith("charge.")) return reconcileStripeCharge(db, stripe, target);
   return null;
 }
@@ -85,7 +95,7 @@ export async function processStripeEvents(db: Db, stripe: Stripe, config: Pick<S
     try {
       if (separator < 1 || !STRIPE_EVENT_TYPES.has(type)) throw new Error("Aviso inválido.");
       const reconciled = await reconcileEvent(db, stripe, type, target);
-      if (reconciled && accessEnabled(config) && await reconcileBillingAccess(db, reconciled.tenantId) === "review") throw new Error("Acesso requer revisão.");
+      if (reconciled && reconciled.subscriptionId && accessEnabled(config) && await reconcileBillingAccess(db, reconciled.tenantId) === "review") throw new Error("Acesso requer revisão.");
       const updated = await db.update(billingWebhookEvents).set({ processedAt: new Date() })
         .where(and(eq(billingWebhookEvents.requestId, event.requestId), isNull(billingWebhookEvents.processedAt))).returning({ id: billingWebhookEvents.requestId });
       if (updated.length) result.processed++;

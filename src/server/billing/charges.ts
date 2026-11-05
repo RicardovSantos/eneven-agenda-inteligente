@@ -49,6 +49,36 @@ function pick(source: unknown, path: string[]): unknown {
 }
 
 /**
+ * Reserva a cobrança avulsa (valor sempre do plano, no servidor) antes de falar com o provedor:
+ * trava por estabelecimento, confere o dono, o plano, a ausência de cartão e de outro pagamento em aberto.
+ */
+export async function reserveCharge(
+  db: Db,
+  input: { tenantId: string; ownerUserId: string; method: ChargeMethod },
+  provider: "mercadopago" | "stripe",
+): Promise<{ id: string; amountCents: number; planName: string; slug: string; email: string }> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.tenantId}))`);
+    const [tenant] = await tx.select({ id: tenants.id, planId: tenants.planId, status: tenants.status, slug: tenants.slug }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1).for("update");
+    const [owner] = await tx.select({ email: users.email }).from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(and(eq(memberships.tenantId, input.tenantId), eq(memberships.userId, input.ownerUserId), eq(memberships.role, "owner"))).limit(1);
+    if (!owner) throw new ChargeError("Acesso indisponível.");
+    if (!tenant || !["trial", "active", "past_due"].includes(tenant.status)) throw new ChargeError("Plano indisponível.");
+    const [plan] = await tx.select().from(plans).where(and(eq(plans.id, tenant.planId), eq(plans.active, true))).limit(1).for("share");
+    if (!plan || plan.priceCents <= 0) throw new ChargeError("Plano indisponível.");
+    const [card] = await tx.select({ id: billingSubscriptions.id }).from(billingSubscriptions)
+      .where(and(eq(billingSubscriptions.tenantId, input.tenantId), inArray(billingSubscriptions.providerStatus, OPEN_SUBSCRIPTION))).limit(1);
+    if (card) throw new ChargeError("Este estabelecimento já tem uma assinatura no cartão.");
+    const [open] = await tx.select({ id: billingCharges.id }).from(billingCharges)
+      .where(and(eq(billingCharges.tenantId, input.tenantId), inArray(billingCharges.status, ["creating", "uncertain", "pending"]))).limit(1);
+    if (open) throw new ChargeError("Já existe um pagamento em aberto. Pague ou aguarde ele vencer.");
+    const [charge] = await tx.insert(billingCharges).values({ tenantId: input.tenantId, planId: plan.id, provider, method: input.method, amountCents: plan.priceCents, status: "creating" }).returning({ id: billingCharges.id });
+    return { id: charge.id, amountCents: plan.priceCents, planName: plan.name, slug: tenant.slug, email: owner.email };
+  });
+}
+
+/**
  * Gera o Pix ou o boleto do mês para o dono. O valor é sempre o do plano atual (servidor),
  * nunca do navegador. Um tempo esgotado deixa a cobrança "uncertain" (o provedor pode ter criado).
  */
@@ -66,25 +96,7 @@ export async function createCharge(
     boleto = parseBoletoPayer(input.payer ?? {});
     if (!boleto.ok) throw new ChargeError("Confira os dados do boleto.", boleto.errors);
   }
-  const reserved = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.tenantId}))`);
-    const [tenant] = await tx.select({ id: tenants.id, planId: tenants.planId, status: tenants.status, slug: tenants.slug }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1).for("update");
-    const [owner] = await tx.select({ email: users.email }).from(memberships)
-      .innerJoin(users, eq(users.id, memberships.userId))
-      .where(and(eq(memberships.tenantId, input.tenantId), eq(memberships.userId, input.ownerUserId), eq(memberships.role, "owner"))).limit(1);
-    if (!owner) throw new ChargeError("Acesso indisponível.");
-    if (!tenant || !["trial", "active", "past_due"].includes(tenant.status)) throw new ChargeError("Plano indisponível.");
-    const [plan] = await tx.select().from(plans).where(and(eq(plans.id, tenant.planId), eq(plans.active, true))).limit(1).for("share");
-    if (!plan || plan.priceCents <= 0) throw new ChargeError("Plano indisponível.");
-    const [card] = await tx.select({ id: billingSubscriptions.id }).from(billingSubscriptions)
-      .where(and(eq(billingSubscriptions.tenantId, input.tenantId), inArray(billingSubscriptions.providerStatus, OPEN_SUBSCRIPTION))).limit(1);
-    if (card) throw new ChargeError("Este estabelecimento já tem uma assinatura no cartão.");
-    const [open] = await tx.select({ id: billingCharges.id }).from(billingCharges)
-      .where(and(eq(billingCharges.tenantId, input.tenantId), inArray(billingCharges.status, ["creating", "uncertain", "pending"]))).limit(1);
-    if (open) throw new ChargeError("Já existe um pagamento em aberto. Pague ou aguarde ele vencer.");
-    const [charge] = await tx.insert(billingCharges).values({ tenantId: input.tenantId, planId: plan.id, method: input.method, amountCents: plan.priceCents, status: "creating" }).returning({ id: billingCharges.id });
-    return { id: charge.id, amountCents: plan.priceCents, planName: plan.name, slug: tenant.slug, email: owner.email };
-  });
+  const reserved = await reserveCharge(db, { tenantId: input.tenantId, ownerUserId: input.ownerUserId, method: input.method }, "mercadopago");
   const expiresAt = new Date(now.getTime() + VALID_DAYS[input.method] * DAY);
   const payer: Record<string, unknown> = { email: reserved.email };
   if (boleto?.ok) {
@@ -180,10 +192,30 @@ export async function reconcileCharge(
     paidAt = typeof payment.date_approved === "string" ? new Date(payment.date_approved) : null;
     if (!paidAt || !Number.isFinite(paidAt.getTime())) throw new Error("Data de pagamento ausente.");
   }
+  return applyChargeState(db, {
+    chargeId, paymentId, provider: "mercadopago", mapped, updatedAt, paidAt,
+    verify: (charge) => verifyPaymentOwnership(payment, { paymentId, externalReference: reference, collectorId: config.collectorId, amountCents: charge.amountCents, liveMode: config.liveMode }),
+  }, now);
+}
+
+/**
+ * Aplica o estado de um pagamento avulso a uma cobrança, igual para qualquer provedor. Idempotente: só
+ * `pending` vira `approved` (soma um mês de acesso uma única vez); avisos antigos são ignorados.
+ */
+export async function applyChargeState(
+  db: Db,
+  input: {
+    chargeId: string; paymentId: string; provider: "mercadopago" | "stripe"; mapped: string; updatedAt: Date; paidAt: Date | null;
+    /** Confere valor, dono e referência com a cobrança já lida (com a linha travada). */
+    verify: (charge: typeof billingCharges.$inferSelect) => boolean;
+  },
+  now: Date = new Date(),
+): Promise<"updated" | "unchanged"> {
+  const { chargeId, mapped, updatedAt, paidAt } = input;
   return db.transaction(async (tx) => {
-    const [charge] = await tx.select().from(billingCharges).where(eq(billingCharges.id, chargeId)).limit(1).for("update");
-    if (!charge || !charge.providerPaymentId || charge.providerPaymentId !== paymentId) throw new Error("Pagamento não corresponde à cobrança.");
-    if (!verifyPaymentOwnership(payment, { paymentId, externalReference: reference, collectorId: config.collectorId, amountCents: charge.amountCents, liveMode: config.liveMode })) throw new Error("Pagamento não corresponde à cobrança.");
+    const [charge] = await tx.select().from(billingCharges).where(eq(billingCharges.id, input.chargeId)).limit(1).for("update");
+    if (!charge || charge.provider !== input.provider || !charge.providerPaymentId || charge.providerPaymentId !== input.paymentId) throw new Error("Pagamento não corresponde à cobrança.");
+    if (!input.verify(charge)) throw new Error("Pagamento não corresponde à cobrança.");
     if (charge.providerUpdatedAt && charge.providerUpdatedAt.getTime() >= updatedAt.getTime()) return "unchanged";
     // Cobrança aprovada só muda para reembolso ou contestação; nunca volta a pendente nem soma outro mês.
     if (charge.status === "approved" && mapped !== "refunded" && mapped !== "charged_back") {
