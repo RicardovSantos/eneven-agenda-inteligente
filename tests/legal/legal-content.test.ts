@@ -92,7 +92,7 @@ describe("termos de uso", () => {
     const trial = terms.sections.find((s) => s.heading.startsWith("4."))!;
     const list = trial.blocks.find((b) => b.type === "ul");
     expect(list && list.type === "ul" && list.items).toHaveLength(4);
-    expect(text(terms)).toContain("14 dias de teste grátis");
+    expect(text(terms)).toContain("30 dias de teste grátis");
   });
 });
 

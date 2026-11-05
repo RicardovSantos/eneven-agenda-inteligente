@@ -103,7 +103,7 @@ test.describe("plataforma", () => {
     await page.getByLabel("Nome do dono").fill("Marina Duarte");
     await page.getByLabel("E-mail do dono").fill(email);
     await page.getByLabel("WhatsApp").fill("11996542210");
-    await expect(page.getByLabel("Dias de teste")).toHaveValue("14");
+    await expect(page.getByLabel("Dias de teste")).toHaveValue("30");
     await page.getByRole("button", { name: "Criar estabelecimento" }).click();
 
     await expect(page).toHaveURL(/\/admin\/estabelecimentos\/[0-9a-f-]{36}$/);

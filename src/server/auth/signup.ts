@@ -14,7 +14,8 @@ import {
   type SignupInput,
 } from "./schemas";
 
-export const TRIAL_DAYS = 14;
+/** Dias de teste grátis de uma conta nova (só vale para quem se cadastra daqui para a frente). */
+export const TRIAL_DAYS = 30;
 const MAX_SLUG_ATTEMPTS = 3;
 
 const emailTaken = () =>
@@ -23,7 +24,7 @@ const emailTaken = () =>
   });
 
 /**
- * Cadastro: cria o estabelecimento (em teste por 14 dias), o usuário e o
+ * Cadastro: cria o estabelecimento (em teste por 30 dias), o usuário e o
  * vínculo `owner` numa única transação.
  *
  * Lança `AuthError` com mensagem em português para entrada inválida e e-mail
@@ -83,7 +84,7 @@ export type NewTenantOwner = {
 };
 
 /**
- * Cria o estabelecimento (em teste por 14 dias), o usuário e o vínculo
+ * Cria o estabelecimento (em teste por 30 dias), o usuário e o vínculo
  * `owner` numa única transação, já com o horário padrão e o dono como
  * primeiro profissional. É a regra única de cadastro, usada pelo
  * cadastro com senha e pelo cadastro com o Google.
