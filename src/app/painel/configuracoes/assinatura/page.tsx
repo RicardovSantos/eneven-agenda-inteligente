@@ -2,27 +2,35 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { users } from "@/db/schema";
-import { ChargePanel, type OpenCharge } from "@/components/settings/charge-panel";
+import { ChargePanel, type ConfirmedCharge, type OpenCharge } from "@/components/settings/charge-panel";
 import { formatBRL } from "@/lib/format";
 import { refreshOpenCharge } from "@/server/billing/charges";
 import { billingConfig } from "@/server/billing/mode";
+import { PAYMENT_KIND_LABEL, PAYMENT_STATE_LABEL, buildPaymentHistory, type PaymentState } from "@/server/billing/payment-history";
+import { summarizePlan, type SummaryTone } from "@/server/billing/plan-summary";
 import { getBillingOverview } from "@/server/billing/queries";
 import { refreshPendingSubscriptions } from "@/server/billing/refresh-pending";
 import { requirePanelRole } from "@/server/panel/roles";
 import { cancelSubscriptionAction, changePlanAction, startCheckout, undoPlanChangeAction } from "./actions";
 
-const statusLabel: Record<string, string> = { pending: "Pendente", approved: "Paga", paid: "Paga", rejected: "Não aprovada", cancelled: "Cancelada", canceled: "Cancelada", refunded: "Reembolsada" };
-const chargeLabel: Record<string, string> = { pending: "Aguardando pagamento", approved: "Pago", expired: "Vencido", cancelled: "Não aprovado", refunded: "Reembolsado", charged_back: "Contestado", uncertain: "Em confirmação", creating: "Gerando" };
+const TONE_BADGE: Record<SummaryTone, string> = {
+  ok: "bg-[#E8F7EF] text-[#0B7A44] dark:bg-[#12301f] dark:text-[#3dd68c]",
+  warn: "bg-[#FFF4ED] text-[#9A3412] dark:bg-danger-soft dark:text-[#fb923c]",
+  info: "bg-primary-soft text-primary",
+  muted: "bg-line text-ink-muted",
+};
+const TONE_NOTICE: Record<SummaryTone, string> = {
+  ok: "m-0 rounded-field bg-[#E8F7EF] p-3 text-sm font-medium text-[#0B7A44] dark:bg-[#12301f] dark:text-[#3dd68c]",
+  warn: "m-0 rounded-field bg-[#FFF4ED] p-3 text-sm text-[#9A3412] dark:bg-danger-soft dark:text-[#fb923c]",
+  info: "m-0 text-sm text-ink-muted",
+  muted: "m-0 text-sm text-ink-muted",
+};
+const STATE_TONE: Record<PaymentState, SummaryTone> = { paid: "ok", refused: "warn", disputed: "warn", pending: "info", processing: "info", expired: "muted", canceled: "muted", refunded: "muted" };
 const primaryButton = "flex min-h-12 w-full items-center justify-center rounded-field bg-primary px-5 text-center font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90";
 const secondaryButton = "flex min-h-11 w-full items-center justify-center rounded-field border border-line bg-canvas px-4 text-center text-sm font-semibold transition-colors hover:bg-primary-soft disabled:opacity-50";
 const card = "flex flex-col gap-4 rounded-panel border border-line bg-surface p-5 sm:p-6";
 const badgeBase = "inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap";
 const chip = "inline-flex items-center rounded-full bg-canvas px-2.5 py-1 text-[0.8125rem] text-ink-muted";
-const invoiceBadge: Record<string, string> = {
-  approved: "bg-[#E8F7EF] text-[#0B7A44] dark:bg-[#12301f] dark:text-[#3dd68c]",
-  paid: "bg-[#E8F7EF] text-[#0B7A44] dark:bg-[#12301f] dark:text-[#3dd68c]",
-  rejected: "bg-[#FFF4ED] text-[#9A3412] dark:bg-danger-soft dark:text-[#fb923c]",
-};
 
 export default async function AssinaturaPage() {
   const { session, timezone } = await requirePanelRole(["owner"]);
@@ -39,34 +47,42 @@ export default async function AssinaturaPage() {
     // Pix ou boleto em aberto: confere o pagamento agora, sem esperar o aviso nem o relógio do servidor.
     if (config.live) await refreshOpenCharge(db, session.tenantId, { accessToken: config.accessToken, collectorId: config.collectorId, liveMode: true });
   }
-  const { current, available, invoices, pendingCheckoutUrl, subscription, activeProfessionals, charges, paidUntil, paidActive: paidNow, justPaid } = await getBillingOverview(db, session.tenantId);
+  const { current, available, invoices, pendingCheckoutUrl, subscription, activeProfessionals, charges, paidUntil, justPaid } = await getBillingOverview(db, session.tenantId);
   const [loginUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, session.userId)).limit(1);
   const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: timezone });
   const live = config?.live === true;
   const canCheckout = Boolean(config) && !session.support && session.emailVerified && ["trial", "active", "past_due"].includes(current.status);
   const plan = available.find((item) => item.id === current.id);
-  const subscribed = subscription?.providerStatus === "authorized";
+  // Tudo o que o topo diz sobre o plano vem desta função, e o histórico lá embaixo é uma lista só:
+  // o pagamento em vigor (Pix, boleto ou cartão) nunca convive com um aviso de "recusado" antigo.
+  const summary = summarizePlan({
+    tenantStatus: current.status,
+    subscriptionStatus: subscription?.providerStatus ?? null,
+    subscriptionAccessUntil: subscription?.accessUntil ?? null,
+    paidUntil,
+    cardRejected: invoices.some((invoice) => invoice.status === "rejected"),
+    cardPaid: invoices.some((invoice) => invoice.status === "approved" || invoice.status === "paid"),
+    now: new Date(),
+    formatDate: (value) => date.format(value),
+  });
+  const { subscribed } = summary;
   const cancelled = subscription?.providerStatus === "cancelled" || subscription?.providerStatus === "canceled";
-  const paidByCharge = Boolean(paidUntil) && !subscribed;
-  const paidActive = paidByCharge && paidNow;
-  // Cancelada sem nada pago e com cobrança recusada: foi a tentativa de assinar que não passou.
-  const refused = cancelled && !subscription?.accessUntil && !paidActive && invoices.some((invoice) => invoice.status === "rejected") && !invoices.some((invoice) => invoice.status === "approved" || invoice.status === "paid");
+  const history = buildPaymentHistory(invoices, charges);
   const scheduled = subscribed && subscription?.scheduledPlanId ? available.find((item) => item.id === subscription.scheduledPlanId) : undefined;
   const dayText = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: timezone });
   const openRow = charges.find((item) => ["pending", "uncertain", "creating"].includes(item.status));
   const openCharge: OpenCharge | null = openRow && openRow.status === "pending" && (openRow.method === "pix" || openRow.method === "boleto")
     ? { id: openRow.id, method: openRow.method, amountLabel: formatBRL(openRow.amountCents), qrCode: openRow.qrCode, qrCodeBase64: openRow.qrCodeBase64, ticketUrl: openRow.ticketUrl, barcode: openRow.barcode, validity: openRow.expiresAt ? `vale até ${dayText.format(openRow.expiresAt)}` : null }
     : null;
-  const canCharge = live && canCheckout && !subscribed && !pendingCheckoutUrl && !openRow && !(subscription && ["creating", "uncertain", "pending", "paused"].includes(subscription.providerStatus));
+  // Pago há menos de uma hora: o bloco de pagamento mostra a confirmação em vez de oferecer outro Pix.
+  const lastCharge = charges[0];
+  const confirmed: ConfirmedCharge | null = justPaid && !openRow && lastCharge && (lastCharge.method === "pix" || lastCharge.method === "boleto")
+    ? { method: lastCharge.method, paidUntilLabel: paidUntil ? date.format(paidUntil) : null }
+    : null;
+  const canCharge = live && canCheckout && !subscribed && !pendingCheckoutUrl && !openRow && !confirmed && !(subscription && ["creating", "uncertain", "pending", "paused"].includes(subscription.providerStatus));
   const canChangePlan = !session.support && ["trial", "active", "past_due"].includes(current.status) && !(subscription && ["paused", "creating", "uncertain"].includes(subscription.providerStatus));
   const currentPlan = plan;
-  const statusBadge = paidActive ? { text: "Plano pago", tone: "bg-[#E8F7EF] text-[#0B7A44] dark:bg-[#12301f] dark:text-[#3dd68c]" }
-    : current.status === "trial" ? { text: "Período de teste", tone: "bg-primary-soft text-primary" }
-    : current.status === "past_due" ? { text: "Pagamento pendente", tone: "bg-[#FFF4ED] text-[#9A3412] dark:bg-danger-soft dark:text-[#fb923c]" }
-    : refused ? { text: "Pagamento recusado", tone: "bg-[#FFF4ED] text-[#9A3412] dark:bg-danger-soft dark:text-[#fb923c]" }
-    : cancelled ? { text: "Cancelada", tone: "bg-line text-ink-muted" }
-    : subscribed ? { text: "Assinatura ativa", tone: "bg-[#E8F7EF] text-[#0B7A44] dark:bg-[#12301f] dark:text-[#3dd68c]" }
-    : null;
+  const statusBadge = summary.badge;
   return <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
     <div className="flex flex-col gap-2">
       <Link href="/painel/configuracoes" className="text-sm text-primary">‹ Configurações</Link>
@@ -79,16 +95,10 @@ export default async function AssinaturaPage() {
           <p className="m-0 text-sm text-ink-muted">Seu plano</p>
           <h2 id="plano-atual" className="text-2xl font-semibold">{current.name}</h2>
         </div>
-        {statusBadge ? <span className={`${badgeBase} ${statusBadge.tone}`}>{statusBadge.text}</span> : null}
+        {statusBadge ? <span className={`${badgeBase} ${TONE_BADGE[statusBadge.tone]}`}>{statusBadge.text}</span> : null}
       </header>
       {plan ? <p className="m-0 text-ink-muted"><span className="text-xl font-semibold text-foreground">{formatBRL(plan.priceCents)}</span>/mês</p> : null}
-      {current.status === "trial" && !paidActive ? <p className="m-0 text-sm text-ink-muted">Você está no período de teste. Assine quando quiser para continuar depois dele.</p> : null}
-      {current.status === "past_due" ? <p className="m-0 text-sm text-danger">Não conseguimos confirmar o pagamento. Regularize para continuar recebendo agendamentos.</p> : null}
-      {subscribed ? <p className="m-0 text-sm text-ink-muted">Cobrada todo mês no cartão pela Mercado Pago.</p> : null}
-      {justPaid && paidUntil ? <p role="status" className="m-0 rounded-field bg-[#E8F7EF] p-3 text-sm font-semibold text-[#0B7A44] dark:bg-[#12301f] dark:text-[#3dd68c]">Pagamento confirmado! Seu plano está pago até {date.format(paidUntil)}.</p> : null}
-      {paidByCharge && paidUntil && !justPaid ? <p className="m-0 text-sm text-ink-muted">Pago por Pix ou boleto até <strong className="text-foreground">{date.format(paidUntil)}</strong>.</p> : null}
-      {refused ? <p role="status" className="m-0 rounded-field bg-[#FFF4ED] p-3 text-sm text-[#9A3412] dark:bg-danger-soft dark:text-[#fb923c]">O pagamento não foi aprovado e o Mercado Pago encerrou essa tentativa. Você pode assinar de novo logo abaixo, de preferência com outro cartão.</p> : null}
-      {cancelled && !refused && !paidActive ? <p className="m-0 text-sm text-ink-muted">Assinatura cancelada.{subscription?.accessUntil ? ` Seu acesso vai até ${date.format(subscription.accessUntil)}.` : ""}</p> : null}
+      {summary.notices.map((notice) => <p key={notice.key} role={notice.tone === "warn" ? "status" : undefined} className={TONE_NOTICE[notice.tone]}>{notice.text}</p>)}
     </section>
 
     <section aria-labelledby="planos" className="flex flex-col gap-3">
@@ -149,31 +159,20 @@ export default async function AssinaturaPage() {
       </details> : null}
     </section>
 
-    {live && (openCharge || canCharge) ? <section aria-labelledby="pix-boleto" className={card}>
+    {live && (openCharge || canCharge || confirmed) ? <section aria-labelledby="pix-boleto" className={card}>
       <h2 id="pix-boleto" className="text-xl font-semibold">Pagar por Pix ou boleto</h2>
       {openRow && !openCharge ? <p className="m-0 text-sm text-ink-muted">Estamos confirmando o pagamento anterior. Em alguns minutos você poderá gerar outro, se precisar.</p> : null}
-      <ChargePanel open={openCharge} canCreate={canCharge} priceLabel={plan ? formatBRL(plan.priceCents) : ""} />
+      <ChargePanel open={openCharge} canCreate={canCharge} confirmed={confirmed} priceLabel={plan ? formatBRL(plan.priceCents) : ""} />
     </section> : null}
 
-    {charges.length > 0 ? <section aria-labelledby="pagamentos" className={card}>
-      <h2 id="pagamentos" className="text-xl font-semibold">Pagamentos por Pix e boleto</h2>
-      <ul className="m-0 flex list-none flex-col p-0">{charges.map((charge) => <li key={charge.id} className="flex items-start justify-between gap-3 border-t border-line py-3 first:border-t-0 first:pt-0">
+    <section aria-labelledby="historico" className={card}>
+      <h2 id="historico" className="text-xl font-semibold">Histórico de pagamentos</h2>
+      {history.length === 0 ? <p className="m-0 text-sm text-ink-muted">Nenhum pagamento registrado.</p> : <ul className="m-0 flex list-none flex-col p-0">{history.map((row) => <li key={row.id} className="flex items-start justify-between gap-3 border-t border-line py-3 first:border-t-0 first:pt-0">
         <div className="flex flex-col gap-0.5">
-          <span className="font-semibold">{formatBRL(charge.amountCents)} · {charge.method === "pix" ? "Pix" : "Boleto"}</span>
-          <span className="text-sm text-ink-muted">{charge.paidAt ? `Pago em ${date.format(charge.paidAt)}${charge.periodEnd ? ` · vale até ${date.format(charge.periodEnd)}` : ""}` : `Gerado em ${date.format(charge.createdAt)}`}</span>
+          <span className="font-semibold">{formatBRL(row.amountCents)} · {PAYMENT_KIND_LABEL[row.kind]}</span>
+          <span className="text-sm text-ink-muted">{row.state === "paid" ? `Pago em ${date.format(row.date)}${row.validUntil ? ` · vale até ${date.format(row.validUntil)}` : ""}` : row.dueAt ? `Vencimento: ${date.format(row.dueAt)}` : `Gerado em ${date.format(row.date)}`}</span>
         </div>
-        <span className={`${badgeBase} ${charge.status === "approved" ? invoiceBadge.approved : charge.status === "pending" ? "bg-primary-soft text-primary" : "bg-line text-ink-muted"}`}>{chargeLabel[charge.status] ?? "Em processamento"}</span>
-      </li>)}</ul>
-    </section> : null}
-
-    <section aria-labelledby="faturas" className={card}>
-      <h2 id="faturas" className="text-xl font-semibold">Faturas</h2>
-      {invoices.length === 0 ? <p className="m-0 text-sm text-ink-muted">Nenhuma fatura registrada.</p> : <ul className="m-0 flex list-none flex-col p-0">{invoices.map((invoice) => <li key={invoice.id} className="flex items-start justify-between gap-3 border-t border-line py-3 first:border-t-0 first:pt-0">
-        <div className="flex flex-col gap-0.5">
-          <span className="font-semibold">{formatBRL(invoice.amountCents)}</span>
-          <span className="text-sm text-ink-muted">{invoice.dueAt ? `Vencimento: ${date.format(invoice.dueAt)}` : ""}{invoice.dueAt && invoice.paidAt ? " · " : ""}{invoice.paidAt ? `Pago: ${date.format(invoice.paidAt)}` : ""}</span>
-        </div>
-        <span className={`${badgeBase} ${invoiceBadge[invoice.status] ?? "bg-line text-ink-muted"}`}>{statusLabel[invoice.status] ?? "Em processamento"}</span>
+        <span className={`${badgeBase} ${TONE_BADGE[STATE_TONE[row.state]]}`}>{PAYMENT_STATE_LABEL[row.state]}</span>
       </li>)}</ul>}
     </section>
   </div>;

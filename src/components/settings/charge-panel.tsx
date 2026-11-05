@@ -1,7 +1,8 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { startChargeAction, type ChargeFormState } from "@/app/painel/configuracoes/assinatura/actions";
 import { useToast } from "@/components/ui/toast";
 
@@ -17,20 +18,109 @@ export type OpenCharge = {
   validity: string | null;
 };
 
+/** Pagamento já confirmado: o que a tela mostra no lugar do QR Code. */
+export type ConfirmedCharge = { method: "pix" | "boleto"; paidUntilLabel: string | null };
+
+/** De quanto em quanto tempo a tela pergunta ao servidor se o pagamento caiu. */
+const POLL_MS = 3_000;
+const POLL_HIDDEN_MS = 20_000;
+
 const field = "min-h-11 w-full rounded-field border border-line bg-canvas px-3 text-base font-normal";
 const primaryButton = "flex min-h-12 w-full items-center justify-center rounded-field bg-primary px-5 text-center font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60";
 const secondaryButton = "flex min-h-11 w-full items-center justify-center rounded-field border border-line bg-canvas px-4 text-center text-sm font-semibold transition-colors hover:bg-primary-soft disabled:opacity-50";
 
 const STATES = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
 
-/** Cobrança em aberto: mostra o QR ou o boleto e se atualiza sozinha quando o pagamento é confirmado. */
-function OpenChargeView({ charge }: { charge: OpenCharge }) {
+/** O que o servidor responde sobre a cobrança (`GET /api/painel/cobranca/status`). */
+type StatusResponse = { ok?: boolean; state?: string; method?: "pix" | "boleto"; paidUntilLabel?: string | null };
+
+/** Pagamento confirmado, no mesmo lugar onde estava o QR Code. */
+function ConfirmedView({ charge }: { charge: ConfirmedCharge }) {
+  return (
+    <div role="status" className="flex flex-col items-center gap-3 rounded-field bg-[#E8F7EF] p-6 text-center dark:bg-[#12301f]">
+      <span className="grid size-14 place-items-center rounded-full bg-[#0B7A44] text-white dark:bg-[#3dd68c] dark:text-[#12301f]" aria-hidden="true">
+        <Check className="size-8" strokeWidth={3} />
+      </span>
+      <p className="m-0 text-xl font-semibold text-[#0B7A44] dark:text-[#3dd68c]">{charge.method === "pix" ? "Pix confirmado!" : "Boleto pago!"}</p>
+      <p className="m-0 text-sm text-foreground">
+        {charge.paidUntilLabel ? <>Seu plano está pago até <strong>{charge.paidUntilLabel}</strong>.</> : "Seu plano está pago."}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Cobrança em aberto: mostra o QR ou o boleto e pergunta ao servidor, a cada 3 s, se o pagamento
+ * caiu. Ao cair, avisa quem chamou (que troca o QR pela confirmação, sem recarregar a página).
+ * Com a aba escondida pergunta menos, e ao voltar para a aba pergunta na hora.
+ */
+function OpenChargeView({ charge, onConfirmed }: { charge: OpenCharge; onConfirmed: (confirmed: ConfirmedCharge) => void }) {
   const router = useRouter();
   const { show } = useToast();
+  const [offline, setOffline] = useState(false);
+  const confirmedRef = useRef(onConfirmed);
   useEffect(() => {
-    const timer = setInterval(() => router.refresh(), 10_000);
-    return () => clearInterval(timer);
-  }, [router]);
+    confirmedRef.current = onConfirmed;
+  });
+
+  useEffect(() => {
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const controller = new AbortController();
+
+    function schedule() {
+      if (stopped) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => void check(), document.visibilityState === "visible" ? POLL_MS : POLL_HIDDEN_MS);
+    }
+
+    async function check() {
+      if (stopped) return;
+      try {
+        const response = await fetch(`/api/painel/cobranca/status?id=${encodeURIComponent(charge.id)}`, { cache: "no-store", signal: controller.signal });
+        if (response.status === 401) {
+          // Sessão perdida ou conta trocada: a página decide o que mostrar.
+          stopped = true;
+          router.refresh();
+          return;
+        }
+        const data = (await response.json()) as StatusResponse;
+        if (stopped) return;
+        setOffline(false);
+        if (data.state === "approved") {
+          stopped = true;
+          confirmedRef.current({ method: data.method ?? charge.method, paidUntilLabel: data.paidUntilLabel ?? null });
+          return;
+        }
+        if (data.state === "expired" || data.state === "failed" || data.state === "none") {
+          stopped = true;
+          router.refresh();
+          return;
+        }
+      } catch {
+        if (stopped) return;
+        setOffline(true);
+      }
+      schedule();
+    }
+
+    function wake() {
+      if (stopped || document.visibilityState !== "visible") return;
+      clearTimeout(timer);
+      void check();
+    }
+
+    schedule();
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("focus", wake);
+    return () => {
+      stopped = true;
+      controller.abort();
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("focus", wake);
+    };
+  }, [charge.id, charge.method, router]);
 
   async function copy(text: string, label: string) {
     try {
@@ -45,7 +135,11 @@ function OpenChargeView({ charge }: { charge: OpenCharge }) {
     <div className="flex flex-col gap-3">
       <p className="m-0 text-sm text-ink-muted">
         {charge.method === "pix" ? "Pague este Pix no app do seu banco" : "Seu boleto está pronto"} · <strong className="text-foreground">{charge.amountLabel}</strong>
-        {charge.validity ? ` · ${charge.validity}` : ""}. Assim que o pagamento for confirmado, esta tela se atualiza e o mês é liberado.
+        {charge.validity ? ` · ${charge.validity}` : ""}.
+      </p>
+      <p role="status" aria-live="polite" className="m-0 flex items-center gap-2 rounded-field bg-primary-soft px-3 py-2 text-sm font-medium text-primary">
+        <span className={`size-2.5 shrink-0 rounded-full ${offline ? "bg-[#9A3412]" : "animate-pulse bg-primary"}`} aria-hidden="true" />
+        {offline ? "Sem conexão agora. Tentando de novo…" : charge.method === "pix" ? "Aguardando o pagamento. Assim que o Pix cair, esta tela confirma sozinha." : "Aguardando o pagamento. Depois de pago, o boleto leva de 1 a 3 dias úteis para compensar e esta tela confirma sozinha."}
       </p>
       {charge.method === "pix" ? (
         <>
@@ -154,8 +248,9 @@ function BoletoFields({ errors }: { errors: Record<string, string> }) {
 }
 
 /** Pagamento do mês por Pix ou boleto. */
-export function ChargePanel({ open, canCreate, priceLabel }: { open: OpenCharge | null; canCreate: boolean; priceLabel: string }) {
+export function ChargePanel({ open, canCreate, priceLabel, confirmed }: { open: OpenCharge | null; canCreate: boolean; priceLabel: string; /** Pagamento confirmado há pouco (o servidor sabe), mostrado no lugar do formulário. */ confirmed: ConfirmedCharge | null }) {
   const [method, setMethod] = useState<"pix" | "boleto">("pix");
+  const [justConfirmed, setJustConfirmed] = useState<ConfirmedCharge | null>(null);
   const [state, action, pending] = useActionState<ChargeFormState, FormData>(startChargeAction, {});
   const { show } = useToast();
   const router = useRouter();
@@ -165,7 +260,22 @@ export function ChargePanel({ open, canCreate, priceLabel }: { open: OpenCharge 
     else if (state.ok) router.refresh();
   }, [state, show, router]);
 
-  if (open) return <OpenChargeView charge={open} />;
+  // A confirmação fica aqui, no lugar do QR Code, e a página ao redor se atualiza em seguida
+  // (plano pago, histórico). Se este bloco sumisse junto com a cobrança, a tela voltaria a oferecer "Gerar Pix".
+  if (justConfirmed) return <ConfirmedView charge={justConfirmed} />;
+  if (open) {
+    return (
+      <OpenChargeView
+        charge={open}
+        onConfirmed={(done) => {
+          setJustConfirmed(done);
+          show(done.method === "pix" ? "Pix confirmado" : "Boleto pago");
+          router.refresh();
+        }}
+      />
+    );
+  }
+  if (confirmed) return <ConfirmedView charge={confirmed} />;
   if (!canCreate) return null;
   return (
     <form action={action} className="flex flex-col gap-3">
