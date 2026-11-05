@@ -127,10 +127,11 @@ test.describe("agenda do painel", () => {
       await block.getByLabel("Motivo (opcional)").fill("Almoço");
       await block.getByRole("button", { name: "Bloquear" }).click();
       await expect(page.getByRole("status").filter({ hasText: "Horário bloqueado" })).toBeVisible();
-      await expect(page.getByText("Bloqueado · Almoço")).toBeVisible();
+      // No computador o bloqueio aparece na coluna do profissional e na lista do dia: basta que apareça.
+      await expect(page.getByText("Bloqueado · Almoço").first()).toBeVisible();
       await page.getByRole("button", { name: "Remover bloqueio Almoço" }).click();
       await page.getByRole("dialog", { name: "Remover bloqueio?" }).getByRole("button", { name: "Remover" }).click();
-      await expect(page.getByText("Bloqueado · Almoço")).toBeHidden();
+      await expect(page.getByText("Bloqueado · Almoço")).toHaveCount(0);
     });
   });
 });
