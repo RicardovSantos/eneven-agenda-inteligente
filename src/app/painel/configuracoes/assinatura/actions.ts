@@ -15,6 +15,7 @@ import { billingConfig, billingReturnUrl } from "@/server/billing/mode";
 import { getStripe } from "@/server/billing/stripe/client";
 import { createStripeSubscription } from "@/server/billing/stripe/checkout";
 import { stripeConfig } from "@/server/billing/stripe/config";
+import { createStripeCharge } from "@/server/billing/stripe/charges";
 import { cancelStripeSubscription, createStripePortalUrl } from "@/server/billing/stripe/manage";
 import { requireOwner } from "@/server/settings/access";
 
@@ -113,25 +114,29 @@ export type ChargeFormState = { ok?: boolean; error?: string; fieldErrors?: Reco
 export async function startChargeAction(_previous: ChargeFormState, form: FormData): Promise<ChargeFormState> {
   const actor = await requireOwner();
   if (actor.support) return { error: "Indisponível no modo suporte.", at: Date.now() };
-  const config = billingConfig();
-  if (!config) return { error: "A cobrança ainda não está disponível.", at: Date.now() };
   const method = form.get("method");
   if (method !== "pix" && method !== "boleto") return { error: "Escolha Pix ou boleto.", at: Date.now() };
   const db = await getDb();
-  // Pix e boleto só existem na Mercado Pago; o roteador confirma que o padrão de hoje consegue gerar.
+  // O provedor vem do padrão salvo no banco (lido aqui, nunca do navegador) e só vale para esta nova cobrança.
+  let gateway;
   try {
-    if ((await resolveGateway(db, method)) !== "mercadopago") return { error: "A cobrança ainda não está disponível.", at: Date.now() };
+    gateway = await resolveGateway(db, method);
   } catch (error) {
     if (error instanceof GatewayUnavailableError) return { error: "A cobrança ainda não está disponível.", at: Date.now() };
     throw error;
   }
+  const config = gateway === "mercadopago" ? billingConfig() : null;
+  const stripe = gateway === "stripe" ? stripeConfig() : null;
+  if (!config && !stripe) return { error: "A cobrança ainda não está disponível.", at: Date.now() };
   const [user] = await db.select({ verified: users.emailVerifiedAt }).from(users).where(eq(users.id, actor.userId)).limit(1);
   if (!user?.verified) return { error: "Confirme o seu e-mail antes de pagar.", at: Date.now() };
   const payer = method === "boleto"
     ? Object.fromEntries(["name", "document", "zipCode", "street", "number", "neighborhood", "city", "state"].map((key) => [key, form.get(key) ?? ""]))
     : undefined;
   try {
-    await createCharge(db, { tenantId: actor.tenantId, ownerUserId: actor.userId, method: method as ChargeMethod, payer }, config);
+    const input = { tenantId: actor.tenantId, ownerUserId: actor.userId, method: method as ChargeMethod, payer };
+    if (stripe) await createStripeCharge(db, input, getStripe(stripe));
+    else await createCharge(db, input, config!);
   } catch (error) {
     if (error instanceof ChargeError) return { error: error.message, fieldErrors: error.fieldErrors, at: Date.now() };
     console.error("Falha ao gerar cobrança avulsa", error instanceof Error ? error.message : "erro");

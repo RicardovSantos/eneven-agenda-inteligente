@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import type Stripe from "stripe";
-import { billingInvoices, billingPaymentAttempts, billingSubscriptions } from "@/db/schema";
+import { auditLog, billingCharges, billingInvoices, billingPaymentAttempts, billingSubscriptions } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { paidThrough } from "../paid-through";
 import { idOf } from "./client";
@@ -143,7 +143,16 @@ export async function reconcileStripeCharge(db: Db, stripe: Stripe, chargeId: st
   if (charge.id !== chargeId || !status || !paymentIntent) return null;
   return db.transaction(async (tx) => {
     const [invoice] = await tx.select().from(billingInvoices).where(eq(billingInvoices.paymentId, paymentIntent)).limit(1).for("update");
-    if (!invoice) throw new Error("Pagamento não corresponde à fatura.");
+    if (!invoice) {
+      // Pix ou boleto avulso: só registra o reembolso/contestação (e audita), sem mexer no acesso, como no Mercado Pago.
+      const [avulso] = await tx.select().from(billingCharges).where(and(eq(billingCharges.provider, "stripe"), eq(billingCharges.providerPaymentId, paymentIntent))).limit(1).for("update");
+      if (!avulso) throw new Error("Pagamento não corresponde à fatura.");
+      if (avulso.status !== status) {
+        await tx.update(billingCharges).set({ status, providerUpdatedAt: now }).where(eq(billingCharges.id, avulso.id));
+        await tx.insert(auditLog).values({ tenantId: avulso.tenantId, action: "billing.charge_disputed", details: { method: avulso.method, status, provider: "stripe" } });
+      }
+      return { tenantId: avulso.tenantId, subscriptionId: "" };
+    }
     const values = { status, providerUpdatedAt: now, paidAt: null };
     const [prior] = await tx.select().from(billingPaymentAttempts).where(eq(billingPaymentAttempts.paymentId, chargeId)).limit(1);
     if (prior) await tx.update(billingPaymentAttempts).set(values).where(eq(billingPaymentAttempts.paymentId, chargeId));

@@ -17,10 +17,12 @@ export type ChargeStatusResult =
   | { state: "approved"; method: "pix" | "boleto"; paidUntil: string | null; paidUntilLabel: string | null };
 
 type Config = { accessToken: string; collectorId: string; liveMode: boolean; fetcher?: typeof fetch };
+/** Consulta o pagamento no provedor da própria cobrança (Stripe), quando a Stripe está ligada. */
+type StripeCheck = (paymentIntentId: string) => Promise<unknown>;
 
 async function readCharge(db: Db, tenantId: string, chargeId: string) {
   const [row] = await db
-    .select({ status: billingCharges.status, method: billingCharges.method, providerPaymentId: billingCharges.providerPaymentId, periodEnd: billingCharges.periodEnd })
+    .select({ provider: billingCharges.provider, status: billingCharges.status, method: billingCharges.method, providerPaymentId: billingCharges.providerPaymentId, periodEnd: billingCharges.periodEnd })
     .from(billingCharges)
     .where(and(eq(billingCharges.id, chargeId), eq(billingCharges.tenantId, tenantId)))
     .limit(1);
@@ -38,20 +40,22 @@ export async function getChargeStatus(
   db: Db,
   tenantId: string,
   chargeId: string,
-  options: { config?: Config | null; now?: Date } = {},
+  options: { config?: Config | null; stripe?: StripeCheck | null; now?: Date } = {},
 ): Promise<ChargeStatusResult> {
   if (!UUID.test(chargeId)) return { state: "none" };
   const now = options.now ?? new Date();
   let charge = await readCharge(db, tenantId, chargeId);
   if (!charge || (charge.method !== "pix" && charge.method !== "boleto")) return { state: "none" };
 
-  if (charge.status === "pending" && charge.providerPaymentId && options.config) {
+  const checker = charge.provider === "stripe" ? options.stripe : options.config;
+  if (charge.status === "pending" && charge.providerPaymentId && checker) {
     const last = lastCheck.get(tenantId) ?? 0;
     if (now.getTime() - last >= CHECK_INTERVAL_MS) {
       if (lastCheck.size >= MAX_TRACKED) lastCheck.clear();
       lastCheck.set(tenantId, now.getTime());
       try {
-        await reconcileCharge(db, charge.providerPaymentId, options.config);
+        if (charge.provider === "stripe") await options.stripe!(charge.providerPaymentId);
+        else await reconcileCharge(db, charge.providerPaymentId, options.config!);
       } catch (error) {
         // Sem resposta da Mercado Pago agora: segue pendente e a próxima consulta tenta de novo.
         console.warn(`Cobrança avulsa não atualizada (${charge.providerPaymentId}): ${error instanceof Error ? error.message : "erro"}`);

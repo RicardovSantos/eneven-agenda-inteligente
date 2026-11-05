@@ -248,8 +248,8 @@ function BoletoFields({ errors }: { errors: Record<string, string> }) {
 }
 
 /** Pagamento do mês por Pix ou boleto. */
-export function ChargePanel({ open, canCreate, priceLabel, confirmed }: { open: OpenCharge | null; canCreate: boolean; priceLabel: string; /** Pagamento confirmado há pouco (o servidor sabe), mostrado no lugar do formulário. */ confirmed: ConfirmedCharge | null }) {
-  const [method, setMethod] = useState<"pix" | "boleto">("pix");
+export function ChargePanel({ open, canCreate, priceLabel, confirmed, methods = ["pix", "boleto"] }: { open: OpenCharge | null; canCreate: boolean; /** Formas que o provedor padrão faz agora. */ methods?: Array<"pix" | "boleto">; priceLabel: string; /** Pagamento confirmado há pouco (o servidor sabe), mostrado no lugar do formulário. */ confirmed: ConfirmedCharge | null }) {
+  const [method, setMethod] = useState<"pix" | "boleto">(methods[0] ?? "pix");
   const [justConfirmed, setJustConfirmed] = useState<ConfirmedCharge | null>(null);
   const [state, action, pending] = useActionState<ChargeFormState, FormData>(startChargeAction, {});
   const { show } = useToast();
@@ -279,8 +279,8 @@ export function ChargePanel({ open, canCreate, priceLabel, confirmed }: { open: 
   if (!canCreate) return null;
   return (
     <form action={action} className="flex flex-col gap-3">
-      <div role="radiogroup" aria-label="Forma de pagamento" className="grid grid-cols-2 gap-2">
-        {(["pix", "boleto"] as const).map((option) => (
+      <div role="radiogroup" aria-label="Forma de pagamento" className={`grid gap-2 ${methods.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+        {methods.map((option) => (
           <label key={option} className={`flex min-h-12 cursor-pointer items-center justify-center rounded-field border px-3 text-center font-semibold ${method === option ? "border-primary bg-primary-soft text-primary" : "border-line bg-canvas"}`}>
             <input type="radio" name="method" value={option} checked={method === option} onChange={() => setMethod(option)} className="sr-only" />
             {option === "pix" ? "Pix" : "Boleto"}

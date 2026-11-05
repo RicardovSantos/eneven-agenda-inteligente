@@ -33,11 +33,17 @@ describe("roteador de provedores", () => {
     expect(await resolveGateway(db, "card", MP)).toBe("mercadopago");
   });
 
-  it("a Stripe só faz cartão", () => {
+  it("a Stripe faz cartão, Pix e boleto no modo real", () => {
     const env = { NODE_ENV: "production", ...STRIPE_TEST };
+    expect(gatewayReadiness("stripe", "pix", env).ready).toBe(true);
+    expect(gatewayReadiness("stripe", "boleto", env).ready).toBe(true);
+    expect(gatewayReadiness("stripe", "card", env).ready).toBe(true);
+  });
+  it("Pix e boleto da Stripe não valem em produção com chave de teste (cartão vale)", () => {
+    const env = { NODE_ENV: "production", STRIPE_SECRET_KEY: "sk_test_x", STRIPE_WEBHOOK_SECRET: "whsec_a" };
+    expect(gatewayReadiness("stripe", "card", env).ready).toBe(true);
     expect(gatewayReadiness("stripe", "pix", env).ready).toBe(false);
     expect(gatewayReadiness("stripe", "boleto", env).ready).toBe(false);
-    expect(gatewayReadiness("stripe", "card", env).ready).toBe(true);
   });
 
   it("em produção o modo real exige chave real", () => {
@@ -53,7 +59,7 @@ describe("troca do provedor padrão (superadmin)", () => {
   it("lista só provedores capazes em cada forma", async () => {
     const routing = await getPaymentRouting(db, { ...MP, ...STRIPE_TEST });
     const by = Object.fromEntries(routing.map((r) => [r.method, r.options.map((o) => o.gateway)]));
-    expect(by).toEqual({ card: ["mercadopago", "stripe"], pix: ["mercadopago"], boleto: ["mercadopago"] });
+    expect(by).toEqual({ card: ["mercadopago", "stripe"], pix: ["mercadopago", "stripe"], boleto: ["mercadopago", "stripe"] });
   });
 
   it("não deixa escolher a Stripe sem credenciais", async () => {
@@ -61,9 +67,10 @@ describe("troca do provedor padrão (superadmin)", () => {
     expect((await getGatewaySettings(db)).card).toBe("mercadopago");
   });
 
-  it("não deixa escolher a Stripe para Pix ou boleto", async () => {
-    await expect(setPaymentGateway(db, actor, { method: "pix", provider: "stripe" }, { ...MP, ...STRIPE_TEST })).rejects.toThrow();
-    await expect(setPaymentGateway(db, actor, { method: "boleto", provider: "stripe" }, { ...MP, ...STRIPE_TEST })).rejects.toThrow();
+  it("Pix da Stripe só com a Stripe em modo real", async () => {
+    const test = { ...MP, STRIPE_SECRET_KEY: "sk_test_x", STRIPE_WEBHOOK_SECRET: "whsec_a" };
+    await expect(setPaymentGateway(db, actor, { method: "pix", provider: "stripe" }, test)).rejects.toThrow(/modo de teste/);
+    expect(await setPaymentGateway(db, actor, { method: "pix", provider: "stripe" }, { ...MP, ...STRIPE_TEST })).toEqual({ changed: true });
   });
 
   it("rejeita valores inválidos", async () => {

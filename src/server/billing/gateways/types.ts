@@ -13,11 +13,11 @@ export const METHOD_LABEL: Record<PaymentMethod, string> = { card: "Cartão de c
 
 /**
  * O que cada provedor sabe fazer aqui. Só vale `true` o que está implementado e validado:
- * a Stripe cobra cartão por assinatura; Pix e boleto avulsos continuam só na Mercado Pago.
+ * a Stripe cobra cartão por assinatura e Pix/boleto avulsos (estes só no modo real em produção).
  */
 export const CAPABILITIES: Record<Gateway, Record<PaymentMethod, boolean>> = {
   mercadopago: { card: true, pix: true, boleto: true },
-  stripe: { card: true, pix: false, boleto: false },
+  stripe: { card: true, pix: true, boleto: true },
 };
 
 export const DEFAULT_SETTINGS: GatewaySettings = { card: "mercadopago", pix: "mercadopago", boleto: "mercadopago" };
