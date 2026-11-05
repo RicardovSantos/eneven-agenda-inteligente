@@ -1,4 +1,5 @@
 import { isSandboxAccessToken } from "./sandbox";
+import { stripeLiveEnabled } from "./stripe/config";
 
 type Env = Record<string, string | undefined>;
 
@@ -38,6 +39,11 @@ function backUrlFrom(appUrl: string | undefined): string | null {
   }
 }
 
+/** Endereço de retorno do checkout (a tela de assinatura), montado no servidor a partir de `APP_URL`; `null` se inválido. */
+export function billingReturnUrl(env: Env = process.env): string | null {
+  return backUrlFrom(env.APP_URL);
+}
+
 /** Configuração ativa da cobrança (real ou sandbox) ou `null` se nada está configurado. */
 export function billingConfig(env: Env = process.env): BillingConfig | null {
   const backUrl = backUrlFrom(env.APP_URL);
@@ -64,4 +70,9 @@ export function assertBillingConfig(config: { accessToken: string; live?: boolea
 export function billingAccessEnabled(config: { accessToken: string; liveMode: boolean }, env: Env = process.env): boolean {
   if (config.liveMode) return liveBillingEnabled(env) && config.accessToken === env.MERCADO_PAGO_ACCESS_TOKEN;
   return env.NODE_ENV !== "production" && isSandboxAccessToken(config.accessToken, env);
+}
+
+/** Algum provedor está com a cobrança real ligada em produção (Mercado Pago ou Stripe). */
+export function anyLiveBillingEnabled(env: Env = process.env): boolean {
+  return liveBillingEnabled(env) || stripeLiveEnabled(env);
 }

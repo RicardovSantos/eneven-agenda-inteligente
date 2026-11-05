@@ -1,11 +1,11 @@
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { auditLog, billingInvoices, billingPaymentAttempts, billingSubscriptions, tenants } from "@/db/schema";
 import type { Db } from "@/db/types";
-import { liveBillingEnabled } from "./mode";
+import { anyLiveBillingEnabled } from "./mode";
 
 /** Nunca desbloqueia bloqueio manual ou cancelamento da conta; só age no modo real em produção ou no sandbox fora dela. */
 export async function reconcileBillingAccess(db: Db, tenantId: string, now = new Date()): Promise<"updated" | "unchanged" | "review"> {
-  if (process.env.NODE_ENV === "production" && !liveBillingEnabled()) throw new Error("Conciliação indisponível em produção.");
+  if (process.env.NODE_ENV === "production" && !anyLiveBillingEnabled()) throw new Error("Conciliação indisponível em produção.");
   if (!Number.isFinite(now.getTime())) throw new Error("Data inválida.");
   return db.transaction(async (tx) => {
     const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1).for("update");

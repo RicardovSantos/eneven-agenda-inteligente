@@ -18,8 +18,8 @@ export async function register() {
     });
   }
 
-  const { liveBillingEnabled } = await import("@/server/billing/mode");
-  if (liveBillingEnabled(process.env)) {
+  const { anyLiveBillingEnabled } = await import("@/server/billing/mode");
+  if (anyLiveBillingEnabled(process.env)) {
     const { getDb } = await import("@/db/client");
     const { runBillingCycle } = await import("@/server/billing/cycle");
     const { startWhatsAppTimer: startTimer } = await import("@/server/whatsapp/timer");

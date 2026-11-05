@@ -17,6 +17,7 @@ import {
   type AdminActor,
 } from "@/server/platform/actions";
 import { PlatformError } from "@/server/platform/errors";
+import { setPaymentGateway } from "@/server/platform/payment-gateways";
 import { sendOwnerAccessInvite } from "@/server/platform/owner-invite";
 import { updatePlan, type PlanInput } from "@/server/platform/plans";
 import { endSupport, startSupport } from "@/server/platform/support";
@@ -124,6 +125,14 @@ export async function updatePlanAction(planId: string, input: unknown): Promise<
   return run("salvar plano", "Plano salvo", ({ db, actor }) =>
     updatePlan(db, actor, String(planId), (typeof input === "object" && input !== null ? input : {}) as PlanInput),
   );
+}
+
+/** Provedor padrão de uma forma de pagamento (só novas contratações). Só o superadmin; o servidor valida tudo. */
+export async function setPaymentGatewayAction(input: unknown): Promise<AdminActionResult> {
+  const raw = typeof input === "object" && input !== null ? (input as Record<string, unknown>) : {};
+  return run("salvar provedor de pagamento", "Provedor salvo", async ({ db, actor }) => {
+    await setPaymentGateway(db, actor, { method: raw.method, provider: raw.provider });
+  });
 }
 
 /** Envia ao dono o convite para criar a senha (o e-mail sai pelo servidor; o token nunca passa por aqui). */

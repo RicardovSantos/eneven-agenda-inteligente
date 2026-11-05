@@ -15,7 +15,7 @@ export async function getBillingOverview(db: Db, tenantId: string) {
   const [pending] = await withTenant(db, tenantId, (tx) => tx.select({ checkoutUrl: billingSubscriptions.checkoutUrl }).from(billingSubscriptions)
     .where(and(eq(billingSubscriptions.tenantId, tenantId), eq(billingSubscriptions.providerStatus, "pending")))
     .orderBy(desc(billingSubscriptions.createdAt)).limit(1));
-  const [subscription] = await withTenant(db, tenantId, (tx) => tx.select({ providerStatus: billingSubscriptions.providerStatus, accessUntil: billingSubscriptions.accessUntil, scheduledPlanId: billingSubscriptions.scheduledPlanId }).from(billingSubscriptions)
+  const [subscription] = await withTenant(db, tenantId, (tx) => tx.select({ providerStatus: billingSubscriptions.providerStatus, accessUntil: billingSubscriptions.accessUntil, scheduledPlanId: billingSubscriptions.scheduledPlanId, provider: billingSubscriptions.provider, providerCustomerId: billingSubscriptions.providerCustomerId }).from(billingSubscriptions)
     .where(and(eq(billingSubscriptions.tenantId, tenantId), notInArray(billingSubscriptions.providerStatus, ["abandoned", "creating", "uncertain"])))
     .orderBy(desc(billingSubscriptions.createdAt)).limit(1));
   const [professionalCount] = await withTenant(db, tenantId, (tx) => tx.select({ n: count() }).from(professionals).where(and(eq(professionals.tenantId, tenantId), eq(professionals.active, true))));
