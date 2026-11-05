@@ -11,7 +11,7 @@
  */
 
 /** Data da última atualização dos textos (AAAA-MM-DD). */
-export const LEGAL_LAST_UPDATED = "2026-10-24";
+export const LEGAL_LAST_UPDATED = "2026-11-05";
 
 const DEFAULT_OWNER_NAME = "Ricardo Santos";
 const DEFAULT_CONTACT_EMAIL = "eneventech@gmail.com";
@@ -93,7 +93,7 @@ export function buildTermsDocument({ ownerName, ownerDoc, contactEmail }: LegalC
         heading: "4. Teste grátis, planos e pagamento",
         blocks: [
           ul(
-            "Novas contas têm 14 dias de teste grátis, sem cartão de crédito.",
+            "Novas contas têm 30 dias de teste grátis, sem cartão de crédito.",
             "Após o teste, o uso continua mediante assinatura de um dos planos exibidos no painel. Preços, limites (como número de profissionais e franquia de mensagens) e condições aparecem no momento da assinatura.",
             "A assinatura é mensal e renovada automaticamente até ser cancelada. O cancelamento pode ser feito a qualquer momento pelo painel e vale ao fim do período já pago; não há reembolso proporcional de mês em curso, salvo quando exigido por lei.",
             "Sem pagamento após o vencimento, a conta pode passar para o modo somente leitura, sem receber novos agendamentos, até a regularização.",

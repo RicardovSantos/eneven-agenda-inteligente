@@ -48,7 +48,7 @@ export function SignupForm({
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
         <h1 className="text-[1.75rem] font-semibold">Crie sua agenda online</h1>
-        <p className="text-ink-muted">14 dias grátis. Sem cartão de crédito.</p>
+        <p className="text-ink-muted">30 dias grátis. Sem cartão de crédito.</p>
       </div>
 
       <div className="flex flex-col gap-6">

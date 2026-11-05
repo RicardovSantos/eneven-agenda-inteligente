@@ -181,7 +181,7 @@ describe("completeGoogleSignup", () => {
     expect(tenant.status).toBe("trial");
     expect(tenant.name).toBe("Studio Bela");
     expect(tenant.whatsapp).toBe("5511988887777");
-    expect(tenant.trialEndsAt.toISOString()).toBe("2026-11-07T12:00:00.000Z");
+    expect(tenant.trialEndsAt.toISOString()).toBe("2026-11-23T12:00:00.000Z");
 
     const [user] = await db.select().from(users).where(eq(users.id, r.userId));
     expect(user.passwordHash).toBeNull();

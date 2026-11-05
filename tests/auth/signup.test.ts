@@ -32,7 +32,7 @@ describe("signup", () => {
     const [tenant] = await db.select().from(tenants).where(eq(tenants.id, r.tenantId));
     expect(tenant.status).toBe("trial");
     expect(tenant.name).toBe("Defendi Studio");
-    expect(tenant.trialEndsAt.toISOString()).toBe("2026-11-07T12:00:00.000Z");
+    expect(tenant.trialEndsAt.toISOString()).toBe("2026-11-23T12:00:00.000Z");
     expect(tenant.whatsapp).toBe("5511999999999");
 
     const [user] = await db.select().from(users).where(eq(users.id, r.userId));

@@ -33,7 +33,7 @@ export function NewTenantForm({
   const [ownerEmail, setOwnerEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [planId, setPlanId] = useState(defaultPlanId);
-  const [trialDays, setTrialDays] = useState("14");
+  const [trialDays, setTrialDays] = useState("30");
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
