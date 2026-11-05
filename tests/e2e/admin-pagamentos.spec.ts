@@ -21,7 +21,7 @@ test("Plataforma: Pagamentos mostra o provedor padrão de cada forma e a Stripe 
   await expect(stripe).toBeDisabled();
   await expect(card.getByText(/Faltam a chave secreta e o segredo do webhook da Stripe/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Salvar" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Todas as formas" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Todas as formas" })).toHaveCount(0);
 
   // Pix e boleto também têm a Stripe como opção, indisponível sem credenciais.
   for (const nome of ["Pix", "Boleto"]) {
