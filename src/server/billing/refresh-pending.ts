@@ -1,7 +1,9 @@
 import { and, asc, eq, gte, isNotNull } from "drizzle-orm";
 import { billingSubscriptions } from "@/db/schema";
 import type { Db } from "@/db/types";
+import type Stripe from "stripe";
 import { reconcileSubscription } from "./reconcile-subscription";
+import { reconcileStripeCheckout } from "./stripe/reconcile";
 
 const RECENT_MS = 7 * 86_400_000;
 
@@ -25,6 +27,7 @@ export async function refreshPendingSubscriptions(
     .where(
       and(
         eq(billingSubscriptions.providerStatus, "pending"),
+        eq(billingSubscriptions.provider, "mercadopago"),
         isNotNull(billingSubscriptions.providerId),
         gte(billingSubscriptions.createdAt, new Date(now.getTime() - RECENT_MS)),
         options.tenantId ? eq(billingSubscriptions.tenantId, options.tenantId) : undefined,
@@ -39,6 +42,38 @@ export async function refreshPendingSubscriptions(
     } catch (error) {
       result.failed++;
       console.warn(`Assinatura pendente não atualizada (${providerId}): ${error instanceof Error ? error.message : "erro"}`);
+    }
+  }
+  return result;
+}
+
+/**
+ * Mesma ideia para a Stripe: um checkout que expirou ou foi concluído sem o aviso chegar deixa de ficar
+ * "pendente" aqui. Consulta a sessão guardada (`cs_…`) das assinaturas pendentes dos últimos 7 dias.
+ */
+export async function refreshPendingStripeSubscriptions(
+  db: Db,
+  stripe: Stripe,
+  options: { tenantId?: string; limit?: number; now?: Date } = {},
+): Promise<{ updated: number; unchanged: number; failed: number }> {
+  const now = options.now ?? new Date();
+  const limit = Math.max(1, Math.min(100, Math.floor(options.limit ?? 50)));
+  const rows = await db.select({ providerId: billingSubscriptions.providerId }).from(billingSubscriptions)
+    .where(and(
+      eq(billingSubscriptions.providerStatus, "pending"),
+      eq(billingSubscriptions.provider, "stripe"),
+      isNotNull(billingSubscriptions.providerId),
+      gte(billingSubscriptions.createdAt, new Date(now.getTime() - RECENT_MS)),
+      options.tenantId ? eq(billingSubscriptions.tenantId, options.tenantId) : undefined,
+    )).orderBy(asc(billingSubscriptions.createdAt)).limit(limit);
+  const result = { updated: 0, unchanged: 0, failed: 0 };
+  for (const { providerId } of rows) {
+    if (!providerId?.startsWith("cs_")) { result.unchanged++; continue; }
+    try {
+      result[(await reconcileStripeCheckout(db, stripe, providerId)) ? "updated" : "unchanged"]++;
+    } catch (error) {
+      result.failed++;
+      console.warn(`Checkout da Stripe não atualizado (${providerId}): ${error instanceof Error ? error.message : "erro"}`);
     }
   }
   return result;

@@ -4,6 +4,9 @@ import type { Db } from "@/db/types";
 import { assertBillingConfig } from "./mode";
 import { paidThrough } from "./paid-through";
 import { assertSandboxAccount } from "./sandbox";
+import { getStripe } from "./stripe/client";
+import { stripeConfig } from "./stripe/config";
+import { updateStripeAmount } from "./stripe/manage";
 import { validateSubscriptionIdentity } from "./subscription-validation";
 
 type Config = { accessToken: string; collectorId: string; live?: boolean; fetcher?: typeof fetch };
@@ -26,6 +29,20 @@ async function updateRemoteAmount(config: Config, subscription: { id: string; pr
   const remote = body as Record<string, unknown>;
   validateSubscriptionIdentity(remote, { reference: subscription.id, collectorId: config.collectorId, priceCents });
   if (remote.id !== subscription.providerId || remote.status !== "authorized") throw new Error("Alteração não confirmada.");
+}
+
+/** Muda o valor das próximas cobranças no provedor em que a assinatura nasceu (nunca no padrão atual). */
+async function updateRemoteAmountFor(subscription: { id: string; provider: string; providerId: string }, priceCents: number, config: Config | null): Promise<void> {
+  if (subscription.provider === "stripe") {
+    const stripe = stripeConfig();
+    if (!stripe) throw new Error("Cobrança não configurada.");
+    await updateStripeAmount(getStripe(stripe), subscription, priceCents);
+    return;
+  }
+  if (!config) throw new Error("Cobrança não configurada.");
+  assertBillingConfig(config);
+  if (!config.live) await assertSandboxAccount(config.accessToken, config.collectorId, config.fetcher);
+  await updateRemoteAmount(config, subscription, priceCents);
 }
 
 async function activeProfessionals(db: Db, tenantId: string): Promise<number> {
@@ -91,10 +108,7 @@ export async function changePlan(db: Db, input: { tenantId: string; ownerUserId:
   }
 
   // Aumento: o valor novo entra na próxima cobrança e o plano novo vale já.
-  if (!config) throw new Error("Cobrança não configurada.");
-  assertBillingConfig(config);
-  if (!config.live) await assertSandboxAccount(config.accessToken, config.collectorId, config.fetcher);
-  await updateRemoteAmount(config, { id: authorized.id, providerId: authorized.providerId }, target.priceCents);
+  await updateRemoteAmountFor({ id: authorized.id, provider: authorized.provider, providerId: authorized.providerId }, target.priceCents, config);
   await db.transaction(async (tx) => {
     await tx.update(billingSubscriptions).set({ planId: target.id, priceCents: target.priceCents, scheduledPlanId: null }).where(eq(billingSubscriptions.id, authorized.id));
     await tx.update(tenants).set({ planId: target.id }).where(eq(tenants.id, input.tenantId));
@@ -118,8 +132,8 @@ export async function cancelScheduledPlanChange(db: Db, input: { tenantId: strin
  * Se os profissionais ativos não couberem mais no plano menor, a troca é cancelada
  * (e registrada) em vez de forçar nada.
  */
-export async function applyScheduledPlanChanges(db: Db, config: Config, now = new Date()): Promise<{ applied: number; canceled: number; failed: number }> {
-  assertBillingConfig(config);
+export async function applyScheduledPlanChanges(db: Db, config: Config | null, now = new Date()): Promise<{ applied: number; canceled: number; failed: number }> {
+  if (config) assertBillingConfig(config);
   const result = { applied: 0, canceled: 0, failed: 0 };
   const due = await db.select().from(billingSubscriptions)
     .where(and(eq(billingSubscriptions.providerStatus, "authorized"), inArray(billingSubscriptions.tenantId, db.select({ id: tenants.id }).from(tenants).where(eq(tenants.status, "active")))))
@@ -139,7 +153,7 @@ export async function applyScheduledPlanChanges(db: Db, config: Config, now = ne
     if (!target) { await cancel("plan_unavailable"); continue; }
     if (target.maxProfessionals !== null && (await activeProfessionals(db, subscription.tenantId)) > target.maxProfessionals) { await cancel("professionals_exceed_limit"); continue; }
     try {
-      await updateRemoteAmount(config, { id: subscription.id, providerId: subscription.providerId }, target.priceCents);
+      await updateRemoteAmountFor({ id: subscription.id, provider: subscription.provider, providerId: subscription.providerId }, target.priceCents, config);
     } catch { result.failed++; continue; }
     await db.transaction(async (tx) => {
       await tx.update(billingSubscriptions).set({ planId: target.id, priceCents: target.priceCents, scheduledPlanId: null }).where(eq(billingSubscriptions.id, subscription.id));

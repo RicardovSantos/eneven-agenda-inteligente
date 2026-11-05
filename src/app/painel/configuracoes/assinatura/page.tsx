@@ -5,13 +5,17 @@ import { users } from "@/db/schema";
 import { ChargePanel, type ConfirmedCharge, type OpenCharge } from "@/components/settings/charge-panel";
 import { formatBRL } from "@/lib/format";
 import { refreshOpenCharge } from "@/server/billing/charges";
+import { GatewayUnavailableError, type Gateway } from "@/server/billing/gateways/types";
+import { resolveGateway } from "@/server/billing/gateways/router";
 import { billingConfig } from "@/server/billing/mode";
+import { getStripe } from "@/server/billing/stripe/client";
+import { stripeConfig } from "@/server/billing/stripe/config";
 import { PAYMENT_KIND_LABEL, PAYMENT_STATE_LABEL, buildPaymentHistory, type PaymentState } from "@/server/billing/payment-history";
 import { summarizePlan, type SummaryTone } from "@/server/billing/plan-summary";
 import { getBillingOverview } from "@/server/billing/queries";
-import { refreshPendingSubscriptions } from "@/server/billing/refresh-pending";
+import { refreshPendingStripeSubscriptions, refreshPendingSubscriptions } from "@/server/billing/refresh-pending";
 import { requirePanelRole } from "@/server/panel/roles";
-import { cancelSubscriptionAction, changePlanAction, startCheckout, undoPlanChangeAction } from "./actions";
+import { cancelSubscriptionAction, changePlanAction, openCardPortalAction, startCheckout, undoPlanChangeAction } from "./actions";
 
 const TONE_BADGE: Record<SummaryTone, string> = {
   ok: "bg-[#E8F7EF] text-[#0B7A44] dark:bg-[#12301f] dark:text-[#3dd68c]",
@@ -47,11 +51,26 @@ export default async function AssinaturaPage() {
     // Pix ou boleto em aberto: confere o pagamento agora, sem esperar o aviso nem o relógio do servidor.
     if (config.live) await refreshOpenCharge(db, session.tenantId, { accessToken: config.accessToken, collectorId: config.collectorId, liveMode: true });
   }
+  // Provedor do cartão para NOVAS contratações; uma assinatura que já existe segue no provedor dela.
+  let cardGateway: Gateway | null = null;
+  try {
+    cardGateway = await resolveGateway(db, "card");
+  } catch (error) {
+    if (!(error instanceof GatewayUnavailableError)) throw error;
+  }
+  const stripe = stripeConfig();
+  if (stripe) {
+    try {
+      await refreshPendingStripeSubscriptions(db, getStripe(stripe), { tenantId: session.tenantId, limit: 5 });
+    } catch {
+      // Sem resposta da Stripe a tela abre com o que já se sabe.
+    }
+  }
   const { current, available, invoices, pendingCheckoutUrl, subscription, activeProfessionals, charges, paidUntil, justPaid } = await getBillingOverview(db, session.tenantId);
   const [loginUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, session.userId)).limit(1);
   const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: timezone });
-  const live = config?.live === true;
-  const canCheckout = Boolean(config) && !session.support && session.emailVerified && ["trial", "active", "past_due"].includes(current.status);
+  const live = config?.live === true || (cardGateway === "stripe" && stripe?.live === true) || subscription?.provider === "stripe";
+  const canCheckout = cardGateway !== null && !session.support && session.emailVerified && ["trial", "active", "past_due"].includes(current.status);
   const plan = available.find((item) => item.id === current.id);
   // Tudo o que o topo diz sobre o plano vem desta função, e o histórico lá embaixo é uma lista só:
   // o pagamento em vigor (Pix, boleto ou cartão) nunca convive com um aviso de "recusado" antigo.
@@ -79,7 +98,7 @@ export default async function AssinaturaPage() {
   const confirmed: ConfirmedCharge | null = justPaid && !openRow && lastCharge && (lastCharge.method === "pix" || lastCharge.method === "boleto")
     ? { method: lastCharge.method, paidUntilLabel: paidUntil ? date.format(paidUntil) : null }
     : null;
-  const canCharge = live && canCheckout && !subscribed && !pendingCheckoutUrl && !openRow && !confirmed && !(subscription && ["creating", "uncertain", "pending", "paused"].includes(subscription.providerStatus));
+  const canCharge = config?.live === true && canCheckout && !subscribed && !pendingCheckoutUrl && !openRow && !confirmed && !(subscription && ["creating", "uncertain", "pending", "paused"].includes(subscription.providerStatus));
   const canChangePlan = !session.support && ["trial", "active", "past_due"].includes(current.status) && !(subscription && ["paused", "creating", "uncertain"].includes(subscription.providerStatus));
   const currentPlan = plan;
   const statusBadge = summary.badge;
@@ -141,15 +160,16 @@ export default async function AssinaturaPage() {
       </> : null}
       {canCheckout && !pendingCheckoutUrl && !subscribed ? <form action={startCheckout} className="flex flex-col gap-2">
         <input type="hidden" name="planId" value={current.id} />
-        <label className="flex flex-col gap-1.5 text-sm font-medium">
+        {cardGateway === "mercadopago" ? <label className="flex flex-col gap-1.5 text-sm font-medium">
           E-mail da conta Mercado Pago
           <input type="email" name="payerEmail" required defaultValue={loginUser?.email ?? ""} autoComplete="email" inputMode="email" maxLength={254} className="min-h-11 rounded-field border border-line bg-canvas px-3 text-base font-normal" />
           <span className="text-xs font-normal text-ink-muted">Use o e-mail da conta com que você paga no Mercado Pago. Pode ser diferente do e-mail de login. A assinatura fica ligada ao seu estabelecimento pelo código dela, não pelo e-mail.</span>
-        </label>
+        </label> : null}
         <button type="submit" className={primaryButton}>{live ? `${cancelled ? "Assinar novamente" : "Assinar"} o plano ${current.name}${plan ? ` · ${formatBRL(plan.priceCents)}/mês` : ""}` : "Testar assinatura do plano atual"}</button>
-        <p className="m-0 text-sm text-ink-muted">{live ? "Cobrança mensal no cartão pela Mercado Pago. Você pode cancelar quando quiser e o acesso continua até o fim do período já pago." : "Somente ambiente de teste. Não altera seu plano nem ativa cobrança real."}</p>
+        <p className="m-0 text-sm text-ink-muted">{live ? `Cobrança mensal no cartão ${cardGateway === "stripe" ? "pela Stripe" : "pela Mercado Pago"}. Você pode cancelar quando quiser e o acesso continua até o fim do período já pago.` : "Somente ambiente de teste. Não altera seu plano nem ativa cobrança real."}</p>
       </form> : null}
       {subscribed ? <p className="m-0 text-sm text-ink-muted">Sua assinatura está ativa. Para trocar de plano, use os cartões acima.</p> : null}
+      {subscribed && !session.support && subscription?.provider === "stripe" ? <form action={openCardPortalAction}><button type="submit" className={secondaryButton}>Atualizar cartão e ver faturas</button></form> : null}
       {subscribed && !session.support ? <details>
         <summary className="cursor-pointer text-sm text-ink-muted">Cancelar assinatura</summary>
         <form action={cancelSubscriptionAction} className="mt-3 flex flex-col gap-2">
@@ -159,7 +179,7 @@ export default async function AssinaturaPage() {
       </details> : null}
     </section>
 
-    {live && (openCharge || canCharge || confirmed) ? <section aria-labelledby="pix-boleto" className={card}>
+    {config?.live === true && (openCharge || canCharge || confirmed) ? <section aria-labelledby="pix-boleto" className={card}>
       <h2 id="pix-boleto" className="text-xl font-semibold">Pagar por Pix ou boleto</h2>
       {openRow && !openCharge ? <p className="m-0 text-sm text-ink-muted">Estamos confirmando o pagamento anterior. Em alguns minutos você poderá gerar outro, se precisar.</p> : null}
       <ChargePanel open={openCharge} canCreate={canCharge} confirmed={confirmed} priceLabel={plan ? formatBRL(plan.priceCents) : ""} />

@@ -1,8 +1,8 @@
-import { Bell, Building2, CreditCard, Database, MessageCircle, Plus, Tag } from "lucide-react";
+import { Bell, Building2, CreditCard, Database, MessageCircle, Plus, Tag, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import { SettingsGroup, SettingsRow } from "@/components/settings/settings-nav";
 import { requireSuperAdminSession } from "@/server/auth/guard";
-import { liveBillingEnabled } from "@/server/billing/mode";
+import { anyLiveBillingEnabled } from "@/server/billing/mode";
 import { pushAvailable } from "@/server/push/mode";
 
 export const metadata: Metadata = { title: "Gerenciar" };
@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Gerenciar" };
 /** Índice da Plataforma: cada área numa categoria, em vez de links soltos na lista de estabelecimentos. */
 export default async function GerenciarPage() {
   await requireSuperAdminSession();
-  const billingReview = process.env.NODE_ENV !== "production" || liveBillingEnabled();
+  const billingReview = process.env.NODE_ENV !== "production" || anyLiveBillingEnabled();
 
   return (
     <main className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 pb-10 pt-6 lg:px-8 lg:pt-7">
@@ -22,6 +22,7 @@ export default async function GerenciarPage() {
       <SettingsGroup title="Estabelecimentos e planos">
         <SettingsRow href="/admin" Icon={Building2} label="Estabelecimentos" description="Lista, testes, planos e uso de cada salão" />
         <SettingsRow href="/admin/estabelecimentos/novo" Icon={Plus} label="Novo estabelecimento" description="Criar e enviar o acesso ao dono" />
+        <SettingsRow href="/admin/pagamentos" Icon={Wallet} label="Pagamentos" description="Provedor de cartão, Pix e boleto para novas contratações" />
         <SettingsRow href="/admin/planos" Icon={Tag} label="Planos e preços" description="Editar limites e valores dos planos" />
       </SettingsGroup>
 

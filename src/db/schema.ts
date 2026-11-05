@@ -810,6 +810,8 @@ export const whatsappInboundEvents = pgTable("whatsapp_inbound_events", {
 /** Fila global de sinais do provedor; dados de pagamento são obtidos na API. */
 export const billingWebhookEvents = pgTable("billing_webhook_events", {
   requestId: text("request_id").primaryKey(),
+  /** Quem enviou o aviso (o id do aviso só é único dentro de cada provedor). */
+  provider: text("provider").notNull().default("mercadopago"),
   resourceId: text("resource_id").notNull(),
   topic: text("topic").notNull(),
   receivedAt: timestamptz("received_at").notNull().defaultNow(),
@@ -818,7 +820,9 @@ export const billingWebhookEvents = pgTable("billing_webhook_events", {
   processedAt: timestamptz("processed_at"),
 }, (t) => [
   index("billing_webhook_events_pending_idx").on(t.processedAt, t.receivedAt),
-  check("billing_webhook_events_topic_check", sql`${t.topic} in ('payment', 'subscription_preapproval', 'subscription_authorized_payment')`),
+  uniqueIndex("billing_webhook_events_provider_request_unique").on(t.provider, t.requestId),
+  check("billing_webhook_events_provider_check", sql`${t.provider} in ('mercadopago', 'stripe')`),
+  check("billing_webhook_events_topic_check", sql`${t.topic} in ('payment', 'subscription_preapproval', 'subscription_authorized_payment', 'stripe_event')`),
 ]);
 
 /** Assinaturas vinculadas a um estabelecimento, sem armazenar dados de cartão. */
@@ -826,7 +830,11 @@ export const billingSubscriptions = pgTable("billing_subscriptions", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: tenantIdColumn(),
   planId: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "restrict" }),
+  /** Provedor em que esta assinatura nasceu; renovação, cancelamento e troca de plano sempre usam este. */
+  provider: text("provider").notNull().default("mercadopago"),
   providerId: text("provider_id").unique(),
+  /** Cliente no provedor (Stripe `cus_…`); a Mercado Pago não usa. */
+  providerCustomerId: text("provider_customer_id"),
   providerStatus: text("provider_status").notNull().default("pending"),
   checkoutUrl: text("checkout_url"),
   priceCents: integer("price_cents"),
@@ -839,6 +847,7 @@ export const billingSubscriptions = pgTable("billing_subscriptions", {
 }, (t) => [
   unique("billing_subscriptions_tenant_id_id_unique").on(t.tenantId, t.id),
   index("billing_subscriptions_tenant_idx").on(t.tenantId, t.createdAt),
+  check("billing_subscriptions_provider_check", sql`${t.provider} in ('mercadopago', 'stripe')`),
 ]);
 
 /** Reserva idempotente de aviso; resultados incertos não são reenviados automaticamente. */
@@ -920,6 +929,8 @@ export const billingCharges = pgTable("billing_charges", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: tenantIdColumn(),
   planId: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "restrict" }),
+  /** Provedor em que a cobrança foi criada; a conciliação usa sempre este. */
+  provider: text("provider").notNull().default("mercadopago"),
   method: text("method").notNull(),
   amountCents: integer("amount_cents").notNull(),
   /** `creating` e `uncertain` cobrem a criação no provedor (um tempo esgotado pode ter criado o pagamento). */
@@ -940,6 +951,7 @@ export const billingCharges = pgTable("billing_charges", {
   unique("billing_charges_tenant_id_id_unique").on(t.tenantId, t.id),
   index("billing_charges_tenant_idx").on(t.tenantId, t.createdAt),
   check("billing_charges_method_check", sql`${t.method} in ('pix', 'boleto')`),
+  check("billing_charges_provider_check", sql`${t.provider} in ('mercadopago', 'stripe')`),
   check("billing_charges_status_check", sql`${t.status} in ('creating', 'uncertain', 'pending', 'approved', 'expired', 'cancelled', 'refunded', 'charged_back')`),
   check("billing_charges_amount_check", sql`${t.amountCents} > 0`),
   // Uma cobrança em aberto por estabelecimento.
@@ -957,4 +969,19 @@ export const billingRenewalNotices = pgTable("billing_renewal_notices", {
 }, (t) => [
   unique("billing_renewal_notices_tenant_period_unique").on(t.tenantId, t.periodEnd),
   check("billing_renewal_notices_state_check", sql`${t.state} in ('sending', 'sent', 'uncertain')`),
+]);
+
+/**
+ * Provedor padrão de cada forma de pagamento para NOVAS contratações e cobranças (uma linha por forma).
+ * Mudar aqui nunca mexe no que já existe: cada assinatura e cobrança guarda o seu próprio `provider`.
+ * Tabela global (sem estabelecimento): só a conexão da plataforma lê e grava.
+ */
+export const paymentGatewaySettings = pgTable("payment_gateway_settings", {
+  method: text("method").primaryKey(),
+  provider: text("provider").notNull().default("mercadopago"),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+}, (t) => [
+  check("payment_gateway_settings_method_check", sql`${t.method} in ('card', 'pix', 'boleto')`),
+  check("payment_gateway_settings_provider_check", sql`${t.provider} in ('mercadopago', 'stripe')`),
 ]);
