@@ -35,10 +35,6 @@ export function PaymentGatewaysScreen({ settings, changes }: { settings: Gateway
     });
   }
 
-  // "Todas": provedores prontos em todas as formas que eles sabem fazer; as demais ficam como estão.
-  const providers = Array.from(new Set(settings.flatMap((s) => s.options.map((o) => o.gateway))));
-  const readyFor = (provider: string) => settings.filter((s) => s.options.some((o) => o.gateway === provider && o.ready)).map((s) => s.method);
-
   return <main className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 pb-10 pt-6 lg:px-8 lg:pt-7">
     <div className="flex flex-col gap-1">
       <Link href="/admin/gerenciar" className="text-sm text-primary">‹ Gerenciar</Link>
@@ -46,23 +42,6 @@ export function PaymentGatewaysScreen({ settings, changes }: { settings: Gateway
       <p className="m-0 text-sm text-ink-muted">Provedor padrão de cada forma de pagamento.</p>
     </div>
     <p role="note" className="m-0 rounded-field bg-primary-soft p-3 text-sm">A alteração vale somente para novas contratações e novas cobranças ainda não iniciadas. Assinaturas e cobranças existentes continuam no provedor original, inclusive nas renovações.</p>
-    <section aria-labelledby="g-todas" className="flex flex-col gap-3 rounded-panel border border-line bg-surface p-5">
-      <h2 id="g-todas" className="text-xl font-semibold">Todas as formas</h2>
-      <p className="m-0 text-sm text-ink-muted">Escolhe o provedor de uma vez para tudo o que ele sabe fazer. Formas que ele não faz ficam como estão.</p>
-      <div className="flex flex-col gap-2" role="radiogroup" aria-labelledby="g-todas">
-        {providers.map((provider) => {
-          const methods = readyFor(provider);
-          const all = methods.length > 0 && methods.every((m) => saved[m] === provider);
-          return <label key={provider} className={`flex min-h-11 items-start gap-3 rounded-field border border-line p-3 ${methods.length ? "" : "opacity-60"}`}>
-            <input type="radio" name="gateway-todas" value={provider} checked={all} disabled={pending || !methods.length} onChange={() => choose(methods, provider)} className="mt-1" />
-            <span className="flex flex-col">
-              <span className="font-medium">{name(provider)}</span>
-              <span className="text-xs text-ink-muted">{methods.length ? `Vale para: ${methods.map(name).join(", ")}` : "Credenciais ainda não configuradas"}</span>
-            </span>
-          </label>;
-        })}
-      </div>
-    </section>
     {settings.map((setting) => {
       return <section key={setting.method} aria-labelledby={`g-${setting.method}`} className="flex flex-col gap-3 rounded-panel border border-line bg-surface p-5">
         <h2 id={`g-${setting.method}`} className="text-xl font-semibold">{setting.label}</h2>
