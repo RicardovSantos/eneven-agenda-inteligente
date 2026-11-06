@@ -15,6 +15,7 @@ import {
 import { ConfirmDialog } from "@/components/catalog/parts";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { SHEET_HANDLE_CLASS, useSheetDrag } from "@/components/ui/use-sheet-drag";
 import { formatShortDate } from "@/lib/dates";
 import { formatBRL } from "@/lib/format";
 import { formatBrazilPhone } from "@/lib/phone";
@@ -79,6 +80,7 @@ export function BookingDetail({
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   const isDesktop = useIsDesktop();
+  const sheetDrag = useSheetDrag(() => sectionRef.current, onClose);
 
   // Foco só ao abrir (o detalhe re-renderiza a cada minuto e a cada ação) e,
   // ao fechar, volta para o item da lista que abriu o detalhe.
@@ -171,7 +173,9 @@ export function BookingDetail({
         data-testid="booking-detail"
         className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col gap-[18px] overflow-y-auto rounded-t-[22px] bg-surface px-5 pb-6 pt-2.5 text-foreground shadow-[0_-12px_32px_-12px_rgb(41_48_60/0.35)] outline-none lg:static lg:z-auto lg:max-h-none lg:overflow-visible lg:rounded-none lg:bg-transparent lg:p-0 lg:shadow-none"
       >
-        <span aria-hidden="true" className="h-1 w-10 self-center rounded-full bg-line lg:hidden" />
+        <div {...sheetDrag} aria-hidden="true" data-testid="sheet-handle" className={SHEET_HANDLE_CLASS}>
+          <span className="h-1 w-10 rounded-full bg-line" />
+        </div>
         <button
           type="button"
           onClick={onClose}

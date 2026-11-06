@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { completeBookingAction, noShowBookingAction } from "@/app/painel/actions";
 import { Button } from "@/components/ui/button";
+import { SHEET_HANDLE_CLASS, useSheetDrag } from "@/components/ui/use-sheet-drag";
 import { useToast } from "@/components/ui/toast";
 import { plural } from "@/lib/dashboard-view";
 
@@ -103,6 +104,7 @@ function ReviewDialog({
   onResolved: (id: string) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const sheetDrag = useSheetDrag(() => ref.current, onClose);
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
@@ -154,7 +156,9 @@ function ReviewDialog({
     >
       {open ? (
         <div className="flex flex-col gap-4 px-4 pb-6 pt-3 lg:p-6">
-          <div aria-hidden="true" className="mx-auto h-1 w-10 rounded-full bg-line lg:hidden" />
+          <div {...sheetDrag} aria-hidden="true" className={SHEET_HANDLE_CLASS}>
+            <span className="h-1 w-10 rounded-full bg-line" />
+          </div>
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-col gap-1">
               <h2 id="pending-title" className="font-display text-xl font-semibold lg:text-[1.375rem]">
