@@ -134,4 +134,34 @@ test.describe("agenda do painel", () => {
       await expect(page.getByText("Bloqueado · Almoço")).toHaveCount(0);
     });
   });
+
+  test("celular: arrastar o traço da folha do detalhe para baixo fecha; puxão curto volta ao lugar", async ({ page, request }) => {
+    const { slug } = await seedTenant(request);
+    const booked = await seedBooking(request, slug, { customerName: "Marina Costa", phone: "(11) 91111-2222" });
+    await loginAs(page, request, slug);
+    await open(page, `/painel?data=${saoPauloDate(booked.startsAt)}`);
+    await page.getByRole("button", { name: /Marina Costa/ }).first().click();
+    const detail = page.getByTestId("booking-detail");
+    await expect(detail).toBeVisible();
+    const handle = page.getByTestId("sheet-handle");
+    const box = (await handle.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+
+    // Puxão curto e devagar: a folha volta ao lugar e continua aberta.
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + 30, { steps: 5 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    await expect(detail).toBeVisible();
+    expect(await detail.evaluate((el) => (el as HTMLElement).style.transform)).toBe("");
+
+    // Arrastar bastante para baixo: a folha desce e fecha.
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + 220, { steps: 10 });
+    await page.mouse.up();
+    await expect(detail).toHaveCount(0);
+  });
 });
