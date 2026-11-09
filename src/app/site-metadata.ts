@@ -24,7 +24,7 @@ export const metadata: Metadata = {
       { url: "/brand/favicon.ico", sizes: "any" },
       { url: "/brand/icon-32.png", type: "image/png", sizes: "32x32" },
     ],
-    apple: "/brand/apple-touch-icon.png",
+    apple: "/app-icons/calendar-v1-apple.png",
   },
   appleWebApp: {
     capable: true,
@@ -58,3 +58,4 @@ export const viewport: Viewport = {
   colorScheme: "light dark",
   themeColor: THEME_COLOR,
 };
+

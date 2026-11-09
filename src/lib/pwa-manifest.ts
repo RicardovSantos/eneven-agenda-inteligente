@@ -22,10 +22,10 @@ export function buildManifest(): MetadataRoute.Manifest {
     theme_color: "#3E07D2",
     background_color: "#FFFFFF",
     icons: [
-      { src: "/brand/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/brand/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/app-icons/calendar-v1-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/app-icons/calendar-v1-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       {
-        src: "/brand/icon-maskable-512.png",
+        src: "/app-icons/calendar-v1-maskable.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
@@ -35,13 +35,14 @@ export function buildManifest(): MetadataRoute.Manifest {
       {
         name: "Agenda de hoje",
         url: "/painel?view=dia",
-        icons: [{ src: "/brand/icon-192.png", sizes: "192x192", type: "image/png" }],
+        icons: [{ src: "/app-icons/calendar-v1-192.png", sizes: "192x192", type: "image/png" }],
       },
       {
         name: "Novo agendamento",
         url: "/painel?novo=1",
-        icons: [{ src: "/brand/icon-192.png", sizes: "192x192", type: "image/png" }],
+        icons: [{ src: "/app-icons/calendar-v1-192.png", sizes: "192x192", type: "image/png" }],
       },
     ],
   };
 }
+

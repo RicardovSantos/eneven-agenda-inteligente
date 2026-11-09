@@ -19,14 +19,14 @@ describe("manifest", () => {
   it("declara ícones 192, 512 e maskable 512", () => {
     const icons = m.icons ?? [];
     expect(
-      icons.some((i) => i.src === "/brand/icon-192.png" && i.sizes === "192x192" && i.purpose === "any"),
+      icons.some((i) => i.src === "/app-icons/calendar-v1-192.png" && i.sizes === "192x192" && i.purpose === "any"),
     ).toBe(true);
     expect(
-      icons.some((i) => i.src === "/brand/icon-512.png" && i.sizes === "512x512" && i.purpose === "any"),
+      icons.some((i) => i.src === "/app-icons/calendar-v1-512.png" && i.sizes === "512x512" && i.purpose === "any"),
     ).toBe(true);
     expect(
       icons.some(
-        (i) => i.src === "/brand/icon-maskable-512.png" && i.purpose === "maskable" && i.sizes === "512x512",
+        (i) => i.src === "/app-icons/calendar-v1-maskable.png" && i.purpose === "maskable" && i.sizes === "512x512",
       ),
     ).toBe(true);
     for (const icon of icons) expect(icon.type).toBe("image/png");
@@ -38,3 +38,4 @@ describe("manifest", () => {
     expect(shortcuts.find((s) => s.name === "Novo agendamento")?.url).toBe("/painel?novo=1");
   });
 });
+

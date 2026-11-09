@@ -14,7 +14,7 @@ describe("metadata do layout raiz", () => {
       icon: { url: string }[];
       apple: string;
     };
-    expect(icons.apple).toBe("/brand/apple-touch-icon.png");
+    expect(icons.apple).toBe("/app-icons/calendar-v1-apple.png");
     expect(icons.icon.map((i) => i.url)).toEqual(["/brand/favicon.ico", "/brand/icon-32.png"]);
   });
 
@@ -42,3 +42,4 @@ describe("metadata do layout raiz", () => {
     expect(viewport.themeColor).toBe("#3E07D2");
   });
 });
+
