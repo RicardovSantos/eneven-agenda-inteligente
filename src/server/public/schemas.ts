@@ -5,7 +5,7 @@ import { normalizeBrazilPhone } from "@/lib/phone";
 export const MESSAGES = {
   consent: "Marque a caixa para concordar com o uso dos seus dados.",
   name: "Informe seu nome (de 2 a 80 caracteres).",
-  phone: "Informe um WhatsApp com DDD.",
+  phone: "Informe o WhatsApp com DDD, por exemplo (11) 91234-5678.",
   email: "Informe um e-mail válido ou deixe em branco.",
   unavailable: "Agendamento online indisponível no momento.",
   generic: "Não foi possível agendar agora. Tente novamente em instantes.",
