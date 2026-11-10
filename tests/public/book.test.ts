@@ -90,7 +90,7 @@ describe("bookPublic", () => {
     expect(await book({ phone: "1".repeat(40) })).toMatchObject({ ok: false, fieldErrors: { phone: expect.any(String) } });
     expect(await book({ phone: "123" })).toMatchObject({
       ok: false,
-      fieldErrors: { phone: "Informe um WhatsApp com DDD." },
+      fieldErrors: { phone: "Informe o WhatsApp com DDD, por exemplo (11) 91234-5678." },
     });
     expect(await book({ email: "isso-nao-e-email" })).toMatchObject({
       ok: false,

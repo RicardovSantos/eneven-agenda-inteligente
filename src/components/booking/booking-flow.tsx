@@ -212,7 +212,7 @@ export function BookingFlow({
     const errors: Record<string, string> = {};
     const name = form.name.trim();
     if (name.length < 2 || name.length > 80) errors.name = "Informe seu nome (de 2 a 80 caracteres).";
-    if (!normalizeBrazilPhone(form.phone)) errors.phone = "Informe um WhatsApp com DDD.";
+    if (!normalizeBrazilPhone(form.phone)) errors.phone = "Informe o WhatsApp com DDD, por exemplo (11) 91234-5678.";
     if (!form.consent) errors.consent = CONSENT_MESSAGE;
     setFieldErrors(errors);
     setFormError(null);
