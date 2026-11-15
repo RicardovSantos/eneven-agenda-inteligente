@@ -1,8 +1,8 @@
 "use client";
 
-import { Loader2, Plus } from "lucide-react";
+import { ChevronRight, Loader2, Plus, Search, X } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import {
   archiveServiceAction,
   restoreServiceAction,
@@ -17,6 +17,13 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { centsFromDigits, formatBRL, formatDuration } from "@/lib/format";
+import {
+  categoryCounts,
+  groupServices,
+  matchRange,
+  OTHER_CATEGORY,
+  showGroupHeaders,
+} from "@/lib/service-groups";
 import { cn } from "@/lib/utils";
 import {
   CatalogLayout,
@@ -66,6 +73,9 @@ export function ServicesScreen({
 }) {
   const [selection, setSelection] = useState<Selection>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [query, setQuery] = useState("");
+  // Categoria escolhida nos chips: `null` = todas, `""` = "Outros serviços".
+  const [chosenCategory, setChosenCategory] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<ServiceItem | null>(null);
   const [pending, startTransition] = useTransition();
   const { show } = useToast();
@@ -75,6 +85,18 @@ export function ServicesScreen({
     () => services.filter((s) => showArchived || !s.archived),
     [services, showArchived],
   );
+  const counts = useMemo(() => categoryCounts(rows), [rows]);
+  // Se a categoria escolhida deixou de existir (ex.: arquivou o último serviço), volta para "Todas".
+  const activeCategory =
+    chosenCategory !== null && counts.some((c) => (c.category ?? "") === chosenCategory)
+      ? chosenCategory
+      : null;
+  const groups = useMemo(
+    () => groupServices(rows, { query, category: activeCategory }),
+    [rows, query, activeCategory],
+  );
+  const headers = showGroupHeaders(groupServices(rows));
+  const searching = query.trim() !== "";
   const byId = useMemo(() => new Map(professionals.map((p) => [p.id, p])), [professionals]);
   const categoryNames = useMemo(
     () => [...new Set(services.map((s) => s.categoryName).filter((n): n is string => n !== null))],
@@ -154,8 +176,79 @@ export function ServicesScreen({
             </label>
           ) : null}
 
+          <div className="flex flex-col gap-3">
+            <div className="flex h-12 items-center gap-2.5 rounded-field border border-input bg-surface px-3.5 focus-within:border-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
+              <Search className="size-5 shrink-0 text-ink-muted" aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar serviço…"
+                aria-label="Pesquisar serviço"
+                autoComplete="off"
+                className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-muted [&::-webkit-search-cancel-button]:hidden"
+              />
+              {query !== "" ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label="Limpar busca"
+                  className="grid size-8 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-primary-soft"
+                >
+                  <X className="size-[18px]" aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
+            {counts.length > 1 ? (
+              <div
+                role="group"
+                aria-label="Filtrar serviços por grupo"
+                className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
+                <CategoryChip
+                  label="Todas"
+                  count={rows.length}
+                  selected={activeCategory === null}
+                  onClick={() => setChosenCategory(null)}
+                />
+                {counts.map((c) => (
+                  <CategoryChip
+                    key={c.category ?? ""}
+                    label={c.category ?? OTHER_CATEGORY}
+                    count={c.count}
+                    selected={activeCategory === (c.category ?? "")}
+                    onClick={() => setChosenCategory(c.category ?? "")}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          {groups.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-panel border border-line bg-surface px-6 py-10 text-center">
+              <p className="font-semibold">
+                {searching ? `Nenhum serviço encontrado para “${query.trim()}”` : "Nenhum serviço aqui"}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  setChosenCategory(null);
+                }}
+                className="min-h-11 rounded-field px-3 text-sm font-semibold text-primary hover:bg-primary-soft"
+              >
+                Mostrar todos os serviços
+              </button>
+            </div>
+          ) : null}
+
           {/* Tabela (computador) */}
-          <div className="hidden overflow-x-auto rounded-panel border border-line bg-surface lg:block">
+          <div
+            className={cn(
+              "hidden overflow-x-auto rounded-panel border border-line bg-surface",
+              groups.length > 0 && "lg:block",
+            )}
+          >
             <table className="w-full min-w-[560px] border-collapse text-[0.9375rem]">
               <thead>
                 <tr className="text-left text-[0.8125rem] text-ink-muted">
@@ -167,80 +260,120 @@ export function ServicesScreen({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((s) => (
-                  <tr
-                    key={s.id}
-                    onClick={() => setSelection({ kind: "edit", id: s.id })}
-                    className={cn(
-                      "cursor-pointer hover:bg-primary-soft/40",
-                      selectedId === s.id && "bg-primary-soft/60 shadow-[inset_3px_0_0_var(--primary)]",
-                      s.archived && "text-ink-muted",
-                    )}
-                  >
-                    <td className="border-b border-line/60 px-5 py-3.5 font-semibold">
-                      <button
-                        type="button"
-                        aria-pressed={selectedId === s.id}
-                        className="text-left font-semibold outline-none focus-visible:underline"
-                      >
-                        {s.name}
-                      </button>
-                    </td>
-                    <td className="border-b border-line/60 px-3 py-3.5 whitespace-nowrap tabular-nums">
-                      {formatDuration(s.durationMin)}
-                    </td>
-                    <td className="border-b border-line/60 px-3 py-3.5 whitespace-nowrap tabular-nums">
-                      {formatBRL(s.priceCents)}
-                    </td>
-                    <td className="border-b border-line/60 px-3 py-3.5">
-                      <WhoDoes ids={s.professionalIds} byId={byId} />
-                    </td>
-                    <td className="border-b border-line/60 px-5 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <VisibilityBadge service={s} />
-                        {s.archived && canEdit ? (
-                          <RestoreButton onClick={() => restore(s)} disabled={pending} name={s.name} />
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
+                {groups.map((group) => (
+                  <Fragment key={group.category ?? ""}>
+                    {headers ? (
+                      <tr>
+                        <th
+                          scope="colgroup"
+                          colSpan={5}
+                          className="border-b border-line bg-primary-soft/40 px-5 py-2 text-left text-xs font-bold uppercase tracking-[0.08em] text-ink-muted"
+                        >
+                          {group.category ?? OTHER_CATEGORY} · {group.items.length}
+                        </th>
+                      </tr>
+                    ) : null}
+  {group.items.map((s) => (
+                    <tr
+                      key={s.id}
+                      onClick={() => setSelection({ kind: "edit", id: s.id })}
+                      className={cn(
+                        "cursor-pointer hover:bg-primary-soft/40",
+                        selectedId === s.id && "bg-primary-soft/60 shadow-[inset_3px_0_0_var(--primary)]",
+                        s.archived && "text-ink-muted",
+                      )}
+                    >
+                      <td className="border-b border-line/60 px-5 py-3.5 font-semibold">
+                        <button
+                          type="button"
+                          aria-pressed={selectedId === s.id}
+                          className="text-left font-semibold outline-none focus-visible:underline"
+                        >
+                          <Highlight text={s.name} query={query} />
+                        </button>
+                      </td>
+                      <td className="border-b border-line/60 px-3 py-3.5 whitespace-nowrap tabular-nums">
+                        {formatDuration(s.durationMin)}
+                      </td>
+                      <td className="border-b border-line/60 px-3 py-3.5 whitespace-nowrap tabular-nums">
+                        {formatBRL(s.priceCents)}
+                      </td>
+                      <td className="border-b border-line/60 px-3 py-3.5">
+                        <WhoDoes ids={s.professionalIds} byId={byId} />
+                      </td>
+                      <td className="border-b border-line/60 px-5 py-3.5">
+                        <div className="flex items-center gap-2">
+                          <VisibilityBadge service={s} />
+                          {s.archived && canEdit ? (
+                            <RestoreButton onClick={() => restore(s)} disabled={pending} name={s.name} />
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+  
+                  </Fragment>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* Lista (celular) */}
-          <ul className="flex flex-col overflow-hidden rounded-panel border border-line bg-surface lg:hidden">
-            {rows.map((s) => (
-              <li key={s.id} className="border-b border-line/60 last:border-b-0">
-                <div className="flex items-center gap-2 pr-3">
-                  <button
-                    type="button"
-                    onClick={() => setSelection({ kind: "edit", id: s.id })}
-                    className={cn(
-                      "flex min-h-[4.5rem] min-w-0 flex-1 flex-col justify-center gap-1 px-4 py-3 text-left",
-                      s.archived && "text-ink-muted",
-                    )}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="truncate font-semibold">{s.name}</span>
-                      <span className="shrink-0 text-sm tabular-nums">{formatBRL(s.priceCents)}</span>
-                    </span>
-                    <span className="flex flex-col items-start gap-1.5 text-sm text-ink-muted">
-                      <span className="tabular-nums">{formatDuration(s.durationMin)}</span>
-                      <WhoDoes ids={s.professionalIds} byId={byId} compact />
-                    </span>
-                  </button>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <VisibilityBadge service={s} />
-                    {s.archived && canEdit ? (
-                      <RestoreButton onClick={() => restore(s)} disabled={pending} name={s.name} />
-                    ) : null}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {/* Lista (celular): uma lista só, com faixa de título entre as categorias */}
+          {groups.length > 0 ? (
+            <div className="overflow-hidden rounded-panel border border-line bg-surface lg:hidden">
+              {groups.map((group, index) => (
+                <section
+                  key={group.category ?? ""}
+                  aria-label={headers ? (group.category ?? OTHER_CATEGORY) : "Serviços"}
+                  className={cn(index > 0 && "border-t border-line")}
+                >
+                  {headers ? (
+                    <h2 className="flex items-center gap-2 border-b border-line bg-primary-soft/40 px-4 py-2 text-xs font-bold uppercase tracking-[0.08em] text-ink-muted">
+                      <span className="truncate">{group.category ?? OTHER_CATEGORY}</span>
+                      <span className="tabular-nums">{group.items.length}</span>
+                    </h2>
+                  ) : null}
+                  <ul className="flex flex-col">
+                    {group.items.map((s) => (
+                      <li key={s.id} className="border-b border-line/60 last:border-b-0">
+                        <div className="flex items-center gap-2 pr-3">
+                          <button
+                            type="button"
+                            onClick={() => setSelection({ kind: "edit", id: s.id })}
+                            className={cn(
+                              "flex min-h-[4.25rem] min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left",
+                              s.archived && "text-ink-muted",
+                            )}
+                          >
+                            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                              <span className="flex min-w-0 items-center gap-2">
+                                <span className="truncate font-semibold">
+                                  <Highlight text={s.name} query={query} />
+                                </span>
+                                {s.archived || !s.visible ? <VisibilityBadge service={s} /> : null}
+                              </span>
+                              <span className="text-sm text-ink-muted">
+                                <span className="tabular-nums">{formatDuration(s.durationMin)}</span>
+                                {" · "}
+                                <ProCount ids={s.professionalIds} byId={byId} />
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-base font-semibold tabular-nums">
+                              {formatBRL(s.priceCents)}
+                            </span>
+                            <ChevronRight className="size-[18px] shrink-0 text-ink-muted" aria-hidden="true" />
+                          </button>
+                          {s.archived && canEdit ? (
+                            <RestoreButton onClick={() => restore(s)} disabled={pending} name={s.name} />
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          ) : null}
         </>
       )}
     </>
@@ -286,6 +419,62 @@ export function ServicesScreen({
       </ConfirmDialog>
     </>
   );
+}
+
+function CategoryChip({
+  label,
+  count,
+  selected,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-[0.9375rem] font-semibold whitespace-nowrap transition-colors",
+        selected
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-line bg-surface text-foreground hover:bg-primary-soft",
+      )}
+    >
+      {label}
+      <span
+        className={cn(
+          "text-sm font-medium tabular-nums",
+          selected ? "text-primary-foreground/80" : "text-ink-muted",
+        )}
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
+
+/** Mostra o nome com o trecho buscado em destaque (ignora acento e maiúscula). */
+function Highlight({ text, query }: { text: string; query: string }) {
+  const range = matchRange(text, query);
+  if (!range) return <>{text}</>;
+  const [start, end] = range;
+  return (
+    <>
+      {text.slice(0, start)}
+      <mark className="rounded-sm bg-primary-soft px-0.5 text-primary">{text.slice(start, end)}</mark>
+      {text.slice(end)}
+    </>
+  );
+}
+
+function ProCount({ ids, byId }: { ids: string[]; byId: Map<string, ProfessionalOption> }) {
+  const total = ids.filter((id) => byId.get(id)?.active).length;
+  if (total === 0) return <span className="font-medium text-danger">Sem profissional</span>;
+  return <>{total === 1 ? "1 profissional" : `${total} profissionais`}</>;
 }
 
 function VisibilityBadge({ service }: { service: ServiceItem }) {
