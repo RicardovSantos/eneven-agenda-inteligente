@@ -43,7 +43,12 @@ export default async function EquipePage() {
         futureBookings: p.futureBookings,
         hasAccess: withAccess.has(p.id),
       }))}
-      services={services.map((s) => ({ id: s.id, name: s.name }))}
+      services={services.map((s) => ({
+        id: s.id,
+        name: s.name,
+        durationMin: s.durationMin,
+        categoryName: s.categoryName,
+      }))}
       businessHours={businessHours}
       canEdit={session.role === "owner"}
     />
