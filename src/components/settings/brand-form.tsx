@@ -102,7 +102,7 @@ export function BrandForm({ initial }: { initial: BrandInitial }) {
     valid ? hex : initial.color,
   );
   const logoUrl = initial.logoUrl;
-  const formRef = useSettingsForm({ pending: savingColor, disabled: !valid });
+  const { setFormElement, onSubmit } = useSettingsForm({ pending: savingColor, disabled: !valid, action: colorAction });
   const logoError = pickError ?? uploadState.fieldErrors?.logo;
 
   const onPickFile = (file: File | undefined) => {
@@ -192,7 +192,7 @@ export function BrandForm({ initial }: { initial: BrandInitial }) {
         </div>
 
         {/* Cor */}
-        <form ref={formRef} action={colorAction} noValidate className="flex flex-col gap-5">
+        <form ref={setFormElement} onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
           <input type="hidden" name="color" value={hex} />
           <div className="flex flex-col gap-3">
             <p id="brand-color-label" className="text-sm font-medium leading-snug">

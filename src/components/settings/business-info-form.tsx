@@ -30,7 +30,7 @@ export function BusinessInfoForm({ initial }: { initial: BusinessInfoInitial }) 
     {},
   );
   useToastOnResult(state);
-  const formRef = useSettingsForm({ pending });
+  const { setFormElement, onSubmit } = useSettingsForm({ pending, action: formAction });
 
   const [name, setName] = useState(initial.name);
   const [whatsapp, setWhatsapp] = useState(formatBrazilPhone(initial.whatsapp));
@@ -47,7 +47,7 @@ export function BusinessInfoForm({ initial }: { initial: BusinessInfoInitial }) 
       title="Seu estabelecimento"
       description="Aparecem na sua página de agendamento."
     >
-      <form ref={formRef} action={formAction} noValidate className="flex flex-col gap-5">
+      <form ref={setFormElement} onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <TextField
           name="name"
           label="Nome do estabelecimento"

@@ -32,7 +32,7 @@ export function HoursForm({
   const [hours, setHours] = useState<WeeklyHours>(initial);
   const [applyToTeam, setApplyToTeam] = useState(applyToTeamDefault);
   const invalid = Object.keys(validateWeeklyHours(hours)).length > 0;
-  const formRef = useSettingsForm({ pending, disabled: invalid });
+  const { setFormElement, onSubmit } = useSettingsForm({ pending, disabled: invalid, action: formAction });
   const allClosed = WEEKDAYS.every((d) => hours[d].length === 0);
 
   return (
@@ -41,7 +41,7 @@ export function HoursForm({
       title="Horário de funcionamento"
       description="Os horários da agenda e da equipe nunca saem desta janela."
     >
-      <form ref={formRef} action={formAction} className="flex flex-col gap-5">
+      <form ref={setFormElement} onSubmit={onSubmit} className="flex flex-col gap-5">
         <input type="hidden" name="hours" value={JSON.stringify(hours)} />
         <WeeklyHoursEditor
           value={hours}

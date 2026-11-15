@@ -54,10 +54,8 @@ export function SlugForm({ currentSlug }: { currentSlug: string }) {
 
   const serverError = state.fieldErrors?.slug;
   const blocked = check.kind === "taken" || check.kind === "reserved" || check.kind === "invalid";
-  const formRef = useSettingsForm({
-    pending,
-    disabled: !changed || blocked || check.kind === "checking",
-  });
+  const { setFormElement, onSubmit } = useSettingsForm({ pending,
+    disabled: !changed || blocked || check.kind === "checking", action: formAction });
   const message = serverError
     ? { tone: "error" as const, text: serverError }
     : check.kind === "taken"
@@ -74,7 +72,7 @@ export function SlugForm({ currentSlug }: { currentSlug: string }) {
       title="Seu link"
       description="É o endereço que você compartilha com seus clientes."
     >
-      <form ref={formRef} action={formAction} noValidate className="flex flex-col gap-5">
+      <form ref={setFormElement} onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="slug">Endereço da sua agenda</Label>
           <div className="flex min-w-0 items-stretch rounded-field border border-input bg-surface focus-within:border-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent has-[[aria-invalid=true]]:border-danger">

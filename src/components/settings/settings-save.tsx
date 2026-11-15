@@ -8,10 +8,10 @@ import {
   useEffect,
   useId,
   useMemo,
-  useRef,
   useState,
+  startTransition,
+  type FormEvent,
   type ReactNode,
-  type RefObject,
 } from "react";
 import { FormAlert } from "@/components/auth/form-alert";
 import { Button } from "@/components/ui/button";
@@ -93,27 +93,45 @@ export function SettingsSaveProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Registra um formulário no botão fixo da tela. Devolve a `ref` para o `<form>`.
+ * Registra um formulário no botão fixo da tela. Devolve `ref` e `onSubmit` para o `<form>`
+ * (use no lugar de `action`).
  * `disabled`: não há o que salvar ou os dados são inválidos (o botão pula este).
  */
 export function useSettingsForm({
   pending,
   disabled = false,
+  action,
 }: {
   pending: boolean;
   disabled?: boolean;
-}): RefObject<HTMLFormElement | null> {
+  /** O `formAction` do `useActionState` do formulário. */
+  action: (formData: FormData) => void;
+}): {
+  setFormElement: (element: HTMLFormElement | null) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+} {
   const api = useContext(SaveContext);
   const id = useId();
-  const formRef = useRef<HTMLFormElement>(null);
-  const submit = useCallback(() => formRef.current?.requestSubmit(), []);
+  const [element, setFormElement] = useState<HTMLFormElement | null>(null);
+  const submit = useCallback(() => element?.requestSubmit(), [element]);
 
   useEffect(() => {
     api?.set(id, { pending, disabled, submit });
   }, [api, id, pending, disabled, submit]);
   useEffect(() => () => api?.remove(id), [api, id]);
 
-  return formRef;
+  // Não usamos `<form action>`: ao terminar, o React 19 chama `form.reset()`, e num
+  // <select> controlado isso devolve o valor antigo na tela (e no próximo envio).
+  const onSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      startTransition(() => action(data));
+    },
+    [action],
+  );
+
+  return { setFormElement, onSubmit };
 }
 
 /**

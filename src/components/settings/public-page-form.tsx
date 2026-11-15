@@ -38,7 +38,7 @@ export function PublicPageForm({ initial }: { initial: PublicPageInitial }) {
     {},
   );
   useToastOnResult(state);
-  const formRef = useSettingsForm({ pending });
+  const { setFormElement, onSubmit } = useSettingsForm({ pending, action: formAction });
   const errors = state.fieldErrors ?? {};
 
   async function send(action: (s: SettingsFormState, f: FormData) => Promise<SettingsFormState>, data: FormData, fallback: string): Promise<PhotoResult> {
@@ -81,7 +81,7 @@ export function PublicPageForm({ initial }: { initial: PublicPageInitial }) {
           ))}
         </div>
 
-        <form ref={formRef} action={formAction} noValidate className="flex flex-col gap-5">
+        <form ref={setFormElement} onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
           <TextField
             name="heroTitle"
             label="Título sobre as imagens (opcional)"

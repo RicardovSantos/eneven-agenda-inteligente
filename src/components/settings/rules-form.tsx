@@ -96,7 +96,7 @@ export function RulesForm({ initial }: { initial: RulesInitial }) {
     {},
   );
   useToastOnResult(state);
-  const formRef = useSettingsForm({ pending });
+  const { setFormElement, onSubmit } = useSettingsForm({ pending, action: formAction });
   const [rules, setRules] = useState(initial);
   const errors = state.fieldErrors ?? {};
   const set = (key: keyof RulesInitial) => (value: number) =>
@@ -108,7 +108,7 @@ export function RulesForm({ initial }: { initial: RulesInitial }) {
       title="Regras de agendamento"
       description="Valem para quem agenda pelo seu link."
     >
-      <form ref={formRef} action={formAction} noValidate className="flex flex-col gap-5">
+      <form ref={setFormElement} onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <div className="grid gap-5 sm:grid-cols-2">
           <RuleSelect
             name="slotIntervalMin"
