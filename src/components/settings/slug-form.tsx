@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { useToastOnResult } from "@/components/ui/toast";
 import { PUBLIC_HOST } from "@/lib/brand";
 import { slugify } from "@/lib/slugify";
-import { SaveRow, SettingsSection } from "./settings-section";
+import { FormFooter, useSettingsForm } from "./settings-save";
+import { SettingsSection } from "./settings-section";
 
 type Status = "available" | "current" | "taken" | "reserved" | "invalid";
 
@@ -53,6 +54,10 @@ export function SlugForm({ currentSlug }: { currentSlug: string }) {
 
   const serverError = state.fieldErrors?.slug;
   const blocked = check.kind === "taken" || check.kind === "reserved" || check.kind === "invalid";
+  const formRef = useSettingsForm({
+    pending,
+    disabled: !changed || blocked || check.kind === "checking",
+  });
   const message = serverError
     ? { tone: "error" as const, text: serverError }
     : check.kind === "taken"
@@ -69,7 +74,7 @@ export function SlugForm({ currentSlug }: { currentSlug: string }) {
       title="Seu link"
       description="É o endereço que você compartilha com seus clientes."
     >
-      <form action={formAction} noValidate className="flex flex-col gap-5">
+      <form ref={formRef} action={formAction} noValidate className="flex flex-col gap-5">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="slug">Endereço da sua agenda</Label>
           <div className="flex min-w-0 items-stretch rounded-field border border-input bg-surface focus-within:border-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent has-[[aria-invalid=true]]:border-danger">
@@ -137,11 +142,7 @@ export function SlugForm({ currentSlug }: { currentSlug: string }) {
           </p>
         ) : null}
 
-        <SaveRow
-          pending={pending}
-          disabled={!changed || blocked || check.kind === "checking"}
-          error={state.error}
-        />
+        <FormFooter error={state.error} />
       </form>
     </SettingsSection>
   );

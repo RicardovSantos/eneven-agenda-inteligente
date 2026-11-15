@@ -8,7 +8,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { useToastOnResult } from "@/components/ui/toast";
-import { SaveRow, SettingsSection } from "./settings-section";
+import { FormFooter, useSettingsForm } from "./settings-save";
+import { SettingsSection } from "./settings-section";
 
 export type RulesInitial = {
   slotIntervalMin: number;
@@ -95,6 +96,7 @@ export function RulesForm({ initial }: { initial: RulesInitial }) {
     {},
   );
   useToastOnResult(state);
+  const formRef = useSettingsForm({ pending });
   const [rules, setRules] = useState(initial);
   const errors = state.fieldErrors ?? {};
   const set = (key: keyof RulesInitial) => (value: number) =>
@@ -106,7 +108,7 @@ export function RulesForm({ initial }: { initial: RulesInitial }) {
       title="Regras de agendamento"
       description="Valem para quem agenda pelo seu link."
     >
-      <form action={formAction} noValidate className="flex flex-col gap-5">
+      <form ref={formRef} action={formAction} noValidate className="flex flex-col gap-5">
         <div className="grid gap-5 sm:grid-cols-2">
           <RuleSelect
             name="slotIntervalMin"
@@ -145,7 +147,7 @@ export function RulesForm({ initial }: { initial: RulesInitial }) {
             error={errors.cancelWindowMin}
           />
         </div>
-        <SaveRow pending={pending} error={state.error} />
+        <FormFooter error={state.error} />
       </form>
     </SettingsSection>
   );

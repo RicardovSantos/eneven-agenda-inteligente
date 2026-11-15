@@ -11,7 +11,8 @@ import {
 import { TextField } from "@/components/auth/text-field";
 import { PhotoField, type PhotoResult } from "@/components/media/photo-field";
 import { useToast, useToastOnResult } from "@/components/ui/toast";
-import { SaveRow, SettingsSection } from "./settings-section";
+import { FormFooter, useSettingsForm } from "./settings-save";
+import { SettingsSection } from "./settings-section";
 
 const HERO_SLOTS = [
   { slot: 0, label: "Imagem 1", hint: "Ex.: o ambiente por dentro." },
@@ -37,6 +38,7 @@ export function PublicPageForm({ initial }: { initial: PublicPageInitial }) {
     {},
   );
   useToastOnResult(state);
+  const formRef = useSettingsForm({ pending });
   const errors = state.fieldErrors ?? {};
 
   async function send(action: (s: SettingsFormState, f: FormData) => Promise<SettingsFormState>, data: FormData, fallback: string): Promise<PhotoResult> {
@@ -79,7 +81,7 @@ export function PublicPageForm({ initial }: { initial: PublicPageInitial }) {
           ))}
         </div>
 
-        <form action={formAction} noValidate className="flex flex-col gap-5">
+        <form ref={formRef} action={formAction} noValidate className="flex flex-col gap-5">
           <TextField
             name="heroTitle"
             label="Título sobre as imagens (opcional)"
@@ -98,7 +100,7 @@ export function PublicPageForm({ initial }: { initial: PublicPageInitial }) {
             defaultValue={initial.heroSubtitle}
             error={errors.heroSubtitle}
           />
-          <SaveRow pending={pending} error={state.error} />
+          <FormFooter error={state.error} />
         </form>
       </div>
     </SettingsSection>

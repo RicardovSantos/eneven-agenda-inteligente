@@ -25,13 +25,13 @@ test.describe("página pública com fotos, equipe e informações", () => {
 
     await page.getByLabel("Facebook (opcional)").fill("https://facebook.com/studio.defendi");
     await page.getByLabel("Instagram (opcional)").fill("@studio.defendi");
-    await page.locator('section[aria-labelledby="info-title"]').getByRole("button", { name: "Salvar" }).click();
+    await page.getByRole("button", { name: "Salvar" }).click();
     await expect(page.getByText("Alterações salvas")).toBeVisible();
 
     await open(page, "/painel/configuracoes/pagina");
     const hero = page.locator('section[aria-labelledby="public-page-title"]');
     for (const [index, color] of ["#336699", "#993366"].entries()) {
-      await hero.getByLabel(`Imagem ${index + 1}`).setInputFiles({
+      await hero.getByLabel(`Imagem ${index + 1}`, { exact: true }).setInputFiles({
         name: `ambiente-${index}.jpg`,
         mimeType: "image/jpeg",
         buffer: await photo(color),
@@ -39,7 +39,7 @@ test.describe("página pública com fotos, equipe e informações", () => {
       await expect(page.getByText("Imagem atualizada").last()).toBeVisible();
     }
     await hero.getByLabel("Título sobre as imagens (opcional)").fill("Bem-vinda ao estúdio");
-    await hero.getByRole("button", { name: "Salvar" }).click();
+    await page.getByRole("button", { name: "Salvar" }).click();
 
     // O que ficou guardado é WebP (convertido), servido pelo endereço público.
     const stored = await request.get(`/api/midia/${slug}/capa/0`);

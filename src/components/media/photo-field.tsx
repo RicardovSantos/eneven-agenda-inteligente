@@ -1,8 +1,8 @@
 "use client";
 
-import { ImagePlus, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import { PhotoTapMenu } from "@/components/media/photo-tap-menu";
 import { SafeImage } from "@/components/media/safe-image";
 import { ImageConvertError, convertImageFile } from "@/lib/image-to-webp";
 import { cn } from "@/lib/utils";
@@ -82,6 +82,15 @@ export function PhotoField({
 
   return (
     <div className={cn("flex gap-4", shape === "wide" ? "flex-col" : "flex-row items-center")}>
+      <PhotoTapMenu
+        label={label}
+        hasImage={Boolean(currentUrl)}
+        round={shape === "round"}
+        disabled={disabled || busy !== null}
+        className={shape === "wide" ? "w-full" : "shrink-0"}
+        onPick={() => input.current?.click()}
+        onRemove={onRemove ? () => void remove() : undefined}
+      >
       <div className={frame}>
         {currentUrl ? (
           <SafeImage
@@ -120,39 +129,18 @@ export function PhotoField({
           </div>
         ) : null}
       </div>
+      </PhotoTapMenu>
       <div className="flex min-w-0 flex-col gap-2">
         <p className="text-sm font-medium leading-snug">{label}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            ref={input}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            tabIndex={-1}
-            aria-label={label}
-            onChange={(e) => void pick(e.target.files?.[0])}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={disabled || busy !== null}
-            onClick={() => input.current?.click()}
-          >
-            <ImagePlus aria-hidden="true" />
-            {currentUrl ? "Trocar" : "Enviar"}
-          </Button>
-          {currentUrl && onRemove ? (
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={disabled || busy !== null}
-              onClick={() => void remove()}
-              className="text-danger hover:text-danger"
-            >
-              Remover
-            </Button>
-          ) : null}
-        </div>
+        <input
+          ref={input}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          tabIndex={-1}
+          aria-label={label}
+          onChange={(e) => void pick(e.target.files?.[0])}
+        />
         {hint ? <p className="text-[0.8125rem] leading-snug text-ink-muted">{hint}</p> : null}
         {error ? (
           <p role="alert" className="text-[0.8125rem] leading-snug text-danger">
