@@ -66,7 +66,7 @@ export function SettingsSaveProvider({ children }: { children: ReactNode }) {
     <SaveContext.Provider value={api}>
       {children}
       {list.length > 0 ? (
-        <div className="pointer-events-none sticky bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-10 -mx-4 mt-2 px-4 pb-3 pt-6 lg:bottom-0 lg:mx-0 lg:px-0 lg:pb-4">
+        <div className="pointer-events-none sticky bottom-[calc(4.25rem+1px+env(safe-area-inset-bottom))] z-10 -mx-4 mt-2 px-4 pb-3 pt-6 lg:bottom-0 lg:mx-0 lg:px-0 lg:pb-4">
           <div
             aria-hidden="true"
             className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/90 to-transparent"

@@ -98,7 +98,7 @@ export function InstallHint() {
     <div
       role="region"
       aria-label="Instalar o aplicativo"
-      className="fixed inset-x-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.5rem)] z-10 flex items-center gap-2 rounded-panel border border-line bg-surface py-2 pl-4 pr-1 shadow-float lg:inset-x-auto lg:bottom-4 lg:right-8 lg:max-w-md"
+      className="fixed inset-x-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom)+0.5rem)] z-10 flex items-center gap-2 rounded-panel border border-line bg-surface py-2 pl-4 pr-1 shadow-float lg:inset-x-auto lg:bottom-4 lg:right-8 lg:max-w-md"
     >
       <p className="min-w-0 flex-1 text-sm leading-snug text-ink">
         {mode === "android"
