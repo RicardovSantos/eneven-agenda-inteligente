@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, open, seedTenant } from "./helpers";
 
-test("agenda no celular: profissionais numa linha que rola, escolher e voltar para Todos", async ({ page, request }) => {
+test("agenda no celular: profissionais em chips numa linha que rola, escolher e voltar para Todos", async ({ page, request }) => {
   const { slug } = await seedTenant(request, {
     extraProfessionals: ["Léo Alves", "Bia Souza", "Caio Lima", "Duda Reis", "Eva Moraes", "Gil Santos"],
   });
@@ -14,7 +14,8 @@ test("agenda no celular: profissionais numa linha que rola, escolher e voltar pa
   // Uma linha só: todos os itens na mesma altura e a linha rola para o lado.
   const geometria = await grupo.evaluate((el) => {
     const tops = [...el.querySelectorAll("a")].map((a) => Math.round(a.getBoundingClientRect().top));
-    return { linhas: new Set(tops).size, rola: el.scrollWidth > el.clientWidth };
+    const faixa = el.querySelector<HTMLElement>("[data-rolagem]")!;
+    return { linhas: new Set(tops).size, rola: faixa.scrollWidth > faixa.clientWidth };
   });
   expect(geometria.linhas).toBe(1);
   expect(geometria.rola).toBe(true);

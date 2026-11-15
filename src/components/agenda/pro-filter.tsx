@@ -1,6 +1,5 @@
 "use client";
 
-import { Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { PersonAvatar } from "@/components/media/person-avatar";
@@ -9,13 +8,15 @@ import { agendaHref } from "./shared";
 
 type Pro = { id: string; name: string; color: string | null; photoUrl?: string | null };
 
-const SIZE = 52;
+const CHIP =
+  "flex h-11 shrink-0 items-center gap-2 rounded-full border text-[0.9375rem] whitespace-nowrap outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 /**
- * Filtro de profissional para o celular: uma linha de fotos redondas que rola para o
- * lado (estilo "stories"). O escolhido ganha um anel; tocar nele de novo volta para "Todos".
+ * Filtro de profissional para o celular, numa linha só: "Todos" fica fixo à esquerda e os
+ * profissionais correm para o lado. O último chip aparece cortado para mostrar que há mais.
+ * Tocar no escolhido de novo volta para "Todos".
  */
-export function ProStories({
+export function ProChips({
   professionals,
   selectedId,
   date,
@@ -34,87 +35,59 @@ export function ProStories({
     const box = scroller.current;
     const item = box?.querySelector<HTMLElement>("[aria-current='true']");
     if (!box || !item) return;
-    const target = item.offsetLeft - (box.clientWidth - item.offsetWidth) / 2;
-    box.scrollTo({ left: Math.max(0, target) });
+    box.scrollTo({ left: Math.max(0, item.offsetLeft - (box.clientWidth - item.offsetWidth) / 2) });
   }, [selectedId]);
 
   return (
     <div
-      ref={scroller}
       role="group"
       aria-label="Profissional"
-      className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
+      className="-mx-4 flex items-center gap-2 pl-4 lg:hidden"
     >
-      <Item
-        label="Todos"
-        active={selectedId === null}
+      <Link
         href={agendaHref({ data: date, pro: "todos", view })}
+        scroll={false}
+        aria-current={selectedId === null ? "true" : undefined}
+        className={cn(CHIP, "px-4", chipTone(selectedId === null))}
       >
+        Todos
+      </Link>
+      <span aria-hidden="true" className="h-6 w-px shrink-0 bg-line" />
+      <div className="relative min-w-0 flex-1">
+        <div
+          ref={scroller}
+          data-rolagem
+          className="relative flex gap-2 overflow-x-auto pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {professionals.map((p) => {
+            const active = selectedId === p.id;
+            return (
+              <Link
+                key={p.id}
+                // Tocar de novo no escolhido volta para "Todos".
+                href={agendaHref({ data: date, pro: active ? "todos" : p.id, view })}
+                scroll={false}
+                aria-current={active ? "true" : undefined}
+                className={cn(CHIP, "pl-1 pr-4", chipTone(active))}
+              >
+                <PersonAvatar name={p.name} color={p.color} photoUrl={p.photoUrl} size={30} />
+                {p.name}
+              </Link>
+            );
+          })}
+        </div>
+        {/* Esmaece a borda direita: sugere que a linha continua. */}
         <span
           aria-hidden="true"
-          className="grid place-items-center rounded-full bg-primary-soft text-primary"
-          style={{ width: SIZE, height: SIZE }}
-        >
-          <Users className="size-6" />
-        </span>
-      </Item>
-      {professionals.map((p) => {
-        const active = selectedId === p.id;
-        return (
-          <Item
-            key={p.id}
-            label={p.name}
-            shortLabel={p.name.trim().split(/\s+/)[0] ?? p.name}
-            active={active}
-            // Tocar de novo no escolhido volta para "Todos".
-            href={agendaHref({ data: date, pro: active ? "todos" : p.id, view })}
-          >
-            <PersonAvatar name={p.name} color={p.color} photoUrl={p.photoUrl} size={SIZE} />
-          </Item>
-        );
-      })}
+          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-r from-transparent to-canvas"
+        />
+      </div>
     </div>
   );
 }
 
-function Item({
-  label,
-  shortLabel,
-  active,
-  href,
-  children,
-}: {
-  label: string;
-  shortLabel?: string;
-  active: boolean;
-  href: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      scroll={false}
-      aria-current={active ? "true" : undefined}
-      aria-label={label}
-      className="flex w-[4.5rem] shrink-0 flex-col items-center gap-1.5 rounded-field py-1 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-    >
-      <span
-        className={cn(
-          "rounded-full p-[3px] ring-[2.5px] transition-shadow",
-          active ? "ring-primary" : "ring-transparent",
-        )}
-      >
-        {children}
-      </span>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "w-full truncate text-center text-[0.8125rem] leading-tight",
-          active ? "font-semibold text-primary" : "font-medium text-foreground",
-        )}
-      >
-        {shortLabel ?? label}
-      </span>
-    </Link>
-  );
+function chipTone(active: boolean) {
+  return active
+    ? "border-primary bg-primary-soft font-semibold text-primary"
+    : "border-line bg-surface font-medium text-foreground hover:bg-primary-soft/60";
 }

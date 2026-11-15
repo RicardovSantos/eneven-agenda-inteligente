@@ -19,7 +19,7 @@ import { DayColumns } from "./day-columns";
 import { DayList } from "./day-list";
 import { MonthList } from "./month-list";
 import { MonthView } from "./month-view";
-import { ProStories } from "./pro-filter";
+import { ProChips } from "./pro-filter";
 import { NewBookingDialog, type PanelPro, type PanelService } from "./new-booking-dialog";
 import { PersonAvatar } from "@/components/media/person-avatar";
 import { agendaHref, formatShortWeekdayDay, useMinuteNow } from "./shared";
@@ -250,7 +250,7 @@ export function AgendaScreen({
 
         {professionals.length > 1 && !lockedProfessionalId ? (
           <>
-          <ProStories
+          <ProChips
             professionals={professionals}
             selectedId={filtered?.id ?? null}
             date={date}
