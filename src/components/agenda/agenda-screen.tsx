@@ -19,6 +19,7 @@ import { DayColumns } from "./day-columns";
 import { DayList } from "./day-list";
 import { MonthList } from "./month-list";
 import { MonthView } from "./month-view";
+import { ProChips } from "./pro-filter";
 import { NewBookingDialog, type PanelPro, type PanelService } from "./new-booking-dialog";
 import { PersonAvatar } from "@/components/media/person-avatar";
 import { agendaHref, formatShortWeekdayDay, useMinuteNow } from "./shared";
@@ -248,7 +249,14 @@ export function AgendaScreen({
         {banners}
 
         {professionals.length > 1 && !lockedProfessionalId ? (
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Profissional">
+          <>
+          <ProChips
+            professionals={professionals}
+            selectedId={filtered?.id ?? null}
+            date={date}
+            view={view}
+          />
+          <div className="hidden flex-wrap items-center gap-2 lg:flex" role="group" aria-label="Profissional">
             <span className="mr-1 text-sm text-ink-muted">Profissional</span>
             <Pill href={agendaHref({ data: date, pro: "todos", view })} active={pro === "todos" || !filtered}>
               Todos
@@ -260,6 +268,7 @@ export function AgendaScreen({
               </Pill>
             ))}
           </div>
+          </>
         ) : null}
 
         <div className="hidden lg:block">
