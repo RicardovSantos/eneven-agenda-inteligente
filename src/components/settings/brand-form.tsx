@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ImagePlus, Loader2 } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { useActionState, useRef, useState } from "react";
 import {
   removeLogoAction,
@@ -8,13 +8,14 @@ import {
   uploadLogoAction,
   type SettingsFormState,
 } from "@/app/painel/configuracoes/actions";
-import { Button } from "@/components/ui/button";
+import { PhotoTapMenu } from "@/components/media/photo-tap-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast, useToastOnResult } from "@/components/ui/toast";
 import { ensureReadableBrandColor, isHexColor, normalizeHex } from "@/lib/color";
 import { initialOf } from "@/lib/initial";
-import { SaveRow, SettingsSection } from "./settings-section";
+import { FormFooter, useSettingsForm } from "./settings-save";
+import { SettingsSection } from "./settings-section";
 
 const LOGO_MAX_BYTES = 1024 * 1024;
 const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
@@ -75,6 +76,7 @@ export function BrandForm({ initial }: { initial: BrandInitial }) {
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const uploadFormRef = useRef<HTMLFormElement>(null);
+  const removeFormRef = useRef<HTMLFormElement>(null);
 
   const [uploadState, uploadAction, uploading] = useActionState<SettingsFormState, FormData>(
     uploadLogoAction,
@@ -100,6 +102,7 @@ export function BrandForm({ initial }: { initial: BrandInitial }) {
     valid ? hex : initial.color,
   );
   const logoUrl = initial.logoUrl;
+  const { setFormElement, onSubmit } = useSettingsForm({ pending: savingColor, disabled: !valid, action: colorAction });
   const logoError = pickError ?? uploadState.fieldErrors?.logo;
 
   const onPickFile = (file: File | undefined) => {
@@ -140,53 +143,41 @@ export function BrandForm({ initial }: { initial: BrandInitial }) {
         <div className="flex flex-col gap-3">
           <p className="text-sm font-medium leading-snug">Logo</p>
           <div className="flex flex-wrap items-center gap-4">
-            <BrandAvatar
-              color={usedColor}
-              name={initial.name}
-              logoUrl={logoUrl}
-              size={72}
-              busy={uploading || removing}
-            />
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <form ref={uploadFormRef} action={uploadAction}>
-                  <input
-                    ref={fileRef}
-                    id="logo"
-                    name="logo"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className="sr-only"
-                    tabIndex={-1}
-                    onChange={(e) => onPickFile(e.target.files?.[0])}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={uploading || removing}
-                    onClick={() => fileRef.current?.click()}
-                  >
-                    <ImagePlus aria-hidden="true" />
-                    {logoUrl ? "Trocar logo" : "Enviar logo"}
-                  </Button>
-                </form>
-                {logoUrl ? (
-                  <form action={removeAction}>
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      disabled={uploading || removing}
-                      className="text-danger hover:text-danger"
-                    >
-                      Remover
-                    </Button>
-                  </form>
-                ) : null}
-              </div>
-              <p className="text-[0.8125rem] leading-snug text-ink-muted">
-                PNG, JPG ou WebP, até 1 MB. Fica redondo na sua página.
-              </p>
-            </div>
+            <PhotoTapMenu
+              label="Logo"
+              hasImage={Boolean(logoUrl)}
+              round
+              disabled={uploading || removing}
+              className="shrink-0"
+              onPick={() => fileRef.current?.click()}
+              onRemove={() => removeFormRef.current?.requestSubmit()}
+            >
+              <BrandAvatar
+                color={usedColor}
+                name={initial.name}
+                logoUrl={logoUrl}
+                size={72}
+                busy={uploading || removing}
+              />
+            </PhotoTapMenu>
+            <form ref={uploadFormRef} action={uploadAction} className="contents">
+              <input
+                ref={fileRef}
+                id="logo"
+                name="logo"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                tabIndex={-1}
+                aria-label="Logo"
+                onChange={(e) => onPickFile(e.target.files?.[0])}
+              />
+            </form>
+            <form ref={removeFormRef} action={removeAction} className="contents" />
+            <p className="min-w-0 flex-1 basis-40 text-[0.8125rem] leading-snug text-ink-muted">
+              {logoUrl ? "Toque no logo para trocar ou remover. " : "Toque no círculo para enviar o logo. "}
+              PNG, JPG ou WebP, até 1 MB. Fica redondo na sua página.
+            </p>
           </div>
           {logoError ? (
             <p role="alert" className="text-[0.8125rem] leading-snug text-danger">
@@ -201,7 +192,7 @@ export function BrandForm({ initial }: { initial: BrandInitial }) {
         </div>
 
         {/* Cor */}
-        <form action={colorAction} noValidate className="flex flex-col gap-5">
+        <form ref={setFormElement} onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
           <input type="hidden" name="color" value={hex} />
           <div className="flex flex-col gap-3">
             <p id="brand-color-label" className="text-sm font-medium leading-snug">
@@ -291,7 +282,7 @@ export function BrandForm({ initial }: { initial: BrandInitial }) {
             ) : null}
           </div>
 
-          <SaveRow pending={savingColor} disabled={!valid} error={colorState.error} />
+          <FormFooter error={colorState.error} />
         </form>
       </div>
     </SettingsSection>

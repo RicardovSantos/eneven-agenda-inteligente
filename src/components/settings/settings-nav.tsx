@@ -1,8 +1,9 @@
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
+import { SettingsSaveProvider } from "./settings-save";
 
-/** Moldura de uma tela de configuração: voltar, título e conteúdo. */
+/** Moldura de uma tela de configuração: voltar, título e conteúdo, com um único botão Salvar fixo. */
 export function SettingsPageShell({
   title,
   description,
@@ -21,7 +22,7 @@ export function SettingsPageShell({
         <h1 className="text-[1.75rem] font-semibold">{title}</h1>
         {description ? <p className="m-0 text-ink-muted">{description}</p> : null}
       </div>
-      {children}
+      <SettingsSaveProvider>{children}</SettingsSaveProvider>
     </div>
   );
 }

@@ -87,7 +87,7 @@ for (const scheme of SCHEMES) {
     await page.getByLabel("Segunda, intervalo 1: de").fill("08:00");
     await page.getByLabel("Segunda, intervalo 1: até").fill("20:00");
     await teamCheckbox.scrollIntoViewIfNeeded();
-    await page.locator('section[aria-labelledby="hours-title"]').getByRole("button", { name: "Salvar" }).click();
+    await page.getByRole("button", { name: "Salvar" }).click();
     const warning = page.getByText("O expediente da equipe não mudou.");
     await expect(warning).toBeVisible();
     await expect(page.getByRole("link", { name: "Equipe", exact: true }).last()).toHaveAttribute("href", "/painel/equipe");

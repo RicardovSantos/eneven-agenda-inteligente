@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToastOnResult } from "@/components/ui/toast";
 import { formatBrazilPhone } from "@/lib/phone";
-import { SaveRow, SettingsSection } from "./settings-section";
+import { FormFooter, useSettingsForm } from "./settings-save";
+import { SettingsSection } from "./settings-section";
 
 const ABOUT_MAX = 160;
 
@@ -29,6 +30,7 @@ export function BusinessInfoForm({ initial }: { initial: BusinessInfoInitial }) 
     {},
   );
   useToastOnResult(state);
+  const { setFormElement, onSubmit } = useSettingsForm({ pending, action: formAction });
 
   const [name, setName] = useState(initial.name);
   const [whatsapp, setWhatsapp] = useState(formatBrazilPhone(initial.whatsapp));
@@ -45,7 +47,7 @@ export function BusinessInfoForm({ initial }: { initial: BusinessInfoInitial }) 
       title="Seu estabelecimento"
       description="Aparecem na sua página de agendamento."
     >
-      <form action={formAction} noValidate className="flex flex-col gap-5">
+      <form ref={setFormElement} onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
         <TextField
           name="name"
           label="Nome do estabelecimento"
@@ -127,7 +129,7 @@ export function BusinessInfoForm({ initial }: { initial: BusinessInfoInitial }) 
             </p>
           ) : null}
         </div>
-        <SaveRow pending={pending} error={state.error} />
+        <FormFooter error={state.error} />
       </form>
     </SettingsSection>
   );

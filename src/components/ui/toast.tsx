@@ -63,7 +63,12 @@ export function ToastProvider({
 
   const show = useCallback((message: string, tone: ToastTone = "success", action?: ToastAction) => {
     const id = nextId.current++;
-    setItems((current) => [...current.slice(-2), { id, message, tone, action }]);
+    setItems((current) =>
+      // Dois formulários salvos juntos devolvem o mesmo aviso: mostra uma vez só.
+      !action && current.some((item) => !item.action && item.message === message && item.tone === tone)
+        ? current
+        : [...current.slice(-2), { id, message, tone, action }],
+    );
     if (!action) {
       setTimeout(() => {
         setItems((current) => current.filter((item) => item.id !== id));
