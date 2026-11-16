@@ -11,6 +11,7 @@ import { formatLongDate } from "@/lib/dates";
 import type { WeekRow } from "@/lib/week-rows";
 import { formatBRL, formatDuration } from "@/lib/format";
 import { formatBrazilPhone, normalizeBrazilPhone } from "@/lib/phone";
+import { clearSavedCustomer, readSavedCustomer, saveCustomer } from "@/lib/saved-customer";
 import { SLOT_TAKEN_MESSAGE } from "@/server/agenda/errors";
 import type { BookingView } from "@/server/public/view";
 import { Confirmation } from "./confirmation";
@@ -93,6 +94,8 @@ export function BookingFlow({
   const [slotError, setSlotError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [form, setForm] = useState<Form>({ name: "", phone: "", email: "", consent: false });
+  // `true` quando nome e WhatsApp vieram do último agendamento feito neste aparelho.
+  const [remembered, setRemembered] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -171,6 +174,24 @@ export function BookingFlow({
   function goTo(next: Step) {
     window.history.pushState({ bookingStep: next }, "");
     setStep(next);
+    // Ao chegar em "Seus dados", já preenche com quem agendou antes neste aparelho (sem apagar o que já foi digitado).
+    if (next === 3) {
+      const saved = readSavedCustomer();
+      if (saved) {
+        setForm((current) => ({
+          ...current,
+          name: current.name || saved.name,
+          phone: current.phone || formatBrazilPhone(saved.phone),
+        }));
+        setRemembered(true);
+      }
+    }
+  }
+
+  function forgetCustomer() {
+    clearSavedCustomer();
+    setForm((current) => ({ ...current, name: "", phone: "", email: "" }));
+    setRemembered(false);
   }
 
   function toggleService(id: string) {
@@ -230,6 +251,7 @@ export function BookingFlow({
         consent: form.consent,
       });
       if (result.ok) {
+        saveCustomer({ name, phone: form.phone });
         setDone({ token: result.token, booking: result.booking, firstName: name.split(/\s+/)[0] });
         // Recarregar a página cai na gestão do agendamento, não numa agenda vazia.
         window.history.replaceState(null, "", `/agendamento/${result.token}`);
@@ -600,6 +622,19 @@ export function BookingFlow({
             </div>
 
             {formError ? <FormAlert>{formError}</FormAlert> : null}
+
+            {remembered ? (
+              <p role="status" className="m-0 flex flex-wrap items-center gap-x-2 text-sm leading-snug text-ink-muted">
+                <span>Preenchemos com os dados do seu último agendamento.</span>
+                <button
+                  type="button"
+                  onClick={forgetCustomer}
+                  className="min-h-11 font-semibold text-foreground underline underline-offset-4"
+                >
+                  Não é você? Limpar
+                </button>
+              </p>
+            ) : null}
 
             <TextField
               name="name"
