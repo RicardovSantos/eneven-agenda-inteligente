@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { PersonAvatar } from "@/components/media/person-avatar";
 import { cn } from "@/lib/utils";
-import { agendaHref } from "./shared";
+import { agendaHref, type AgendaView } from "./shared";
 
 type Pro = { id: string; name: string; color: string | null; photoUrl?: string | null };
 
@@ -26,7 +26,7 @@ export function ProChips({
   /** `null` = todos. */
   selectedId: string | null;
   date: string;
-  view: "mes" | "dia";
+  view: AgendaView;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
 

@@ -56,7 +56,8 @@ export function Dot({ color, size = 7 }: { color: string | null; size?: number }
 }
 
 /** Opções de link da agenda (estado na URL: `?data=&pro=&view=`). */
-export type AgendaParams = { data?: string; pro?: string; view?: "mes" | "dia" };
+export type AgendaView = "mes" | "semana" | "dia";
+export type AgendaParams = { data?: string; pro?: string; view?: AgendaView };
 
 export function agendaHref({ data, pro, view }: AgendaParams): string {
   const query = new URLSearchParams();
