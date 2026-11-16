@@ -2,10 +2,12 @@ import { runInNewContext } from "node:vm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   THEME_INIT_SCRIPT,
+  PUBLIC_THEME_STORAGE_KEY,
   THEME_STORAGE_KEY,
   applyThemePreference,
   parseThemePreference,
   readThemePreference,
+  themeStorageKey,
 } from "@/lib/theme";
 
 function fakeRoot() {
@@ -96,5 +98,48 @@ describe("tema", () => {
     expect(run("auto")).toEqual([]);
     expect(run(null)).toEqual([]);
     expect(run("dark", true)).toEqual([]);
+  });
+
+  it("o painel e as telas do cliente guardam o tema em chaves separadas", () => {
+    expect(themeStorageKey("/painel/configuracoes")).toBe(THEME_STORAGE_KEY);
+    expect(themeStorageKey("/entrar")).toBe(THEME_STORAGE_KEY);
+    expect(themeStorageKey("/")).toBe(THEME_STORAGE_KEY);
+    expect(themeStorageKey("/agendamento/abc123")).toBe(PUBLIC_THEME_STORAGE_KEY);
+    expect(themeStorageKey("/studio-aurora")).toBe(PUBLIC_THEME_STORAGE_KEY);
+    expect(themeStorageKey("/studio-aurora/profissional/7")).toBe(PUBLIC_THEME_STORAGE_KEY);
+    expect(themeStorageKey(null)).toBe(THEME_STORAGE_KEY);
+  });
+
+  it("escolher o tema numa tela pública não mexe na escolha do painel, e vice-versa", () => {
+    const storage = fakeStorage({ [THEME_STORAGE_KEY]: "dark" });
+    vi.stubGlobal("localStorage", storage);
+    const { root } = fakeRoot();
+
+    vi.stubGlobal("location", { pathname: "/agendamento/abc123" });
+    expect(readThemePreference()).toBe("auto"); // o escuro do painel não vale aqui
+    applyThemePreference("light", root);
+    expect(storage.data.get(PUBLIC_THEME_STORAGE_KEY)).toBe("light");
+    expect(storage.data.get(THEME_STORAGE_KEY)).toBe("dark");
+
+    vi.stubGlobal("location", { pathname: "/painel" });
+    expect(readThemePreference()).toBe("dark");
+  });
+
+  it("o script inicial lê a chave certa para cada tipo de tela", () => {
+    function run(pathname: string, stored: Record<string, string>) {
+      const { root, classes } = fakeRoot();
+      const localStorage = { getItem: (k: string) => stored[k] ?? null };
+      runInNewContext(THEME_INIT_SCRIPT, {
+        localStorage,
+        location: { pathname },
+        document: { documentElement: root },
+      });
+      return [...classes];
+    }
+    const painelEscuro = { [THEME_STORAGE_KEY]: "dark" };
+    expect(run("/agendamento/abc123", painelEscuro)).toEqual([]);
+    expect(run("/studio-aurora", painelEscuro)).toEqual([]);
+    expect(run("/painel", painelEscuro)).toEqual(["dark"]);
+    expect(run("/agendamento/abc123", { [PUBLIC_THEME_STORAGE_KEY]: "light" })).toEqual(["light"]);
   });
 });

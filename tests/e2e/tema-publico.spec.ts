@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { chooseService, open, randomIp, seedTenant } from "./helpers";
+import { chooseService, open, randomIp, seedBooking, seedTenant } from "./helpers";
 
 test.use({ extraHTTPHeaders: { "x-forwarded-for": randomIp() } });
 
@@ -70,5 +70,30 @@ test.describe("página de agendamento: tema claro/escuro", () => {
     await expect(page.locator("html")).toHaveClass(/dark/);
     await expect.poll(() => opacidades(page)).toEqual([1, 0]);
     await page.screenshot({ path: "/tmp/tema-escuro.png" });
+  });
+
+  test("link de gestão: segue o aparelho, tem o botão sol/lua e ignora o tema escolhido no painel", async ({ page, request }) => {
+    const { slug } = await seedTenant(request);
+    const { token } = await seedBooking(request, slug);
+
+    // O dono deixou o painel escuro neste navegador; isso não vale para o link do cliente.
+    await page.addInitScript(() => localStorage.setItem("eneven-tema", "dark"));
+    await page.emulateMedia({ colorScheme: "light" });
+    await open(page, `/agendamento/${token}`);
+    await expect(page.getByRole("heading", { name: "Seu agendamento" })).toBeVisible();
+    await expect(page.locator("html")).not.toHaveClass(/dark/);
+    await expect(page.getByRole("button", { name: "Mudar para o tema escuro" })).toBeVisible();
+    expect(await opacidades(page)).toEqual([0, 1]);
+
+    // Aparelho escuro: abre escuro, com o sol.
+    await page.emulateMedia({ colorScheme: "dark" });
+    await open(page, `/agendamento/${token}`);
+    await expect(page.getByRole("button", { name: "Mudar para o tema claro" })).toBeVisible();
+
+    // Tocar troca para o claro e lembra só nas telas do cliente.
+    await page.getByRole("button", { name: "Mudar para o tema claro" }).click();
+    await expect(page.locator("html")).toHaveClass(/light/);
+    expect(await page.evaluate(() => localStorage.getItem("eneven-tema-publico"))).toBe("light");
+    expect(await page.evaluate(() => localStorage.getItem("eneven-tema"))).toBe("dark");
   });
 });
