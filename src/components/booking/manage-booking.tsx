@@ -12,6 +12,7 @@ import {
   rescheduleAction,
 } from "@/app/agendamento/[token]/actions";
 import { FormAlert, FormNotice } from "@/components/auth/form-alert";
+import { ThemeToggle } from "@/components/brand/theme-toggle";
 import { ConfirmDialog } from "@/components/catalog/parts";
 import { formatLongDate } from "@/lib/dates";
 import { SLOT_TAKEN_MESSAGE } from "@/server/agenda/errors";
@@ -153,6 +154,7 @@ export function ManageBooking({
             <ChevronLeft className="size-[22px]" aria-hidden="true" />
           </button>
           <CompactBrand tenant={tenant} />
+          <ThemeToggle className="ml-auto" />
         </header>
         <main className="flex flex-1 flex-col gap-4 px-5 pt-[18px]">
           <div className="flex flex-col gap-1">
@@ -218,7 +220,10 @@ export function ManageBooking({
 
   return (
     <div className="flex min-h-dvh flex-col gap-6 px-5 pt-7 pb-5">
-      <CompactBrand tenant={tenant} />
+      <div className="flex items-center justify-between gap-3">
+        <CompactBrand tenant={tenant} />
+        <ThemeToggle />
+      </div>
 
       <div className="flex flex-col gap-3">
         {notice ? <FormNotice>{notice}</FormNotice> : null}
