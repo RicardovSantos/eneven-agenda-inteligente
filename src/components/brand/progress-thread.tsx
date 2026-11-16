@@ -51,34 +51,35 @@ export function ProgressThread({
           <li
             key={name}
             aria-current={isCurrent ? "step" : undefined}
-            className="flex flex-col gap-2"
+            className="relative flex flex-col items-center gap-2 text-center"
           >
-            <span className="flex items-center" aria-hidden="true">
+            {/* O ponto fica no centro da coluna, com o nome centralizado embaixo; o fio vai do centro
+                deste ponto ao centro do próximo (por isso começa em 50% e tem a largura da coluna). */}
+            <span className="relative flex h-3 w-full items-center justify-center" aria-hidden="true">
+              {index < last ? (
+                <span
+                  className="absolute top-1/2 left-1/2 h-[3px] w-full -translate-y-1/2"
+                  style={{
+                    background: done
+                      ? doneLine(index, current)
+                      : isCurrent
+                        ? CURRENT_LINE
+                        : "var(--line)",
+                  }}
+                />
+              ) : null}
               <span
                 className={cn(
-                  "size-3 shrink-0 rounded-full",
+                  "relative z-10 size-3 shrink-0 rounded-full",
                   reached
                     ? "bg-[#3E07D2] dark:bg-[#A673FF]"
                     : "bg-surface shadow-[inset_0_0_0_2px_var(--line)]",
                 )}
               />
-              <span
-                className="h-[3px] flex-1"
-                style={{
-                  background:
-                    index === last
-                      ? "transparent"
-                      : done
-                        ? doneLine(index, current)
-                        : isCurrent
-                          ? CURRENT_LINE
-                          : "var(--line)",
-                }}
-              />
             </span>
             <span
               className={cn(
-                "pr-1 text-xs leading-tight",
+                "px-0.5 text-xs leading-tight",
                 isCurrent ? "font-semibold text-foreground" : "text-ink-muted",
               )}
             >
