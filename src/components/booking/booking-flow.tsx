@@ -7,6 +7,7 @@ import { bookAction, getDatesAction, getSlotsAction } from "@/app/[slug]/actions
 import { FormAlert } from "@/components/auth/form-alert";
 import { TextField } from "@/components/auth/text-field";
 import { ProgressThread } from "@/components/brand/progress-thread";
+import { ThemeToggle } from "@/components/brand/theme-toggle";
 import { formatLongDate } from "@/lib/dates";
 import type { WeekRow } from "@/lib/week-rows";
 import { formatBRL, formatDuration } from "@/lib/format";
@@ -285,12 +286,13 @@ export function BookingFlow({
         <header className="flex flex-col gap-4 pt-5">
           <div className="flex items-center gap-3.5 px-5">
             <BrandMark name={tenant.name} logoUrl={tenant.logoUrl} size="lg" />
-            <div className="flex min-w-0 flex-col gap-[3px]">
+            <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
               <h1 className="m-0 font-display text-[21px] leading-tight font-semibold">{tenant.name}</h1>
               <span className="text-[13px] text-ink-muted">
                 {tenant.subtitle ?? "Agendamento online"}
               </span>
             </div>
+            <ThemeToggle className="self-start" />
           </div>
           {lockedProfessional ? (
             <div className="mx-5 flex items-center gap-3.5 rounded-2xl border border-line bg-canvas p-3.5">
@@ -335,6 +337,7 @@ export function BookingFlow({
               <ChevronLeft className="size-[22px]" aria-hidden="true" />
             </button>
             <CompactBrand tenant={tenant} />
+            <ThemeToggle className="ml-auto" />
           </div>
           <ProgressThread steps={STEPS} current={view} label="Etapas do agendamento" />
         </header>
