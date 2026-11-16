@@ -4,6 +4,7 @@ import { AgendaScreen } from "@/components/agenda/agenda-screen";
 import { ResendVerification } from "@/components/panel/resend-verification";
 import { PUBLIC_HOST } from "@/lib/brand";
 import { formatDayMonth, trialDaysLeft } from "@/lib/trial";
+import { getBusinessHours } from "@/server/settings";
 import { findStaffProfessional, getDayAgenda, getMonthAgenda, getMonthOverview, listPanelProfessionals } from "@/server/agenda/panel-queries";
 import { panelBookingOptions } from "@/server/agenda/booking-options";
 import { addDaysToDate, localDateOf, weekdayOf } from "@/server/agenda/time";
@@ -31,7 +32,8 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
   const today = localDateOf(now, data.timezone);
   const dateParam = first(params.data);
   const date = dateParam && isRealDate(dateParam) ? dateParam : today;
-  const view = first(params.view) === "dia" ? "dia" : "mes";
+  const viewParam = first(params.view);
+  const view = viewParam === "dia" ? "dia" : viewParam === "semana" ? "semana" : "mes";
 
   // Profissional (`staff`) só enxerga a própria agenda; os demais podem filtrar.
   const allPros = (await listPanelProfessionals(db, session.tenantId)).map((p) => ({
@@ -67,13 +69,23 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
   const weekEnd = addDaysToDate(weekStart, 6);
   const otherMonth = [weekStart, weekEnd].map((d) => d.slice(0, 7)).find((m) => m !== month);
 
-  const [monthDays, otherDays, day, catalog, monthList] = await Promise.all([
+  const [monthDays, otherDays, day, catalog, monthList, week, businessHours] = await Promise.all([
     getMonthOverview(db, session.tenantId, month, professionalId),
     otherMonth ? getMonthOverview(db, session.tenantId, otherMonth, professionalId) : Promise.resolve([]),
     getDayAgenda(db, session.tenantId, date, professionalId),
     listServices(db, session.tenantId),
     view === "mes" ? getMonthAgenda(db, session.tenantId, date, professionalId) : Promise.resolve(null),
+    view === "semana"
+      ? getDayAgenda(db, session.tenantId, weekStart, professionalId, addDaysToDate(weekEnd, 1))
+      : Promise.resolve(null),
+    view === "semana" ? getBusinessHours(db, session.tenantId) : Promise.resolve(null),
   ]);
+  // Do primeiro horário de abertura ao último de fechamento da semana (grade da visão "Semana").
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const openRanges = businessHours ? Object.values(businessHours).flat() : [];
+  const weekOpenHours = openRanges.length
+    ? { startMin: Math.min(...openRanges.map((r) => toMin(r.start))), endMin: Math.max(...openRanges.map((r) => toMin(r.end))) }
+    : null;
 
   const { professionals, services } = panelBookingOptions(allPros, catalog, own);
 
@@ -90,6 +102,8 @@ export default async function PainelPage({ searchParams }: PageProps<"/painel">)
       date={date}
       view={view}
       monthList={monthList}
+      week={week}
+      weekOpenHours={weekOpenHours}
       professionalFilter={filter}
       monthDays={monthDays}
       stripDays={[...monthDays, ...otherDays]}

@@ -11,6 +11,7 @@ const svc = (id: string, professionalIds: string[]) => ({
   durationMin: 30,
   priceCents: 1000,
   professionalIds,
+  categoryName: id === "a" ? "Cabelo" : null,
 });
 const catalog = [svc("a", ["p1"]), svc("b", ["p2"]), svc("c", [])];
 
@@ -19,6 +20,8 @@ describe("panelBookingOptions", () => {
     const r = panelBookingOptions(pros, catalog, null);
     expect(r.professionals.map((p) => p.id)).toEqual(["p1", "p2"]);
     expect(r.services.map((s) => s.id)).toEqual(["a", "b"]);
+    // A categoria vai junto, para o "Novo agendamento" agrupar os serviços.
+    expect(r.services.map((s) => s.categoryName)).toEqual(["Cabelo", null]);
   });
 
   it("staff: só o próprio profissional e os serviços dele", () => {

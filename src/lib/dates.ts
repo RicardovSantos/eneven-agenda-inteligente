@@ -105,3 +105,18 @@ export function formatMonthLabel(date: string, referenceDate?: string): string {
   const name = capitalize(MONTHS[m - 1]);
   return referenceDate && parts(referenceDate).y !== y ? `${name} ${y}` : name;
 }
+
+/**
+ * Intervalo de uma semana para o título da agenda: "15 – 21 de novembro",
+ * "28 de out – 3 de nov" (atravessa meses). O ano só aparece quando difere do
+ * ano de referência ("28 de dez 2026 – 3 de jan 2027" quando atravessa o ano).
+ */
+export function formatWeekRange(start: string, end: string, referenceDate?: string): string {
+  const a = parts(start);
+  const b = parts(end);
+  const refYear = referenceDate ? parts(referenceDate).y : null;
+  const yearA = a.y !== b.y || (refYear !== null && a.y !== refYear) ? ` ${a.y}` : "";
+  const yearB = a.y !== b.y || (refYear !== null && b.y !== refYear) ? ` ${b.y}` : "";
+  if (a.y === b.y && a.m === b.m) return `${a.d} – ${b.d} de ${MONTHS[b.m - 1]}${yearB}`;
+  return `${a.d} de ${MONTHS[a.m - 1].slice(0, 3)}${yearA} – ${b.d} de ${MONTHS[b.m - 1].slice(0, 3)}${yearB}`;
+}

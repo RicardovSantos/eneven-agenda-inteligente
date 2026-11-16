@@ -8,11 +8,11 @@ import { deleteBlockAction } from "@/app/painel/actions";
 import { ConfirmDialog } from "@/components/catalog/parts";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import { formatLongDate, formatMonthRange } from "@/lib/dates";
+import { formatLongDate, formatMonthRange, formatWeekRange } from "@/lib/dates";
 import { formatBRL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { DayAgenda, MonthDay } from "@/server/agenda/panel-queries";
-import { addDaysToDate } from "@/server/agenda/time";
+import { addDaysToDate, weekdayOf } from "@/server/agenda/time";
 import { BlockDialog } from "./block-dialog";
 import { BookingDetail } from "./booking-detail";
 import { DayColumns } from "./day-columns";
@@ -22,8 +22,9 @@ import { MonthView } from "./month-view";
 import { ProChips } from "./pro-filter";
 import { NewBookingDialog, type PanelPro, type PanelService } from "./new-booking-dialog";
 import { PersonAvatar } from "@/components/media/person-avatar";
-import { agendaHref, formatShortWeekdayDay, useMinuteNow } from "./shared";
+import { agendaHref, formatShortWeekdayDay, useMinuteNow, type AgendaView } from "./shared";
 import { WeekStrip } from "./week-strip";
+import { WeekView } from "./week-view";
 
 const NAV_BUTTON =
   "flex size-10 items-center justify-center rounded-field border border-line bg-surface text-foreground hover:bg-primary-soft";
@@ -39,7 +40,11 @@ function TodayLabel() {
 export type AgendaScreenProps = {
   today: string;
   date: string;
-  view: "mes" | "dia";
+  view: AgendaView;
+  /** Semana inteira (domingo a sábado); só vem preenchida na visão "Semana". */
+  week: DayAgenda | null;
+  /** Horário de funcionamento da semana (minutos), para a grade da visão "Semana". */
+  weekOpenHours: { startMin: number; endMin: number } | null;
   /** Do dia escolhido até o fim do mês; só vem preenchido na visão "Mês". */
   monthList: DayAgenda | null;
   /** "todos" ou o id do profissional filtrado. */
@@ -69,6 +74,8 @@ export function AgendaScreen({
   today,
   date,
   view,
+  week,
+  weekOpenHours,
   monthList,
   professionalFilter,
   monthDays,
@@ -100,17 +107,34 @@ export function AgendaScreen({
   const goMonth = (first: string) => (first.slice(0, 7) === todayMonth ? today : first);
   const pro = professionalFilter;
   const isToday = date === today;
+  const weekStart = addDaysToDate(date, -weekdayOf(date));
+  const weekEnd = addDaysToDate(weekStart, 6);
+  const todayInWeek = today >= weekStart && today <= weekEnd;
+  // "Hoje" só acende quando há para onde voltar: o dia (Mês e Dia) ou a semana (Semana).
+  const atToday = view === "semana" ? todayInWeek : isToday;
+  const step = {
+    mes: { prev: goMonth(prevMonth), next: goMonth(nextMonth), prevLabel: "Mês anterior", nextLabel: "Próximo mês" },
+    semana: { prev: addDaysToDate(date, -7), next: addDaysToDate(date, 7), prevLabel: "Semana anterior", nextLabel: "Próxima semana" },
+    dia: { prev: addDaysToDate(date, -1), next: addDaysToDate(date, 1), prevLabel: "Dia anterior", nextLabel: "Próximo dia" },
+  }[view];
 
   const stripInfo = new Map(stripDays.map((d) => [d.date, d]));
   const monthMode = view === "mes" && monthList !== null;
   const listed = monthMode && monthList ? monthList : day;
-  const selected = listed.items.find((i) => i.kind === "booking" && i.id === selectedId);
+  const lookup = [...day.items, ...(monthList?.items ?? []), ...(week?.items ?? [])];
+  const selected = lookup.find((i) => i.kind === "booking" && i.id === selectedId);
   const detail = selected && selected.kind === "booking" ? selected : null;
 
   const filtered = professionals.find((p) => p.id === pro) ?? null;
   const columns = filtered ? [filtered] : professionals;
   const photos = Object.fromEntries(professionals.map((p) => [p.id, p.photoUrl ?? null]));
   const longDate = formatLongDate(date);
+  const viewTitle =
+    view === "semana"
+      ? formatWeekRange(weekStart, weekEnd, today)
+      : view === "dia"
+        ? longDate
+        : formatMonthRange(monthFirst, monthFirst);
   const shownCount = listed.count;
   const summary =
     shownCount === 0
@@ -169,26 +193,9 @@ export function AgendaScreen({
           <div className="flex flex-wrap items-center justify-between gap-3 lg:gap-4">
             <div className="flex items-center gap-3">
               <h1 className="font-display text-xl font-semibold tracking-[-0.01em] lg:text-[28px]">
-                {formatMonthRange(monthFirst, monthFirst)}
+                <span className="lg:hidden">{formatMonthRange(monthFirst, monthFirst)}</span>
+                <span className="hidden lg:inline" data-testid="agenda-title">{viewTitle}</span>
               </h1>
-              <div className="hidden gap-1 lg:flex">
-                <Link
-                  href={agendaHref({ data: goMonth(prevMonth), pro, view })}
-                  scroll={false}
-                  aria-label="Mês anterior"
-                  className={NAV_BUTTON}
-                >
-                  <ChevronLeft className="size-[18px]" aria-hidden="true" />
-                </Link>
-                <Link
-                  href={agendaHref({ data: goMonth(nextMonth), pro, view })}
-                  scroll={false}
-                  aria-label="Próximo mês"
-                  className={NAV_BUTTON}
-                >
-                  <ChevronRight className="size-[18px]" aria-hidden="true" />
-                </Link>
-              </div>
               <div className="flex gap-1 lg:hidden">
                 <Link
                   href={agendaHref({ data: addDaysToDate(date, -7), pro })}
@@ -207,37 +214,64 @@ export function AgendaScreen({
                   <ChevronRight className="size-[18px]" aria-hidden="true" />
                 </Link>
               </div>
-              {isToday ? (
+              <div className="lg:hidden">
+                {isToday ? (
+                  <span aria-disabled="true" className={cn(TEXT_BUTTON, "cursor-default opacity-50 hover:bg-surface")}>
+                    Hoje
+                  </span>
+                ) : (
+                  <Link href={agendaHref({ data: today, pro, view })} scroll={false} className={TEXT_BUTTON}>
+                    <TodayLabel />
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {/* Computador: Hoje + setas (pulam de mês, semana ou dia conforme a visão) + seletor de visão */}
+            <div className="hidden items-center gap-3 lg:flex">
+              {atToday ? (
                 <span aria-disabled="true" className={cn(TEXT_BUTTON, "cursor-default opacity-50 hover:bg-surface")}>
                   Hoje
                 </span>
               ) : (
-                <Link href={agendaHref({ data: today, pro, view })} scroll={false} className={TEXT_BUTTON}>
+                <Link href={agendaHref({ data: today, pro, view })} scroll={false} className={cn(TEXT_BUTTON, "border-primary bg-primary-soft text-primary hover:bg-primary-soft/70")}>
                   <TodayLabel />
                 </Link>
               )}
-            </div>
-
-            <div
-              role="tablist"
-              aria-label="Visualização"
-              className="hidden gap-0.5 rounded-xl bg-[color-mix(in_oklch,var(--line)_70%,transparent)] p-1 lg:flex"
-            >
-              <ViewTab href={agendaHref({ data: date, pro, view: "mes" })} active={view === "mes"}>
-                Mês
-              </ViewTab>
-              <span
-                role="tab"
-                aria-selected="false"
-                aria-disabled="true"
-                className="flex h-9 cursor-not-allowed items-center rounded-[9px] px-4 text-sm font-medium text-ink-muted/60"
+              <div className="flex gap-1">
+                <Link
+                  href={agendaHref({ data: step.prev, pro, view })}
+                  scroll={false}
+                  aria-label={step.prevLabel}
+                  className={NAV_BUTTON}
+                >
+                  <ChevronLeft className="size-[18px]" aria-hidden="true" />
+                </Link>
+                <Link
+                  href={agendaHref({ data: step.next, pro, view })}
+                  scroll={false}
+                  aria-label={step.nextLabel}
+                  className={NAV_BUTTON}
+                >
+                  <ChevronRight className="size-[18px]" aria-hidden="true" />
+                </Link>
+              </div>
+              <span aria-hidden="true" className="h-6 w-px bg-line" />
+              <div
+                role="tablist"
+                aria-label="Visualização"
+                className="flex gap-0.5 rounded-xl bg-[color-mix(in_oklch,var(--line)_70%,transparent)] p-1"
               >
-                Semana
-                <span className="sr-only"> (em breve)</span>
-              </span>
-              <ViewTab href={agendaHref({ data: date, pro, view: "dia" })} active={view === "dia"}>
-                Dia
-              </ViewTab>
+                <ViewTab href={agendaHref({ data: date, pro, view: "mes" })} active={view === "mes"}>
+                  Mês
+                </ViewTab>
+                <ViewTab href={agendaHref({ data: date, pro, view: "semana" })} active={view === "semana"}>
+                  Semana
+                </ViewTab>
+                <ViewTab href={agendaHref({ data: date, pro, view: "dia" })} active={view === "dia"}>
+                  Dia
+                </ViewTab>
+              </div>
             </div>
           </div>
 
@@ -274,6 +308,31 @@ export function AgendaScreen({
         <div className="hidden lg:block">
           {view === "dia" ? (
             <DayColumns day={day} professionals={columns} isToday={isToday} nowMs={now} onOpen={setSelectedId} />
+          ) : view === "semana" && week ? (
+            <>
+              {/* A coluna da direita some nesta visão (a grade precisa da largura): os botões ficam aqui. */}
+              <div className="mb-4 flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setBlockOpen(true)} disabled={readOnly} className="min-h-11 gap-1.5 rounded-field text-sm">
+                  <Lock className="size-4" aria-hidden="true" />
+                  Bloquear horário
+                </Button>
+                <Button type="button" onClick={() => setNewOpen(true)} disabled={readOnly} className="min-h-11 gap-1.5 rounded-field text-sm">
+                  <Plus className="size-[18px]" aria-hidden="true" />
+                  Novo agendamento
+                </Button>
+              </div>
+              <WeekView
+                week={week}
+                date={date}
+                today={today}
+                days={stripInfo}
+                openHours={weekOpenHours}
+                professionalId={pro}
+                nowMs={now}
+                selectedId={selectedId}
+                onOpen={setSelectedId}
+              />
+            </>
           ) : (
             <MonthView days={monthDays} selected={date} today={today} professionalId={pro} />
           )}
@@ -282,7 +341,7 @@ export function AgendaScreen({
 
       <aside
         aria-label="Agendamentos do dia"
-        className="flex flex-col gap-4 lg:sticky lg:top-0 lg:h-dvh lg:w-[360px] lg:shrink-0 min-[1536px]:w-[400px] lg:gap-[18px] lg:overflow-y-auto lg:border-l lg:border-line lg:bg-surface lg:p-6 lg:pt-7"
+        className={cn("flex flex-col gap-4 lg:sticky lg:top-0 lg:h-dvh lg:w-[360px] lg:shrink-0 min-[1536px]:w-[400px] lg:gap-[18px] lg:overflow-y-auto lg:border-l lg:border-line lg:bg-surface lg:p-6 lg:pt-7", view === "semana" && !detail && "lg:hidden")}
       >
         <div className={cn("flex flex-col gap-4 lg:gap-[18px]", detail && "lg:hidden")}>
           <div className="flex flex-col gap-1 max-lg:flex-row max-lg:items-baseline max-lg:justify-between">
