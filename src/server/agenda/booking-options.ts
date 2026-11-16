@@ -11,6 +11,7 @@ export function panelBookingOptions(
     durationMin: number;
     priceCents: number;
     professionalIds: string[];
+    categoryName: string | null;
   }>,
   own: { id: string; name: string; color: string | null; photoUrl?: string | null } | null,
 ) {
@@ -23,6 +24,7 @@ export function panelBookingOptions(
       durationMin: s.durationMin,
       priceCents: s.priceCents,
       professionalIds: s.professionalIds,
+      categoryName: s.categoryName,
     }));
   return { professionals, services };
 }

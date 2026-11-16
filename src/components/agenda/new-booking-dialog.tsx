@@ -1,21 +1,22 @@
 "use client";
 
 import { PersonLabel } from "@/components/media/person-avatar";
-import { Loader2, Search, UserPlus, X } from "lucide-react";
+import { Check, Loader2, Search, UserPlus, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { createBookingAction, searchCustomersAction } from "@/app/painel/actions";
 import { FormAlert } from "@/components/auth/form-alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { formatBRL, formatDuration } from "@/lib/format";
 import { formatBrazilPhone, normalizeBrazilPhone } from "@/lib/phone";
+import { groupServices, matchRange, OTHER_CATEGORY, showGroupHeaders } from "@/lib/service-groups";
 import { cn } from "@/lib/utils";
 import { localDateOf } from "@/server/agenda/time";
 import type { CustomerHit } from "@/server/agenda/panel-ops";
 import { PanelDialog } from "./panel-dialog";
+import { ProSelect } from "./pro-select";
 import { SlotField, type SlotSelection } from "./slot-field";
 
 export type PanelService = {
@@ -24,6 +25,8 @@ export type PanelService = {
   durationMin: number;
   priceCents: number;
   professionalIds: string[];
+  /** Categoria da lista pública; `null` = "Outros serviços". */
+  categoryName: string | null;
 };
 export type PanelPro = { id: string; name: string; color: string | null; photoUrl?: string | null };
 
@@ -61,7 +64,7 @@ export function NewBookingDialog({
   onCreated: (date: string) => void;
 }) {
   return (
-    <PanelDialog open={open} onClose={onClose} title="Novo agendamento" titleId="new-booking-title">
+    <PanelDialog open={open} onClose={onClose} title="Novo agendamento" titleId="new-booking-title" wide layout="fixed">
       <NewBookingForm
         today={today}
         timezone={timezone}
@@ -75,6 +78,62 @@ export function NewBookingDialog({
       />
     </PanelDialog>
   );
+}
+
+/** Destaca no nome o trecho buscado (ignora acento e maiúscula). */
+function MarkName({ text, query }: { text: string; query: string }) {
+  const range = /\d/.test(query) ? null : matchRange(text, query);
+  if (!range) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, range[0])}
+      <mark className="bg-transparent font-bold text-primary">{text.slice(range[0], range[1])}</mark>
+      {text.slice(range[1])}
+    </>
+  );
+}
+
+/** Destaca no telefone formatado os dígitos buscados: "98765" em "(11) 98765-4321". */
+function MarkPhone({ phone, query }: { phone: string; query: string }) {
+  const formatted = formatBrazilPhone(phone);
+  const wanted = query.replace(/\D/g, "");
+  const digits = formatted.replace(/\D/g, "");
+  const at = wanted.length >= 2 ? digits.indexOf(wanted) : -1;
+  if (at < 0) return <>{formatted}</>;
+  let seen = -1;
+  let start = 0;
+  let end = formatted.length;
+  for (let i = 0; i < formatted.length; i++) {
+    if (!/\d/.test(formatted[i]!)) continue;
+    seen++;
+    if (seen === at) start = i;
+    if (seen === at + wanted.length - 1) {
+      end = i + 1;
+      break;
+    }
+  }
+  return (
+    <>
+      {formatted.slice(0, start)}
+      <mark className="bg-transparent font-bold text-primary">{formatted.slice(start, end)}</mark>
+      {formatted.slice(end)}
+    </>
+  );
+}
+
+/** "ter., 17 · 10:30" no fuso do estabelecimento. */
+function slotLabel(startsAt: string, timezone: string): string {
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    weekday: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: timezone,
+  }).formatToParts(new Date(startsAt));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const weekday = get("weekday").replace(".", "");
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${get("day")} · ${get("hour")}:${get("minute")}`;
 }
 
 function NewBookingForm({
@@ -170,210 +229,294 @@ function NewBookingForm({
     }
   }
 
+  const groups = groupServices(services);
+  const grouped = showGroupHeaders(groups);
+  const proOptions = [
+    { id: "any", name: "Qualquer profissional", color: null },
+    ...eligible.map((p) => ({ id: p.id, name: p.name, color: p.color })),
+  ];
+  const pickedInHits = picked !== null && (hits?.some((h) => h.id === picked.id) ?? false);
+  const proName =
+    effectivePro === "any"
+      ? "qualquer profissional"
+      : (professionals.find((p) => p.id === effectivePro)?.name ?? "");
+
+  const serviceChip = (service: PanelService) => {
+    const on = serviceIds.includes(service.id);
+    return (
+      <button
+        key={service.id}
+        type="button"
+        aria-pressed={on}
+        onClick={() => toggleService(service.id)}
+        className={cn(
+          "flex min-h-11 cursor-pointer flex-col items-start justify-center rounded-[14px] border px-3.5 py-1.5 text-left",
+          on
+            ? "border-primary bg-primary-soft text-primary ring-1 ring-primary"
+            : "border-line bg-surface text-foreground hover:bg-primary-soft/60",
+        )}
+      >
+        <span className="text-[0.9375rem] font-semibold">{service.name}</span>
+        <span className={cn("text-xs tabular-nums", on ? "text-primary" : "text-ink-muted")}>
+          {formatDuration(service.durationMin)} · {formatBRL(service.priceCents)}
+        </span>
+      </button>
+    );
+  };
+
   return (
-    <form onSubmit={submit} className="flex flex-1 flex-col gap-6" noValidate>
-      {error ? <FormAlert>{error}</FormAlert> : null}
+    <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
+      {/* Só este miolo rola: o cabeçalho e o rodapé (Voltar / Agendar) ficam fixos. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-5 lg:px-6">
+        {error ? <FormAlert>{error}</FormAlert> : null}
 
-      <section className="flex flex-col gap-2.5" aria-labelledby="nb-customer">
-        <h3 id="nb-customer" className={LABEL}>
-          Cliente
-        </h3>
-        {picked ? (
-          <div className="flex items-center justify-between gap-3 rounded-field border border-line bg-canvas px-3 py-2.5">
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{picked.name}</p>
-              <p className="text-sm tabular-nums text-ink-muted">{formatBrazilPhone(picked.phone)}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setPicked(null)}
-              aria-label="Trocar cliente"
-              className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-field text-ink-muted hover:bg-primary-soft"
-            >
-              <X className="size-5" aria-hidden="true" />
-            </button>
-          </div>
-        ) : isNew ? (
-          <div className="flex flex-col gap-3 rounded-field border border-line bg-canvas p-3">
-            <label className="flex flex-col gap-1.5 text-sm font-medium">
-              Nome do cliente
-              <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" maxLength={80} />
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm font-medium">
-              WhatsApp
-              <Input
-                value={phone}
-                onChange={(e) => setPhone(formatBrazilPhone(e.target.value))}
-                inputMode="tel"
-                autoComplete="off"
-                placeholder="(11) 99999-9999"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => setIsNew(false)}
-              className="min-h-11 self-start cursor-pointer text-sm font-semibold text-primary hover:underline"
-            >
-              Buscar cliente existente
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-ink-muted"
-                aria-hidden="true"
-              />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar por nome ou WhatsApp"
-                aria-label="Buscar cliente por nome ou WhatsApp"
-                autoComplete="off"
-                className="pl-10"
-              />
-            </div>
-            {hits ? (
-              hits.length > 0 ? (
-                <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-field border border-line">
-                  {hits.map((hit) => (
-                    <li key={hit.id}>
-                      <button
-                        type="button"
-                        onClick={() => setPicked(hit)}
-                        className="flex min-h-12 w-full cursor-pointer flex-col items-start justify-center px-3 py-2 text-left hover:bg-primary-soft"
-                      >
-                        <span className="font-semibold">{hit.name}</span>
-                        <span className="text-sm tabular-nums text-ink-muted">{formatBrazilPhone(hit.phone)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-ink-muted">Nenhum cliente encontrado.</p>
-              )
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                setIsNew(true);
-                setName(/\d/.test(q) ? "" : q);
-                setPhone(/\d/.test(q) ? formatBrazilPhone(q) : "");
-              }}
-              className="flex min-h-11 cursor-pointer items-center gap-2 self-start text-sm font-semibold text-primary hover:underline"
-            >
-              <UserPlus className="size-4" aria-hidden="true" />+ Novo cliente
-            </button>
-          </>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-2.5" aria-labelledby="nb-services">
-        <h3 id="nb-services" className={LABEL}>
-          Serviços
-        </h3>
-        <div className="flex flex-wrap gap-2">
-          {services.map((service) => {
-            const on = serviceIds.includes(service.id);
-            return (
+        <section className="flex flex-col gap-2.5" aria-labelledby="nb-customer">
+          <h3 id="nb-customer" className={LABEL}>
+            Cliente
+          </h3>
+          {isNew ? (
+            <div className="flex flex-col gap-3 rounded-field border border-line bg-canvas p-3">
+              <label className="flex flex-col gap-1.5 text-sm font-medium">
+                Nome do cliente
+                <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" maxLength={80} />
+              </label>
+              <label className="flex flex-col gap-1.5 text-sm font-medium">
+                WhatsApp
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(formatBrazilPhone(e.target.value))}
+                  inputMode="tel"
+                  autoComplete="off"
+                  placeholder="(11) 99999-9999"
+                />
+              </label>
               <button
-                key={service.id}
                 type="button"
-                aria-pressed={on}
-                onClick={() => toggleService(service.id)}
-                className={cn(
-                  "flex min-h-11 cursor-pointer flex-col items-start justify-center rounded-[14px] border px-3.5 py-1.5 text-left",
-                  on
-                    ? "border-primary bg-primary-soft text-primary"
-                    : "border-line bg-surface text-foreground hover:bg-primary-soft/60",
-                )}
+                onClick={() => setIsNew(false)}
+                className="min-h-11 self-start cursor-pointer text-sm font-semibold text-primary hover:underline"
               >
-                <span className="text-[0.9375rem] font-semibold">{service.name}</span>
-                <span className={cn("text-xs tabular-nums", on ? "text-primary" : "text-ink-muted")}>
-                  {formatDuration(service.durationMin)} · {formatBRL(service.priceCents)}
-                </span>
+                Buscar cliente existente
               </button>
-            );
-          })}
-        </div>
-        {chosen.length > 0 ? (
-          <p className="text-sm tabular-nums text-ink-muted">
-            {chosen.length} {chosen.length === 1 ? "serviço" : "serviços"} · {formatDuration(totalMin)} ·{" "}
-            {formatBRL(totalCents)}
-          </p>
-        ) : null}
-      </section>
+            </div>
+          ) : (
+            <>
+              {picked && !pickedInHits ? (
+                <div className="flex items-center gap-3 rounded-field border-2 border-primary bg-primary-soft px-3.5 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-primary">{picked.name}</p>
+                    <p className="text-sm tabular-nums text-primary">{formatBrazilPhone(picked.phone)}</p>
+                  </div>
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+                    <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPicked(null)}
+                    aria-label="Trocar cliente"
+                    className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-field text-primary hover:bg-primary/10"
+                  >
+                    <X className="size-5" aria-hidden="true" />
+                  </button>
+                </div>
+              ) : null}
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-ink-muted"
+                  aria-hidden="true"
+                />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar por nome ou WhatsApp"
+                  aria-label="Buscar cliente por nome ou WhatsApp"
+                  autoComplete="off"
+                  className="h-12 pl-11 pr-11"
+                />
+                {query !== "" ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    aria-label="Limpar busca"
+                    className="absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 cursor-pointer place-items-center rounded-full text-ink-muted hover:bg-primary-soft"
+                  >
+                    <X className="size-[18px]" aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
+              {hits ? (
+                hits.length > 0 ? (
+                  <ul className="flex flex-col gap-2">
+                    {hits.map((hit) => {
+                      const on = picked?.id === hit.id;
+                      return (
+                        <li key={hit.id}>
+                          <button
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => setPicked(on ? null : hit)}
+                            className={cn(
+                              "flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-field border px-3.5 py-2 text-left",
+                              on
+                                ? "border-primary bg-primary-soft ring-1 ring-primary"
+                                : "border-line bg-surface hover:bg-primary-soft/50",
+                            )}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                "grid size-10 shrink-0 place-items-center rounded-full font-display text-base font-semibold",
+                                on ? "bg-primary text-primary-foreground" : "bg-line/70 text-ink-muted",
+                              )}
+                            >
+                              {hit.name.trim().charAt(0).toUpperCase()}
+                            </span>
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className={cn("truncate font-semibold", on && "text-primary")}>
+                                <MarkName text={hit.name} query={q} />
+                              </span>
+                              <span className={cn("text-sm tabular-nums", on ? "text-primary" : "text-ink-muted")}>
+                                <MarkPhone phone={hit.phone} query={q} />
+                              </span>
+                            </span>
+                            {on ? (
+                              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+                                <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
+                              </span>
+                            ) : null}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-ink-muted">Nenhum cliente encontrado.</p>
+                )
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setPicked(null);
+                  setIsNew(true);
+                  setName(/\d/.test(q) ? "" : q);
+                  setPhone(/\d/.test(q) ? formatBrazilPhone(q) : "");
+                }}
+                className="flex min-h-11 cursor-pointer items-center gap-2 self-start text-sm font-semibold text-primary hover:underline"
+              >
+                <UserPlus className="size-4" aria-hidden="true" />+ Novo cliente
+              </button>
+            </>
+          )}
+        </section>
 
-      <section className="flex flex-col gap-2.5" aria-labelledby="nb-pro">
-        <h3 id="nb-pro" className={LABEL}>
-          Profissional
-        </h3>
-        {lockedProfessionalId ? (
-          <p className="flex min-h-11 items-center gap-2 text-[0.9375rem] font-medium">
-            {(() => {
-              const locked = professionals.find((p) => p.id === lockedProfessionalId);
-              return locked ? (
-                <PersonLabel name={locked.name} color={locked.color} photoUrl={locked.photoUrl} size={26} className="gap-2" />
-              ) : null;
-            })()}
-          </p>
-        ) : (
-          <Select
-            aria-labelledby="nb-pro"
-            value={effectivePro}
-            onChange={(e) => {
-              setProfessionalId(e.target.value);
-              setSlot(null);
-            }}
-          >
-            <option value="any">Qualquer profissional</option>
-            {eligible.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        )}
-      </section>
+        <section className="flex flex-col gap-3" aria-labelledby="nb-services">
+          <h3 id="nb-services" className={LABEL}>
+            Serviços
+          </h3>
+          {grouped ? (
+            groups.map((group) => {
+              const marked = group.items.filter((s) => serviceIds.includes(s.id)).length;
+              return (
+                <div key={group.category ?? ""} role="group" aria-label={group.category ?? OTHER_CATEGORY} className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className="m-0 font-display text-[1.0625rem] font-semibold">{group.category ?? OTHER_CATEGORY}</h4>
+                    {marked > 0 ? (
+                      <span className="rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">
+                        {marked} {marked === 1 ? "marcado" : "marcados"}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2">{group.items.map(serviceChip)}</div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="flex flex-wrap gap-2">{services.map(serviceChip)}</div>
+          )}
+        </section>
 
-      <section className="flex flex-col gap-2.5" aria-labelledby="nb-when">
-        <h3 id="nb-when" className={LABEL}>
-          Dia e horário
-        </h3>
-        {serviceIds.length === 0 ? (
-          <p className="text-[0.9375rem] text-ink-muted">Escolha o serviço para ver os horários livres.</p>
-        ) : (
-          <SlotField
-            key={`${serviceIds.join(",")}|${effectivePro}`}
-            today={today}
-            timezone={timezone}
-            base={{ serviceIds, professionalId: effectivePro }}
-            loadKey={`${serviceIds.join(",")}|${effectivePro}`}
-            value={slot}
-            onChange={setSlot}
+        <section className="flex flex-col gap-2.5" aria-labelledby="nb-pro">
+          <h3 id="nb-pro" className={LABEL}>
+            Profissional
+          </h3>
+          {lockedProfessionalId ? (
+            <p className="flex min-h-11 items-center gap-2 text-[0.9375rem] font-medium">
+              {(() => {
+                const locked = professionals.find((p) => p.id === lockedProfessionalId);
+                return locked ? (
+                  <PersonLabel name={locked.name} color={locked.color} photoUrl={locked.photoUrl} size={26} className="gap-2" />
+                ) : null;
+              })()}
+            </p>
+          ) : (
+            <ProSelect
+              labelledBy="nb-pro"
+              value={effectivePro}
+              options={proOptions}
+              onChange={(id) => {
+                setProfessionalId(id);
+                setSlot(null);
+              }}
+            />
+          )}
+        </section>
+
+        <section className="flex flex-col gap-2.5" aria-labelledby="nb-when">
+          <h3 id="nb-when" className={LABEL}>
+            Dia e horário
+          </h3>
+          {serviceIds.length === 0 ? (
+            <p className="text-[0.9375rem] text-ink-muted">Escolha o serviço para ver os horários livres.</p>
+          ) : (
+            <SlotField
+              key={`${serviceIds.join(",")}|${effectivePro}`}
+              today={today}
+              timezone={timezone}
+              base={{ serviceIds, professionalId: effectivePro }}
+              loadKey={`${serviceIds.join(",")}|${effectivePro}`}
+              value={slot}
+              onChange={setSlot}
+            />
+          )}
+        </section>
+
+        <label className="flex flex-col gap-2.5 text-sm font-semibold">
+          Observação (opcional)
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            maxLength={300}
+            rows={3}
+            className="font-normal"
           />
-        )}
-      </section>
+        </label>
+      </div>
 
-      <label className="flex flex-col gap-2.5 text-sm font-semibold">
-        Observação (opcional)
-        <Textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          maxLength={300}
-          rows={3}
-          className="font-normal"
-        />
-      </label>
-
-      <div className="mt-auto flex gap-3 pt-2">
-        <Button type="button" variant="outline" size="lg" onClick={onClose} className="flex-1 lg:flex-none lg:px-6">
-          Voltar
-        </Button>
-        <Button type="submit" size="lg" disabled={!ready || pending} className="flex-1">
-          {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
-          Agendar
-        </Button>
+      {/* Rodapé fixo: resumo + Voltar / Agendar sempre à vista. */}
+      <div className="flex shrink-0 flex-col gap-3 border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-10px_20px_-14px_rgb(41_48_60_/_0.25)] lg:flex-row lg:items-center lg:px-6 lg:py-4">
+        <div className="min-w-0 flex-1 text-sm leading-snug" aria-live="polite">
+          {chosen.length > 0 ? (
+            <>
+              <p className="m-0 font-semibold tabular-nums">
+                {chosen.length} {chosen.length === 1 ? "serviço" : "serviços"} · {formatDuration(totalMin)} ·{" "}
+                {formatBRL(totalCents)}
+              </p>
+              <p className="m-0 truncate text-ink-muted">
+                {slot ? `${slotLabel(slot.startsAt, timezone)} com ${proName}` : "Escolha o dia e o horário"}
+              </p>
+            </>
+          ) : (
+            <p className="m-0 text-ink-muted">Escolha ao menos um serviço.</p>
+          )}
+        </div>
+        <div className="flex gap-3">
+          <Button type="button" variant="outline" size="lg" onClick={onClose} className="flex-1 lg:flex-none lg:px-6">
+            Voltar
+          </Button>
+          <Button type="submit" size="lg" disabled={!ready || pending} className="flex-1 lg:flex-none lg:px-8">
+            {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+            Agendar
+          </Button>
+        </div>
       </div>
     </form>
   );
