@@ -10,6 +10,7 @@ import {
   saveProfessionalAction,
   uploadProfessionalPhotoAction,
 } from "@/app/painel/equipe/actions";
+import { ServicePicker, type PickableService } from "./service-picker";
 import { PhotoField, type PhotoResult } from "@/components/media/photo-field";
 import { PersonAvatar } from "@/components/media/person-avatar";
 import { WeeklyHoursEditor } from "@/components/hours/weekly-hours-editor";
@@ -51,7 +52,7 @@ export type ProfessionalItem = {
   hasAccess?: boolean;
 };
 
-export type ServiceOption = { id: string; name: string };
+export type ServiceOption = PickableService;
 
 type Selection = { kind: "new" } | { kind: "edit"; id: string } | null;
 
@@ -573,20 +574,12 @@ function ProfessionalForm({
               para escolher o que esta pessoa faz.
             </p>
           ) : (
-            services.map((s) => (
-              <label
-                key={s.id}
-                className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-field border border-line px-3"
-              >
-                <input
-                  type="checkbox"
-                  checked={serviceIds.includes(s.id)}
-                  onChange={(e) => toggleService(s.id, e.target.checked)}
-                  className="size-[18px] accent-primary"
-                />
-                <span className="min-w-0 truncate">{s.name}</span>
-              </label>
-            ))
+            <>
+              <p className="m-0 text-[0.8125rem] text-ink-muted tabular-nums">
+                {serviceIds.length} de {services.length} marcados
+              </p>
+              <ServicePicker services={services} selectedIds={serviceIds} onToggle={toggleService} />
+            </>
           )}
           <FieldError>{errors.serviceIds}</FieldError>
         </fieldset>

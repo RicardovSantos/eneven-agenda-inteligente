@@ -20,6 +20,12 @@ test("agenda no celular: profissionais em chips numa linha que rola, escolher e 
   expect(geometria.linhas).toBe(1);
   expect(geometria.rola).toBe(true);
 
+  // "Todos" corre junto com os chips (não fica fixo): ao rolar até o fim, ele sai da tela.
+  await grupo.locator("[data-rolagem]").evaluate((el) => el.scrollTo({ left: el.scrollWidth }));
+  await expect(grupo.getByRole("link", { name: "Todos" })).not.toBeInViewport();
+  await grupo.locator("[data-rolagem]").evaluate((el) => el.scrollTo({ left: 0 }));
+  await expect(grupo.getByRole("link", { name: "Todos" })).toBeInViewport();
+
   // "Todos" começa escolhido.
   await expect(grupo.getByRole("link", { name: "Todos" })).toHaveAttribute("aria-current", "true");
   await page.screenshot({ path: "/tmp/agenda-todos.png" });

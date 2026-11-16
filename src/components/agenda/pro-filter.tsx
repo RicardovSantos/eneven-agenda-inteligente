@@ -12,8 +12,8 @@ const CHIP =
   "flex h-11 shrink-0 items-center gap-2 rounded-full border text-[0.9375rem] whitespace-nowrap outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 /**
- * Filtro de profissional para o celular, numa linha só: "Todos" fica fixo à esquerda e os
- * profissionais correm para o lado. O último chip aparece cortado para mostrar que há mais.
+ * Filtro de profissional para o celular, numa linha só: "Todos" é o primeiro chip e corre junto
+ * com os profissionais (a tela é pequena). O último chip aparece cortado para mostrar que há mais.
  * Tocar no escolhido de novo volta para "Todos".
  */
 export function ProChips({
@@ -42,23 +42,22 @@ export function ProChips({
     <div
       role="group"
       aria-label="Profissional"
-      className="-mx-4 flex items-center gap-2 pl-4 lg:hidden"
+      className="-mx-4 pl-4 lg:hidden"
     >
-      <Link
-        href={agendaHref({ data: date, pro: "todos", view })}
-        scroll={false}
-        aria-current={selectedId === null ? "true" : undefined}
-        className={cn(CHIP, "px-4", chipTone(selectedId === null))}
-      >
-        Todos
-      </Link>
-      <span aria-hidden="true" className="h-6 w-px shrink-0 bg-line" />
-      <div className="relative min-w-0 flex-1">
+      <div className="relative">
         <div
           ref={scroller}
           data-rolagem
-          className="relative flex gap-2 overflow-x-auto pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="relative flex gap-2 overflow-x-auto pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
+          <Link
+            href={agendaHref({ data: date, pro: "todos", view })}
+            scroll={false}
+            aria-current={selectedId === null ? "true" : undefined}
+            className={cn(CHIP, "px-4", chipTone(selectedId === null))}
+          >
+            Todos
+          </Link>
           {professionals.map((p) => {
             const active = selectedId === p.id;
             return (
