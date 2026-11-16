@@ -29,3 +29,21 @@ export async function enablePushForDevice(publicKey: string, save: (subscription
   await save(subscription.toJSON());
   return "enabled";
 }
+
+/**
+ * Troca a inscrição do aparelho por uma nova (a antiga foi recusada pelo serviço de notificações):
+ * cancela a atual, cria outra com a mesma chave e entrega para salvar. Vale só com a permissão já concedida.
+ */
+export async function renewPushForDevice(publicKey: string, save: (subscription: PushSubscriptionJSON) => Promise<void>): Promise<PushSubscriptionJSON> {
+  const key = decodePublicKey(publicKey);
+  if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) throw new Error("Notificações não disponíveis neste dispositivo.");
+  if (Notification.permission !== "granted") throw new Error("Permissão de notificações não concedida.");
+  const registration = await navigator.serviceWorker.getRegistration("/");
+  if (!registration || !registration.active) throw new Error("Aplicativo ainda não está pronto para notificações.");
+  const current = await registration.pushManager.getSubscription();
+  if (current) await current.unsubscribe();
+  const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  const json = subscription.toJSON();
+  await save(json);
+  return json;
+}

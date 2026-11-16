@@ -12,14 +12,41 @@ async function worker() {
   return { handlers, showNotification, openWindow, matchAll };
 }
 
-it("exibe texto fixo sem dados arbitrários e trata payload inválido", async () => {
-  const w = await worker();
+async function receive(w: Awaited<ReturnType<typeof worker>>, payload: unknown) {
   let task: Promise<unknown> = Promise.resolve();
-  w.handlers.push({ data: { json: () => ({ type: "booking_created", body: "informação privada" }) }, waitUntil: (value: Promise<unknown>) => { task = value; } });
+  w.handlers.push({ data: { json: () => { if (payload === "invalid") throw new Error("invalid"); return payload; } }, waitUntil: (value: Promise<unknown>) => { task = value; } });
   await task;
-  expect(w.showNotification).toHaveBeenLastCalledWith("Eneven Agenda", expect.objectContaining({ body: "Você recebeu um novo agendamento." }));
-  w.handlers.push({ data: { json: () => { throw new Error("invalid"); } }, waitUntil: (value: Promise<unknown>) => { task = value; } });
-  await task;
+}
+
+it("mostra o nome do cliente, o serviço e o horário enviados pelo servidor, em português", async () => {
+  const w = await worker();
+  await receive(w, { type: "booking_created", title: "Novo agendamento", body: "Marina Costa · Corte feminino · ter, 17/11 às 10:30" });
+  expect(w.showNotification).toHaveBeenLastCalledWith("Novo agendamento", expect.objectContaining({ body: "Marina Costa · Corte feminino · ter, 17/11 às 10:30", data: { destination: "/painel" } }));
+});
+
+it("sem texto do servidor usa uma frase genérica em português por tipo; payload inválido vira aviso geral", async () => {
+  const w = await worker();
+  await receive(w, { type: "booking_created" });
+  expect(w.showNotification).toHaveBeenLastCalledWith("Novo agendamento", expect.objectContaining({ body: "Você recebeu um novo agendamento." }));
+  await receive(w, { type: "booking_canceled" });
+  expect(w.showNotification).toHaveBeenLastCalledWith("Agendamento cancelado", expect.objectContaining({ body: "Um agendamento foi cancelado." }));
+  await receive(w, { type: "booking_rescheduled" });
+  expect(w.showNotification).toHaveBeenLastCalledWith("Agendamento remarcado", expect.objectContaining({ body: "Um agendamento foi remarcado." }));
+  await receive(w, "invalid");
+  expect(w.showNotification).toHaveBeenLastCalledWith("Eneven Agenda", expect.objectContaining({ body: "Há uma atualização na sua agenda." }));
+  await receive(w, { type: "outro" });
+  expect(w.showNotification).toHaveBeenLastCalledWith("Eneven Agenda", expect.objectContaining({ body: "Há uma atualização na sua agenda." }));
+});
+
+it("ignora texto que não é string e corta texto grande demais", async () => {
+  const w = await worker();
+  await receive(w, { type: "booking_created", title: { x: 1 }, body: 42 });
+  expect(w.showNotification).toHaveBeenLastCalledWith("Novo agendamento", expect.objectContaining({ body: "Você recebeu um novo agendamento." }));
+  await receive(w, { type: "booking_created", title: "T".repeat(500), body: "B".repeat(900) });
+  const [title, options] = w.showNotification.mock.calls.at(-1) as unknown as [string, { body: string }];
+  expect(title).toHaveLength(80);
+  expect(options.body).toHaveLength(200);
+  await receive(w, null);
   expect(w.showNotification).toHaveBeenLastCalledWith("Eneven Agenda", expect.objectContaining({ body: "Há uma atualização na sua agenda." }));
 });
 

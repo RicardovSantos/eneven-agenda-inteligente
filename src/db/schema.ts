@@ -662,6 +662,8 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   endpoint: text("endpoint").notNull(),
   p256dh: text("p256dh").notNull(),
   auth: text("auth").notNull(),
+  /** O serviço de notificações recusou este aparelho (aviso expirado ou removido); o painel renova na próxima abertura. */
+  staleAt: timestamptz("stale_at"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 }, (t) => [

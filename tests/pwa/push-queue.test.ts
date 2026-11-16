@@ -74,3 +74,38 @@ it("remove apenas a inscrição rejeitada pelo provedor se ela não mudou", asyn
   expect(await db.select().from(pushSubscriptions)).toHaveLength(0);
   expect(await db.select().from(auditLog)).toMatchObject([{ action: "push.test_expired_subscription_removed" }]);
 });
+
+it("manda ao aparelho o nome do cliente, o serviço e o horário", async () => {
+  const db = await createTestDb();
+  const tenant = await seedTenant(db);
+  const booking = await seedBooking(db, tenant.id);
+  const [user] = await db.insert(users).values({ name: "Dona", email: "owner2@example.com" }).returning();
+  await db.insert(memberships).values({ userId: user.id, tenantId: tenant.id, role: "owner" });
+  const now = new Date();
+  await db.insert(pushSubscriptions).values({ tenantId: tenant.id, userId: user.id, endpointHash: "x", endpoint: "https://fcm.googleapis.com/x", p256dh: "k", auth: "a", createdAt: new Date(now.getTime() - 1000) });
+  await db.insert(pushEvents).values({ tenantId: tenant.id, bookingId: booking.id, eventType: "booking_created", eventKey: "created", createdAt: now });
+  const sender = vi.fn(async () => "sent" as const);
+  await processTestPushQueue(db, sender, now);
+  expect(sender).toHaveBeenCalledWith(expect.anything(), "booking_created", expect.objectContaining({ title: "Novo agendamento", body: expect.stringContaining("Cliente") }));
+});
+
+it("marca como parado o aparelho que o serviço de notificações recusou, sem apagar nada", async () => {
+  const db = await createTestDb();
+  const tenant = await seedTenant(db);
+  const booking = await seedBooking(db, tenant.id);
+  const [user] = await db.insert(users).values({ name: "Dona", email: "owner3@example.com" }).returning();
+  await db.insert(memberships).values({ userId: user.id, tenantId: tenant.id, role: "owner" });
+  const now = new Date();
+  const base = { tenantId: tenant.id, userId: user.id, p256dh: "k", auth: "a", createdAt: new Date(now.getTime() - 1000) };
+  await db.insert(pushSubscriptions).values([
+    { ...base, endpointHash: "gone", endpoint: "https://fcm.googleapis.com/gone" },
+    { ...base, endpointHash: "alive", endpoint: "https://fcm.googleapis.com/alive" },
+  ]);
+  await db.insert(pushEvents).values({ tenantId: tenant.id, bookingId: booking.id, eventType: "booking_created", eventKey: "created", createdAt: now });
+  const sender = async (input: unknown) => ((input as { endpoint: string }).endpoint.endsWith("/gone") ? ("expired" as const) : ("sent" as const));
+  expect(await processTestPushQueue(db, sender, now)).toMatchObject({ sent: 1, expired: 1 });
+  const rows = await db.select().from(pushSubscriptions);
+  expect(rows).toHaveLength(2);
+  expect(rows.find((r) => r.endpointHash === "gone")?.staleAt).toEqual(now);
+  expect(rows.find((r) => r.endpointHash === "alive")?.staleAt).toBeNull();
+});

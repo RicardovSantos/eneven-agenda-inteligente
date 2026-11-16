@@ -83,17 +83,27 @@ self.addEventListener("fetch", (event) => {
   // Todo o resto (JS, CSS, imagens, payloads RSC) segue o caminho normal do navegador.
 });
 
-// Não exibir conteúdo arbitrário ou dados de clientes na tela bloqueada.
+// O texto (nome do cliente, serviço e horário) vem do nosso servidor dentro do aviso criptografado;
+// mesmo assim só aceitamos texto simples e curto. Sem texto (ou inválido), vai uma frase genérica.
 self.addEventListener("push", (event) => {
-  let type;
-  try { type = event.data?.json()?.type; } catch { /* Mensagem genérica em payload inválido. */ }
+  let data = null;
+  try { data = event.data?.json() ?? null; } catch { /* Mensagem genérica em payload inválido. */ }
+  if (typeof data !== "object" || data === null) data = {};
+  const titles = {
+    booking_created: "Novo agendamento",
+    booking_canceled: "Agendamento cancelado",
+    booking_rescheduled: "Agendamento remarcado",
+  };
   const descriptions = {
     booking_created: "Você recebeu um novo agendamento.",
     booking_canceled: "Um agendamento foi cancelado.",
     booking_rescheduled: "Um agendamento foi remarcado.",
   };
-  const body = typeof type === "string" && Object.hasOwn(descriptions, type) ? descriptions[type] : "Há uma atualização na sua agenda.";
-  event.waitUntil(self.registration.showNotification("Eneven Agenda", { body, icon: "/brand/icon-192.png", data: { destination: "/painel" } }));
+  const known = typeof data.type === "string" && Object.hasOwn(descriptions, data.type);
+  const text = (value, max) => (typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null);
+  const title = text(data.title, 80) ?? (known ? titles[data.type] : "Eneven Agenda");
+  const body = text(data.body, 200) ?? (known ? descriptions[data.type] : "Há uma atualização na sua agenda.");
+  event.waitUntil(self.registration.showNotification(title, { body, icon: "/brand/icon-192.png", data: { destination: "/painel" } }));
 });
 
 self.addEventListener("notificationclick", (event) => {
