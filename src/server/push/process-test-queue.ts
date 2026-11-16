@@ -2,11 +2,11 @@ import { and, asc, eq, isNull, lte } from "drizzle-orm";
 import { pushDeliveries, pushEvents, pushSubscriptions } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { pushAvailable } from "./mode";
+import { pushContentFor, type PushContent, type PushType } from "./content";
 import { sendTestPush } from "./test-transport";
 import { pushSubscriptionVersion } from "./subscription-version";
 
-type PushType = "booking_created" | "booking_canceled" | "booking_rescheduled";
-type Sender = (input: unknown, type: PushType) => Promise<"sent" | "expired">;
+type Sender = (input: unknown, type: PushType, content?: PushContent | null) => Promise<"sent" | "expired">;
 
 /** Reserva antes de enviar e mantém casos incertos sem nova tentativa automática. */
 export async function processTestPushQueue(db: Db, sender: Sender, now = new Date(), limit = 20) {
@@ -46,16 +46,23 @@ export async function processTestPushQueue(db: Db, sender: Sender, now = new Dat
     try {
       if (now.getTime() - claimed.event.createdAt.getTime() > 5 * 60_000) { status = "expired"; expirationReason = "event_old"; }
       else {
-        status = await sender({ endpoint: claimed.subscription.endpoint, keys: { p256dh: claimed.subscription.p256dh, auth: claimed.subscription.auth } }, claimed.event.eventType as PushType);
+        // Nome do cliente, serviço e horário; se não der para ler, vai o aviso genérico.
+        const content = await pushContentFor(db, claimed.event.tenantId, claimed.event.bookingId, claimed.event.eventType as PushType).catch(() => null);
+        status = await sender({ endpoint: claimed.subscription.endpoint, keys: { p256dh: claimed.subscription.p256dh, auth: claimed.subscription.auth } }, claimed.event.eventType as PushType, content);
         if (status === "expired") expirationReason = "subscription_gone";
       }
     } catch { status = "uncertain"; }
     const updated = await db.update(pushDeliveries).set({ status, expirationReason, completedAt: now }).where(and(eq(pushDeliveries.id, claimed.delivery.id), eq(pushDeliveries.status, "processing"), eq(pushDeliveries.claimedAt, now))).returning({ id: pushDeliveries.id });
     if (updated.length) result[status]++;
+    // O serviço de notificações recusou este aparelho: marca (só se a inscrição não mudou desde o envio)
+    // para o painel renovar sozinho na próxima abertura. Nada é apagado aqui.
+    if (updated.length && expirationReason === "subscription_gone") {
+      await db.update(pushSubscriptions).set({ staleAt: now }).where(and(eq(pushSubscriptions.id, claimed.subscription.id), eq(pushSubscriptions.updatedAt, claimed.subscription.updatedAt), eq(pushSubscriptions.endpoint, claimed.subscription.endpoint)));
+    }
   }
   return result;
 }
 
 export function testPushSender(vapid: { subject: string; publicKey: string; privateKey: string }): Sender {
-  return (subscription, type) => sendTestPush(subscription, type, vapid);
+  return (subscription, type, content) => sendTestPush(subscription, type, vapid, content);
 }

@@ -7,7 +7,7 @@ import { validatePushSubscription } from "./validate-subscription";
 
 type Address = { address: string; family: number };
 type Vapid = { subject: string; publicKey: string; privateKey: string };
-type PushType = "booking_created" | "booking_canceled" | "booking_rescheduled";
+import type { PushContent, PushType } from "./content";
 
 /** Os provedores permitidos são fixos; subdomínios arbitrários de outros domínios não passam. */
 export function assertAllowedPushEndpoint(endpoint: string): URL {
@@ -29,13 +29,13 @@ export function selectPublicPushAddress(addresses: Address[]): Address {
   return addresses.find(({ family }) => family === 4) ?? addresses[0];
 }
 
-/** Envio com destinos fixos e endereço público validado; não recebe payload arbitrário. Em produção só com o envio real ligado. */
-export async function sendTestPush(input: unknown, type: PushType, vapid: Vapid): Promise<"sent" | "expired"> {
+/** Envio com destinos fixos e endereço público validado; o texto vem do servidor (nome, serviço e horário). Em produção só com o envio real ligado. */
+export async function sendTestPush(input: unknown, type: PushType, vapid: Vapid, content?: PushContent | null): Promise<"sent" | "expired"> {
   if (!pushAvailable()) throw new Error("Envio indisponível em produção.");
   if (!["booking_created", "booking_canceled", "booking_rescheduled"].includes(type)) throw new Error("Evento inválido.");
   const subscription = validatePushSubscription(input);
   const url = assertAllowedPushEndpoint(subscription.endpoint);
-  const details = generateRequestDetails({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } }, JSON.stringify({ type }), { vapidDetails: vapid, TTL: 300 });
+  const details = generateRequestDetails({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } }, JSON.stringify(content ? { type, title: content.title, body: content.body } : { type }), { vapidDetails: vapid, TTL: 300 });
   const addresses = await Promise.race([
     lookup(url.hostname, { all: true }),
     new Promise<never>((_, reject) => { const timer = setTimeout(() => reject(new Error("Tempo de DNS esgotado.")), 5000); timer.unref(); }),

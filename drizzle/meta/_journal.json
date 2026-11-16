@@ -253,6 +253,13 @@
       "when": 1793877399271,
       "tag": "0035_gateways_base",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794842166364,
+      "tag": "0036_push_aparelho_parado",
+      "breakpoints": true
     }
   ]
 }

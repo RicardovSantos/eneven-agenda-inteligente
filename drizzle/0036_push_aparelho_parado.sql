@@ -1,0 +1,1 @@
+ALTER TABLE "push_subscriptions" ADD COLUMN "stale_at" timestamp with time zone;
