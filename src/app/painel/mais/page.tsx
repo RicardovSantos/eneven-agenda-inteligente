@@ -1,4 +1,4 @@
-import { ChevronRight, LogOut, ShieldCheck, Trash2, type LucideIcon } from "lucide-react";
+import { CalendarDays, ChevronRight, LogOut, ShieldCheck, Trash2, type LucideIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CopyLinkButton } from "@/components/panel/copy-link-button";
@@ -45,6 +45,9 @@ export default async function MaisPage() {
             <NavRow href={item.href} icon={item.icon} label={item.label} />
           </li>
         ))}
+        <li>
+          <NavRow href="/painel/integracoes" icon={CalendarDays} label="Integrações" />
+        </li>
         <li>
           <NavRow href="/painel/conta/excluir" icon={Trash2} label="Excluir conta" />
         </li>

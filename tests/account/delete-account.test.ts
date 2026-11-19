@@ -179,6 +179,28 @@ describe("exclusão de conta", () => {
     expect(error.code).toBe("password");
   });
 
+  describe("Google Agenda na exclusão", () => {
+    it("proprietário: retira o acesso de todas as conexões do estabelecimento antes de apagar", async () => {
+      const revokeCalendar = vi.fn(async () => 1);
+      await deleteAccount(db, { userId: ownerId, tenantId, confirmation: "EXCLUIR", password: PASSWORD }, { cancelBilling, revokeCalendar });
+      expect(revokeCalendar).toHaveBeenCalledWith({ tenantId });
+      expect(await db.select().from(tenants).where(eq(tenants.id, tenantId))).toHaveLength(0);
+    });
+
+    it("equipe: retira só o acesso da própria pessoa", async () => {
+      const staff = await join("reception", "rita@x.com");
+      const revokeCalendar = vi.fn(async () => 1);
+      await deleteAccount(db, { userId: staff.userId, tenantId, confirmation: "EXCLUIR", password: "senha-da-equipe-1" }, { cancelBilling, revokeCalendar });
+      expect(revokeCalendar).toHaveBeenCalledWith({ tenantId, userId: staff.userId });
+    });
+
+    it("falha ao retirar o acesso no Google não impede a exclusão", async () => {
+      const revokeCalendar = vi.fn(async () => { throw new Error("google fora do ar"); });
+      await deleteAccount(db, { userId: ownerId, tenantId, confirmation: "EXCLUIR", password: PASSWORD }, { cancelBilling, revokeCalendar });
+      expect(await db.select().from(tenants).where(eq(tenants.id, tenantId))).toHaveLength(0);
+    });
+  });
+
   describe("cobrança depois da exclusão", () => {
     async function deleteWithBilling() {
       const planId = (await db.select().from(tenants).where(eq(tenants.id, tenantId)))[0].planId;

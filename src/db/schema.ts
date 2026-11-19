@@ -1013,3 +1013,51 @@ export const deletedTenantBilling = pgTable("deleted_tenant_billing", {
   check("deleted_tenant_billing_provider_check", sql`${t.provider} in ('mercadopago', 'stripe')`),
   check("deleted_tenant_billing_kind_check", sql`${t.kind} in ('subscription', 'invoice', 'payment', 'charge')`),
 ]);
+
+/**
+ * Conexão de uma pessoa (dono, recepção ou profissional) com o Google Agenda. O token de renovação fica
+ * cifrado. Dono e recepção recebem os agendamentos de todos; profissional, só os dele (decidido na hora de
+ * sincronizar, pelo papel atual). Tabela só do servidor: a conexão da aplicação com papel restrito não a lê.
+ */
+export const googleCalendarConnections = pgTable("google_calendar_connections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** E-mail da conta Google, só para mostrar na tela. */
+  googleEmail: text("google_email").notNull(),
+  refreshTokenEnc: text("refresh_token_enc").notNull(),
+  /** Agenda secundária criada pelo app ("Eneven Agenda"). */
+  calendarId: text("calendar_id").notNull(),
+  calendarName: text("calendar_name").notNull(),
+  /** Desligado pela pessoa: nada é enviado, mas a conexão e o histórico ficam. */
+  enabled: boolean("enabled").notNull().default(true),
+  /** `needs_reconnect`: o Google recusou o token (acesso retirado ou vencido). */
+  status: text("status").notNull().default("active"),
+  lastError: text("last_error"),
+  /** Nulo até a primeira carga (agendamentos futuros); depois, até onde as mudanças já foram lidas. */
+  cursor: timestamptz("cursor"),
+  lastSyncedAt: timestamptz("last_synced_at"),
+  failures: integer("failures").notNull().default(0),
+  nextAttemptAt: timestamptz("next_attempt_at"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  unique("google_calendar_connections_tenant_user_unique").on(t.tenantId, t.userId),
+  index("google_calendar_connections_sync_idx").on(t.enabled, t.status),
+  check("google_calendar_connections_status_check", sql`${t.status} in ('active', 'needs_reconnect')`),
+]);
+
+/** Qual evento do Google corresponde a qual agendamento, e até que versão do agendamento ele reflete. */
+export const googleCalendarEvents = pgTable("google_calendar_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: tenantIdColumn(),
+  connectionId: uuid("connection_id").notNull().references(() => googleCalendarConnections.id, { onDelete: "cascade" }),
+  bookingId: uuid("booking_id").notNull(),
+  googleEventId: text("google_event_id").notNull(),
+  /** `bookings.updated_at` da versão já enviada; versão igual ou mais nova no Google = nada a fazer. */
+  syncedUpdatedAt: timestamptz("synced_updated_at").notNull(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  unique("google_calendar_events_connection_booking_unique").on(t.connectionId, t.bookingId),
+  index("google_calendar_events_booking_idx").on(t.tenantId, t.bookingId),
+]);

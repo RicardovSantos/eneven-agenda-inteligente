@@ -19,6 +19,10 @@ export const OAUTH_VERIFIER_COOKIE = cookieName("ea_oauth_verifier");
 export const OAUTH_INTENT_COOKIE = cookieName("ea_oauth_intent");
 export const GOOGLE_PENDING_COOKIE = cookieName("ea_google_pending");
 
+/** Fluxo "Conectar o Google Agenda" (state e PKCE, 10 min). */
+export const GCAL_STATE_COOKIE = cookieName("ea_gcal_state");
+export const GCAL_VERIFIER_COOKIE = cookieName("ea_gcal_verifier");
+
 /** Token do convite da equipe durante o "Continuar com Google" (assinado, 10 min). */
 export const INVITE_COOKIE = cookieName("ea_invite");
 

@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { AccountDeletionError } from "@/server/account/errors";
+import { revokeConnections } from "@/server/calendar/connections";
 import { cancelTenantBilling } from "@/server/account/cancel-billing";
 import { deleteAccount } from "@/server/account/delete-account";
 import { sessionCookieOptions } from "@/server/auth/cookie";
@@ -41,7 +42,7 @@ export async function deleteAccountAction(_previous: DeleteAccountState, formDat
         confirmation: field(formData, "confirmation"),
         password: field(formData, "password"),
       },
-      { cancelBilling: (input) => cancelTenantBilling(db, input) },
+      { cancelBilling: (input) => cancelTenantBilling(db, input), revokeCalendar: (input) => revokeConnections(db, input) },
     );
   } catch (error) {
     if (error instanceof AccountDeletionError) return { error: error.message };

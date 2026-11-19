@@ -1,5 +1,6 @@
 import {
   Bell,
+  CalendarDays,
   Clock,
   CreditCard,
   Download,
@@ -48,6 +49,10 @@ export default async function ConfiguracoesPage() {
 
       <SettingsGroup title="Equipe">
         <SettingsRow href={`${BASE}/acessos`} Icon={Users} label="Acessos da equipe" description="Convidar pessoas e controlar o que cada uma vê" />
+      </SettingsGroup>
+
+      <SettingsGroup title="Integrações">
+        <SettingsRow href="/painel/integracoes" Icon={CalendarDays} label="Google Agenda" description="Enviar os agendamentos para o seu Google Agenda" />
       </SettingsGroup>
 
       <SettingsGroup title="Avisos">

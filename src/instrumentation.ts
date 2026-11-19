@@ -35,6 +35,21 @@ export async function register() {
     );
   }
 
+  const { googleCalendarEnabled } = await import("@/server/calendar/config");
+  if (googleCalendarEnabled(process.env)) {
+    const { getDb } = await import("@/db/client");
+    const { runCalendarCycle } = await import("@/server/calendar/sync");
+    const { startWhatsAppTimer: startTimer } = await import("@/server/whatsapp/timer");
+    // Google Agenda: lê os agendamentos alterados e envia, a cada minuto (sem sobrepor rodadas).
+    startTimer(
+      async () => {
+        const result = await runCalendarCycle(await getDb());
+        if (result.synced || result.deleted || result.failed || result.reconnect || result.removed) console.info("Ciclo do Google Agenda:", JSON.stringify(result));
+      },
+      { intervalMs: 60_000, firstDelayMs: 60_000, registry: namedRegistry("__enevenCalendarTimerRegistry"), log: console },
+    );
+  }
+
   const { livePushEnabled, pushVapid } = await import("@/server/push/mode");
   const vapid = pushVapid(process.env);
   if (vapid && livePushEnabled(process.env)) {

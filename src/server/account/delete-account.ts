@@ -21,6 +21,8 @@ export type DeleteAccountDeps = {
    * exclusão. Se lançar, nada é apagado. Só é chamada para o proprietário.
    */
   cancelBilling: (input: { tenantId: string; ownerUserId: string }) => Promise<void>;
+  /** Retira o acesso ao Google Agenda (proprietário: de todas as conexões do estabelecimento; equipe: só a da pessoa). Falha não impede a exclusão. */
+  revokeCalendar?: (input: { tenantId: string; userId?: string }) => Promise<unknown>;
 };
 
 export type DeleteAccountResult = {
@@ -84,9 +86,19 @@ export async function deleteAccount(
         "Não foi possível encerrar a cobrança agora. Nada foi apagado. Tente novamente em instantes ou fale com o suporte.",
       );
     }
+    await revokeCalendarBestEffort(deps, { tenantId: input.tenantId });
     return deleteTenantAccount(db, input.tenantId, input.userId);
   }
+  await revokeCalendarBestEffort(deps, { tenantId: input.tenantId, userId: input.userId });
   return deleteMemberAccount(db, input.tenantId, input.userId, row.role);
+}
+
+async function revokeCalendarBestEffort(deps: DeleteAccountDeps, input: { tenantId: string; userId?: string }): Promise<void> {
+  try {
+    await deps.revokeCalendar?.(input);
+  } catch (error) {
+    console.warn("Falha ao retirar o acesso ao Google Agenda antes de excluir a conta", error instanceof Error ? error.message : "erro");
+  }
 }
 
 /** Apaga as contas que não têm mais nenhum estabelecimento (e não são da administração). */

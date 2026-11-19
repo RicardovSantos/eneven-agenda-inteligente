@@ -63,11 +63,11 @@ export function publicBaseUrl(fallbackOrigin: string): string {
 }
 
 /** Cliente OAuth do Google, ou `null` sem credenciais. */
-export function createGoogleClient(baseUrl: string): Google | null {
+export function createGoogleClient(baseUrl: string, callbackPath = "/api/auth/google/callback"): Google | null {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) return null;
-  return new Google(clientId, clientSecret, `${baseUrl}/api/auth/google/callback`);
+  return new Google(clientId, clientSecret, `${baseUrl}${callbackPath}`);
 }
 
 // --- id_token ---

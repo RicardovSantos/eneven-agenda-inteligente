@@ -204,7 +204,7 @@ export function buildPrivacyDocument({ ownerName, contactEmail }: LegalContext):
         heading: "4. Compartilhamento",
         blocks: [
           p(
-            "Compartilhamos dados apenas com fornecedores necessários ao serviço: hospedagem (servidor próprio em provedor de nuvem), envio de e-mails (ZeptoMail/Zoho), envio de mensagens (WhatsApp Business Platform da Meta), login (Google, quando escolhido) e pagamentos (Mercado Pago). Esses fornecedores podem tratar dados fora do Brasil, com as salvaguardas previstas na LGPD.",
+            "Compartilhamos dados apenas com fornecedores necessários ao serviço: hospedagem (servidor próprio em provedor de nuvem), envio de e-mails (ZeptoMail/Zoho), envio de mensagens (WhatsApp Business Platform da Meta), login (Google, quando escolhido), pagamentos (Mercado Pago) e, se você ativar a integração com o Google Agenda, o Google (enviamos o nome do cliente, os serviços, o profissional, o valor e o horário dos agendamentos para uma agenda criada pelo Eneven Agenda na sua conta; telefone e observações não são enviados, e você desconecta quando quiser em Integrações). Esses fornecedores podem tratar dados fora do Brasil, com as salvaguardas previstas na LGPD.",
           ),
         ],
       },
