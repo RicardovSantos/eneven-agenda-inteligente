@@ -987,3 +987,29 @@ export const paymentGatewaySettings = pgTable("payment_gateway_settings", {
   check("payment_gateway_settings_method_check", sql`${t.method} in ('card', 'pix', 'boleto')`),
   check("payment_gateway_settings_provider_check", sql`${t.provider} in ('mercadopago', 'stripe')`),
 ]);
+
+/**
+ * Registro, sem dados pessoais, do que a cobrança de um estabelecimento tinha ao ser excluído
+ * (identificadores no provedor e valores pagos). Serve a dois fins: (1) os avisos que o Mercado Pago e a
+ * Stripe ainda enviam depois da exclusão (ex.: o cancelamento feito por ela) são reconhecidos e
+ * ignorados, em vez de falhar para sempre; (2) guarda o histórico de pagamentos recebidos
+ * (`invoice` e `charge` com `paid_at`) para conferência e prazo legal. `tenant_ref` é o id antigo do
+ * estabelecimento, sem chave estrangeira. Tabela global: só a conexão da plataforma lê e grava.
+ */
+export const deletedTenantBilling = pgTable("deleted_tenant_billing", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantRef: uuid("tenant_ref").notNull(),
+  provider: text("provider").notNull(),
+  kind: text("kind").notNull(),
+  resourceId: text("resource_id").notNull(),
+  /** Só em `invoice` e `charge` pagos; `payment` e `subscription` são só marcadores. */
+  amountCents: integer("amount_cents"),
+  paidAt: timestamptz("paid_at"),
+  deletedAt: timestamptz("deleted_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("deleted_tenant_billing_unique").on(t.provider, t.kind, t.resourceId),
+  index("deleted_tenant_billing_resource_idx").on(t.provider, t.resourceId),
+  index("deleted_tenant_billing_paid_idx").on(t.paidAt),
+  check("deleted_tenant_billing_provider_check", sql`${t.provider} in ('mercadopago', 'stripe')`),
+  check("deleted_tenant_billing_kind_check", sql`${t.kind} in ('subscription', 'invoice', 'payment', 'charge')`),
+]);

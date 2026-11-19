@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { enablePushForDevice } from "@/lib/push-subscription";
 import { registerDevice, removeDevice } from "./actions";
 
-export function DeviceControls({ publicKey, support }: { publicKey: string | null; support: boolean }) {
+export function DeviceControls({ publicKey, support, live }: { publicKey: string | null; support: boolean; live: boolean }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -14,7 +14,7 @@ export function DeviceControls({ publicKey, support }: { publicKey: string | nul
     setBusy(true); setMessage("");
     try {
       const result = await enablePushForDevice(publicKey, registerDevice);
-      setMessage(result === "denied" ? "Permissão não concedida. Confira as configurações do navegador." : "Dispositivo cadastrado. O envio de notificações ainda está em preparação.");
+      setMessage(result === "denied" ? "Permissão não concedida. Ative as notificações deste app nas configurações do aparelho (no Android: Configurações > Apps > Eneven Agenda > Notificações)." : live ? "Dispositivo cadastrado. Você vai receber os avisos de agendamento aqui." : "Dispositivo cadastrado. O envio de notificações ainda está em preparação.");
       if (result === "enabled") router.refresh();
     } catch {
       setMessage("Não foi possível cadastrar este dispositivo. Confira a permissão do navegador e tente novamente.");

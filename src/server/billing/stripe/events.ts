@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type Stripe from "stripe";
 import { billingWebhookEvents } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { isDeletedBillingResource } from "../deleted-resources";
 import { reconcileBillingAccess } from "../reconcile-access";
 import { stripeLiveEnabled, type StripeConfig } from "./config";
 import { reconcileStripePayment } from "./charges";
@@ -94,6 +95,13 @@ export async function processStripeEvents(db: Db, stripe: Stripe, config: Pick<S
     const target = event.resourceId.slice(separator + 1);
     try {
       if (separator < 1 || !STRIPE_EVENT_TYPES.has(type)) throw new Error("Aviso inválido.");
+      // Estabelecimento já excluído: o aviso não tem mais a que se ligar e é dado como processado.
+      if (await isDeletedBillingResource(db, "stripe", target)) {
+        const done = await db.update(billingWebhookEvents).set({ processedAt: new Date() })
+          .where(and(eq(billingWebhookEvents.requestId, event.requestId), isNull(billingWebhookEvents.processedAt))).returning({ id: billingWebhookEvents.requestId });
+        if (done.length) result.processed++;
+        continue;
+      }
       const reconciled = await reconcileEvent(db, stripe, type, target);
       if (reconciled && reconciled.subscriptionId && accessEnabled(config) && await reconcileBillingAccess(db, reconciled.tenantId) === "review") throw new Error("Acesso requer revisão.");
       const updated = await db.update(billingWebhookEvents).set({ processedAt: new Date() })

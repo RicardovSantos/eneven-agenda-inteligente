@@ -2,10 +2,13 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   auditLog,
+  billingCharges,
   billingInvoices,
   billingSubscriptions,
+  billingWebhookEvents,
   bookings,
   customers,
+  deletedTenantBilling,
   memberships,
   professionals,
   sessions,
@@ -16,6 +19,9 @@ import type { Db } from "@/db/types";
 import { AccountDeletionError } from "@/server/account/errors";
 import { deleteAccount } from "@/server/account/delete-account";
 import { createSession } from "@/server/auth/session";
+import { processPaymentEvents } from "@/server/billing/process-events";
+import { processStripeEvents } from "@/server/billing/stripe/events";
+import type Stripe from "stripe";
 import { resetRateLimitsForTests } from "@/server/security/limits";
 import { acceptInvitation } from "@/server/team/accept";
 import { inviteMemberForTests as inviteMember } from "@/server/team/invitations";
@@ -171,5 +177,56 @@ describe("exclusão de conta", () => {
   it("a senha conferida é a do próprio usuário, não a de outra conta", async () => {
     const error = await failure(deleteAccount(db, { userId: ownerId, tenantId, confirmation: "EXCLUIR", password: "senha-da-equipe-1" }, { cancelBilling }));
     expect(error.code).toBe("password");
+  });
+
+  describe("cobrança depois da exclusão", () => {
+    async function deleteWithBilling() {
+      const planId = (await db.select().from(tenants).where(eq(tenants.id, tenantId)))[0].planId;
+      const [mp] = await db.insert(billingSubscriptions).values({ tenantId, planId, provider: "mercadopago", providerStatus: "authorized", providerId: "mp-sub-1", priceCents: 3990 }).returning();
+      const paidAt = new Date("2026-11-01T12:00:00Z");
+      await db.insert(billingInvoices).values([
+        { tenantId, subscriptionId: mp.id, providerId: "mp-inv-1", paymentId: "mp-pay-1", providerStatus: "approved", amountCents: 3990, paidAt },
+        { tenantId, subscriptionId: mp.id, providerId: "mp-inv-2", providerStatus: "scheduled", amountCents: 3990 },
+      ]);
+      await db.insert(billingCharges).values({ tenantId, planId, provider: "stripe", method: "pix", amountCents: 3990, status: "approved", providerPaymentId: "pi_abc", paidAt });
+      await deleteAccount(db, { userId: ownerId, tenantId, confirmation: "EXCLUIR", password: PASSWORD }, { cancelBilling });
+      return { paidAt };
+    }
+
+    it("guarda os recebimentos e os identificadores, sem dados pessoais", async () => {
+      const { paidAt } = await deleteWithBilling();
+      const rows = await db.select().from(deletedTenantBilling);
+      const paid = rows.filter((row) => row.paidAt !== null).map((row) => `${row.provider}:${row.kind}:${row.resourceId}:${row.amountCents}`).sort();
+      expect(paid).toEqual(["mercadopago:invoice:mp-inv-1:3990", "stripe:charge:pi_abc:3990"]);
+      expect(rows.every((row) => row.tenantRef === tenantId)).toBe(true);
+      expect(rows.find((row) => row.resourceId === "mp-inv-1")?.paidAt?.getTime()).toBe(paidAt.getTime());
+      expect(rows.map((row) => row.resourceId)).toEqual(expect.arrayContaining(["mp-sub-1", "mp-inv-2", "mp-pay-1"]));
+      expect(JSON.stringify(rows)).not.toContain("dona@studio.com");
+    });
+
+    it("o aviso do Mercado Pago sobre o cancelamento é dado como processado, sem consultar nada", async () => {
+      await deleteWithBilling();
+      await db.insert(billingWebhookEvents).values({ requestId: "req-1", provider: "mercadopago", topic: "subscription_preapproval", resourceId: "mp-sub-1" });
+      const fetcher = vi.fn<typeof fetch>();
+      const result = await processPaymentEvents(db, { accessToken: "TEST-x", collectorId: "1", liveMode: false, fetcher });
+      expect(result).toEqual({ processed: 1, failed: 0 });
+      expect(fetcher).not.toHaveBeenCalled();
+      expect((await db.select().from(billingWebhookEvents))[0].processedAt).not.toBeNull();
+    });
+
+    it("o aviso da Stripe sobre um pagamento já excluído também é dado como processado", async () => {
+      await deleteWithBilling();
+      await db.insert(billingWebhookEvents).values({ requestId: "evt_1", provider: "stripe", topic: "stripe_event", resourceId: "payment_intent.succeeded:pi_abc" });
+      const result = await processStripeEvents(db, {} as Stripe, { live: false });
+      expect(result).toEqual({ processed: 1, failed: 0 });
+    });
+
+    it("aviso de outro recurso continua seguindo o caminho normal (e falha se não houver vínculo)", async () => {
+      await deleteWithBilling();
+      await db.insert(billingWebhookEvents).values({ requestId: "req-2", provider: "mercadopago", topic: "subscription_preapproval", resourceId: "mp-sub-desconhecida" });
+      const fetcher = vi.fn<typeof fetch>().mockRejectedValue(new Error("sem rede"));
+      const result = await processPaymentEvents(db, { accessToken: "TEST-x", collectorId: "1", liveMode: false, fetcher });
+      expect(result).toEqual({ processed: 0, failed: 1 });
+    });
   });
 });

@@ -19,7 +19,7 @@ export default async function NotificacoesPage() {
     <section className="space-y-4 rounded-card border border-line bg-surface p-5">
       <h2 className="font-semibold">Avisos neste dispositivo</h2>
       <p className="text-sm text-ink-muted">{livePushEnabled() ? "Você recebe um aviso neste dispositivo quando houver um novo agendamento, um cancelamento ou uma remarcação. O aviso mostra o nome do cliente, o serviço e o horário (inclusive na tela bloqueada). Se o aparelho parar de receber, o aplicativo renova sozinho quando você abrir o painel." : "O envio de avisos sobre agendamentos, cancelamentos e remarcações ainda está em preparação."} No iPhone, instale o aplicativo na tela de início para permitir notificações.</p>
-      <DeviceControls publicKey={publicKey} support={session.support} />
+      <DeviceControls publicKey={publicKey} support={session.support} live={livePushEnabled()} />
     </section>
     {!session.support && <section className="space-y-4 rounded-card border border-line bg-surface p-5">
       <h2 className="font-semibold">Dispositivos cadastrados</h2>

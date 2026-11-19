@@ -20,6 +20,18 @@ depois de gerar o projeto: `grep -n "SdkVersion" app/build.gradle`.
 - Exclusão de conta: dentro do app em **Configurações > Excluir conta** (dono) ou **Mais > Excluir conta**;
   na web, a página pública `/excluir-conta` (é o link que o Play Console pede na política de exclusão).
 
+## Notificações de novo agendamento
+
+- `enableNotifications: true` no `twa-manifest.json` faz o Bubblewrap declarar `POST_NOTIFICATIONS` no
+  `AndroidManifest.xml` e incluir o serviço de delegação. É isso que repassa o aviso web push ao Android.
+- No Android 13+ a permissão é uma pergunta do sistema. O app a pede só quando o dono toca em
+  **Ativar notificações** (faixa que aparece só dentro do app, `src/components/pwa/push-prompt.tsx`) ou em
+  **Configurações > Notificações > Cadastrar este dispositivo**. Nunca pergunta ao abrir.
+- Se o dono recusar, a faixa passa a explicar como ativar em *Configurações do Android > Apps > Eneven Agenda >
+  Notificações*.
+- Confira no aparelho de teste: instale o APK, entre como dono, toque em Ativar, aceite a pergunta do Android,
+  faça um agendamento pela página pública e veja o aviso chegar. Confira também "Dispositivos cadastrados".
+
 ## Passo a passo
 
 1. Instale: `npm i -g @bubblewrap/cli@1.27.0` (precisa de JDK 17 e do Android SDK; o Bubblewrap oferece baixar).

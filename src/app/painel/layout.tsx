@@ -1,5 +1,6 @@
 import { RegisterSw } from "@/components/pwa/register-sw";
 import { InstallHint } from "@/components/pwa/install-hint";
+import { PushPrompt } from "@/components/pwa/push-prompt";
 import { PushKeeper } from "@/components/pwa/push-keeper";
 import { livePushEnabled } from "@/server/push/mode";
 import { PanelShell } from "@/components/panel/panel-shell";
@@ -69,7 +70,7 @@ export default async function PainelLayout({
         isSuperAdmin={session.isSuperAdmin}
         notice={readOnly ? <ReadOnlyBanner whatsappUrl={whatsappUrl} billingUrl={tenantStatus === "past_due" && session.role === "owner" ? "/painel/configuracoes/assinatura" : undefined} /> : tenantStatus === "past_due" && session.role === "owner" ? <div role="status" className="bg-amber-100 p-3 text-amber-900">Pagamento pendente. {graceLabel ? `A carência termina em ${graceLabel}. ` : ""}<Link href="/painel/configuracoes/assinatura" {...HIDE_IN_APP} className="font-semibold underline">Ver plano e faturas</Link></div> : null}
       >
-        {session.role === "owner" && !session.support && livePushEnabled() && process.env.PUSH_VAPID_PUBLIC_KEY ? <PushKeeper publicKey={process.env.PUSH_VAPID_PUBLIC_KEY} /> : null}
+        {session.role === "owner" && !session.support && livePushEnabled() && process.env.PUSH_VAPID_PUBLIC_KEY ? <><PushKeeper publicKey={process.env.PUSH_VAPID_PUBLIC_KEY} /><PushPrompt publicKey={process.env.PUSH_VAPID_PUBLIC_KEY} /></> : null}
         {children}
         <InstallHint />
         <RegisterSw />

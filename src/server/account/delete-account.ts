@@ -3,6 +3,7 @@ import { auditLog, memberships, tenants, users } from "@/db/schema";
 import type { Db } from "@/db/types";
 import { verifyPassword } from "@/server/auth/password";
 import type { TenantTx } from "@/server/tenant-db";
+import { archiveTenantBilling } from "./archive-billing";
 import { AccountDeletionError, DELETE_CONFIRMATION_WORD } from "./errors";
 
 export type DeleteAccountInput = {
@@ -107,6 +108,8 @@ async function deleteOrphanUsers(tx: TenantTx, userIds: string[]): Promise<strin
 async function deleteTenantAccount(db: Db, tenantId: string, ownerUserId: string): Promise<DeleteAccountResult> {
   return db.transaction(async (tx) => {
     const members = await tx.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.tenantId, tenantId));
+    // Antes de apagar, guarda só os identificadores e valores da cobrança, sem dados pessoais.
+    const archived = await archiveTenantBilling(tx, tenantId);
     // Os dados do estabelecimento saem em cascata (clientes, agenda, equipe, fotos, cobranças, avisos...).
     const removed = await tx.delete(tenants).where(eq(tenants.id, tenantId)).returning({ id: tenants.id });
     if (removed.length === 0) throw new AccountDeletionError("not_found", MESSAGES.not_found);
@@ -116,7 +119,7 @@ async function deleteTenantAccount(db: Db, tenantId: string, ownerUserId: string
       actorUserId: null,
       tenantId: null,
       action: "account.deleted",
-      details: { scope: "owner", tenantId, members: members.length, usersDeleted: deletedUsers.length },
+      details: { scope: "owner", tenantId, members: members.length, usersDeleted: deletedUsers.length, billingRecords: archived },
     });
     return { scope: "owner" as const, userDeleted: deletedUsers.includes(ownerUserId) };
   });

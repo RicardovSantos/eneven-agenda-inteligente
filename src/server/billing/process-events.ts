@@ -7,6 +7,7 @@ import { reconcileSubscription } from "./reconcile-subscription";
 import { reconcileAuthorizedInvoice } from "./reconcile-invoice";
 import { reconcileBillingAccess } from "./reconcile-access";
 import { billingAccessEnabled } from "./mode";
+import { isDeletedBillingResource } from "./deleted-resources";
 
 /** Processa sinais; altera acesso só no modo real em produção ou no sandbox fora dela. */
 export async function processPaymentEvents(db: Db, config: {
@@ -22,6 +23,14 @@ export async function processPaymentEvents(db: Db, config: {
   const result = { processed: 0, failed: 0 };
   for (const event of events) {
     try {
+      // Estabelecimento já excluído: não há mais a que ligar o aviso (ex.: o cancelamento da própria exclusão).
+      if (await isDeletedBillingResource(db, "mercadopago", event.resourceId)) {
+        const updated = await db.update(billingWebhookEvents).set({ processedAt: new Date() })
+          .where(and(eq(billingWebhookEvents.requestId, event.requestId), isNull(billingWebhookEvents.processedAt)))
+          .returning({ id: billingWebhookEvents.requestId });
+        if (updated.length) result.processed++;
+        continue;
+      }
       // Pix e boleto avulsos têm caminho próprio: não passam pela conciliação da assinatura de cartão.
       if (event.topic === "payment") {
         const [charge] = await db.select({ id: billingCharges.id }).from(billingCharges).where(eq(billingCharges.providerPaymentId, event.resourceId)).limit(1);
