@@ -37,6 +37,9 @@ export const manageByIpLimiter = createRateLimiter({ limit: 20, windowMs: 10 * M
 export const inviteByTenantLimiter = createRateLimiter({ limit: 20, windowMs: 24 * HOUR_MS });
 export const acceptInviteByIpLimiter = createRateLimiter({ limit: 10, windowMs: 15 * MINUTE_MS });
 
+/** Excluir a conta confere a senha: 5 tentativas / 15 min por usuário (a sessão já vale, mas o aparelho pode ser de outra pessoa). */
+export const deleteAccountByUserLimiter = createRateLimiter({ limit: 5, windowMs: 15 * MINUTE_MS });
+
 /** Junta os resultados: recusa se qualquer um recusar, com o maior tempo de espera. */
 function combine(results: RateLimitResult[]): RateLimitResult {
   const blocked = results.filter(
@@ -116,4 +119,8 @@ export function resetRateLimitsForTests(): void {
   ]) {
     limiter.reset();
   }
+}
+
+export function limitDeleteAccount(userId: string, now?: number): RateLimitResult {
+  return deleteAccountByUserLimiter.hit(userId, now);
 }

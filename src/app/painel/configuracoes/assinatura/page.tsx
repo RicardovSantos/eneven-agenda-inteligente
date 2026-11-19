@@ -15,6 +15,7 @@ import { PAYMENT_KIND_LABEL, PAYMENT_STATE_LABEL, buildPaymentHistory, type Paym
 import { summarizePlan, type SummaryTone } from "@/server/billing/plan-summary";
 import { getBillingOverview } from "@/server/billing/queries";
 import { refreshPendingStripeSubscriptions, refreshPendingSubscriptions } from "@/server/billing/refresh-pending";
+import { HIDE_IN_APP, ONLY_IN_APP } from "@/lib/twa";
 import { requirePanelRole } from "@/server/panel/roles";
 import { cancelSubscriptionAction, changePlanAction, openCardPortalAction, startCheckout, undoPlanChangeAction } from "./actions";
 
@@ -121,6 +122,13 @@ export default async function AssinaturaPage() {
       <h1 className="text-[1.75rem] font-semibold">Plano e faturas</h1>
     </div>
 
+    {/* App Android: a política de pagamentos da Google Play não deixa mostrar planos, preços nem cobrança aqui. */}
+    <section {...ONLY_IN_APP} aria-labelledby="plano-no-app" className={card}>
+      <h2 id="plano-no-app" className="text-xl font-semibold">Plano e cobrança</h2>
+      <p className="m-0 text-sm text-ink-muted">Nesta versão do aplicativo não é possível contratar, trocar ou pagar o plano. A contratação e a cobrança são feitas pelo site da Eneven Agenda, fora do aplicativo. O seu acesso e a sua agenda continuam funcionando normalmente.</p>
+    </section>
+
+    <div {...HIDE_IN_APP} className="flex flex-col gap-6">
     <section aria-labelledby="plano-atual" className={card}>
       <header className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
@@ -208,5 +216,6 @@ export default async function AssinaturaPage() {
         <span className={`${badgeBase} ${TONE_BADGE[STATE_TONE[row.state]]}`}>{PAYMENT_STATE_LABEL[row.state]}</span>
       </li>)}</ul>}
     </section>
+    </div>
   </div>;
 }

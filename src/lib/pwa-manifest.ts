@@ -15,6 +15,8 @@ export function buildManifest(): MetadataRoute.Manifest {
     name: PRODUCT_NAME,
     short_name: PRODUCT_SHORT_NAME,
     description: "Agenda online para salões, estúdios e clínicas de estética.",
+    // Identidade estável do app: o start_url pode mudar sem o Android tratar como outro app.
+    id: "/painel",
     start_url: "/painel",
     scope: "/",
     display: "standalone",

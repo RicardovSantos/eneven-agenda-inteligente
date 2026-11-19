@@ -9,6 +9,7 @@ import { SupportBanner } from "@/components/panel/support-banner";
 import { ToastProvider } from "@/components/ui/toast";
 import { PUBLIC_HOST } from "@/lib/brand";
 import { PWA_METADATA } from "@/lib/pwa-manifest";
+import { HIDE_IN_APP } from "@/lib/twa";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import Link from "next/link";
 import { getPanelData } from "@/server/panel/data";
@@ -66,7 +67,7 @@ export default async function PainelLayout({
         publicLink={released ? { label, url: `https://${label}` } : null}
         role={session.role!}
         isSuperAdmin={session.isSuperAdmin}
-        notice={readOnly ? <ReadOnlyBanner whatsappUrl={whatsappUrl} billingUrl={tenantStatus === "past_due" && session.role === "owner" ? "/painel/configuracoes/assinatura" : undefined} /> : tenantStatus === "past_due" && session.role === "owner" ? <div role="status" className="bg-amber-100 p-3 text-amber-900">Pagamento pendente. {graceLabel ? `A carência termina em ${graceLabel}. ` : ""}<Link href="/painel/configuracoes/assinatura" className="font-semibold underline">Ver plano e faturas</Link></div> : null}
+        notice={readOnly ? <ReadOnlyBanner whatsappUrl={whatsappUrl} billingUrl={tenantStatus === "past_due" && session.role === "owner" ? "/painel/configuracoes/assinatura" : undefined} /> : tenantStatus === "past_due" && session.role === "owner" ? <div role="status" className="bg-amber-100 p-3 text-amber-900">Pagamento pendente. {graceLabel ? `A carência termina em ${graceLabel}. ` : ""}<Link href="/painel/configuracoes/assinatura" {...HIDE_IN_APP} className="font-semibold underline">Ver plano e faturas</Link></div> : null}
       >
         {session.role === "owner" && !session.support && livePushEnabled() && process.env.PUSH_VAPID_PUBLIC_KEY ? <PushKeeper publicKey={process.env.PUSH_VAPID_PUBLIC_KEY} /> : null}
         {children}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   LEGAL_LAST_UPDATED,
+  buildAccountDeletionDocument,
   buildPrivacyDocument,
   buildTermsDocument,
   formatLegalDate,
@@ -139,4 +140,24 @@ describe("os dois documentos", () => {
       expect(all).not.toMatch(/rascunho|advogado/i);
     });
   }
+});
+
+describe("buildAccountDeletionDocument", () => {
+  const doc = buildAccountDeletionDocument({ ownerName: "Maria Souza", ownerDoc: "", contactEmail: "contato@eneven.com.br" });
+
+  it("cita o app, o desenvolvedor e o contato (exigido pela Google Play)", () => {
+    expect(doc.title).toContain("Eneven Agenda");
+    expect(text(doc)).toContain("Eneven Tech");
+    expect(text(doc)).toContain("Maria Souza");
+    expect(text(doc)).toContain("contato@eneven.com.br");
+  });
+
+  it("explica os passos no app, o que é apagado e o que pode ser mantido", () => {
+    const headings = doc.sections.map((section) => section.heading);
+    expect(headings.some((h) => /como excluir/i.test(h))).toBe(true);
+    expect(headings.some((h) => /o que é apagado/i.test(h))).toBe(true);
+    expect(headings.some((h) => /mantido/i.test(h))).toBe(true);
+    expect(text(doc)).toContain("Configurações");
+    expect(text(doc)).toContain("Excluir conta");
+  });
 });

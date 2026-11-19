@@ -8,6 +8,7 @@ import {
   Palette,
   SlidersHorizontal,
   Store,
+  Trash2,
   Users,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -32,6 +33,7 @@ export default async function ConfiguracoesPage() {
         <SettingsRow href={`${BASE}/aparencia`} Icon={Palette} label="Aparência" description="Tema claro, escuro ou automático" />
         <SettingsRow href={`${BASE}/assinatura`} Icon={CreditCard} label="Plano e faturas" description="Seu plano, pagamento e faturas" />
         <SettingsRow href={`${BASE}/dados`} Icon={Download} label="Seus dados" description={session.support ? "Indisponível no modo suporte" : "Baixar uma cópia das suas informações"} />
+        <SettingsRow href="/painel/conta/excluir" Icon={Trash2} label="Excluir conta" description="Apagar a sua conta e o estabelecimento" />
       </SettingsGroup>
 
       <SettingsGroup title="Seu estabelecimento">

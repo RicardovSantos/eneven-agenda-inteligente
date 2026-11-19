@@ -9,6 +9,7 @@ describe("manifest", () => {
     expect(m.name).toBe("Eneven Agendamentos Inteligentes");
     expect(m.short_name).toBe(PRODUCT_SHORT_NAME);
     expect(m.short_name).toBe("Eneven Agenda");
+    expect(m.id).toBe("/painel");
     expect(m.start_url).toBe("/painel");
     expect(m.display).toBe("standalone");
     expect(m.lang).toBe("pt-BR");

@@ -1,0 +1,11 @@
+# Chave de assinatura e saídas do build: nunca no repositório.
+*.keystore
+*.jks
+keystore.properties
+app/
+build/
+.gradle/
+*.apk
+*.aab
+*.idsig
+local.properties

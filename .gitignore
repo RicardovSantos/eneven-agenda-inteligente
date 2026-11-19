@@ -24,3 +24,6 @@ npm-debug.log*
 .pnpm-debug.log*
 .vercel
 /dist
+
+# App Android (TWA): chave de assinatura e saídas do build
+android/twa/*.keystore

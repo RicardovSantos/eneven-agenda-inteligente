@@ -23,6 +23,7 @@ const OWNER_AREAS = [
   "demo",
   "termos",
   "privacidade",
+  "excluir-conta",
   "api",
 ];
 

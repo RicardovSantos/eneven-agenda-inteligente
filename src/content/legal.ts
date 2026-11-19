@@ -11,7 +11,7 @@
  */
 
 /** Data da última atualização dos textos (AAAA-MM-DD). */
-export const LEGAL_LAST_UPDATED = "2026-11-05";
+export const LEGAL_LAST_UPDATED = "2026-11-19";
 
 const DEFAULT_OWNER_NAME = "Ricardo Santos";
 const DEFAULT_CONTACT_EMAIL = "eneventech@gmail.com";
@@ -214,6 +214,7 @@ export function buildPrivacyDocument({ ownerName, contactEmail }: LegalContext):
           ul(
             "Enquanto a conta estiver ativa.",
             "Após o encerramento, por até 90 dias para permitir reativação e exportação; depois, os dados são excluídos ou anonimizados, exceto o que a lei obrigar a manter (por exemplo, registros de acesso por 6 meses, conforme o Marco Civil da Internet, e dados fiscais pelo prazo legal).",
+            "Se você excluir a conta pelo painel (Configurações > Excluir conta), os dados são apagados na hora, sem esperar os 90 dias. Veja /excluir-conta.",
           ),
         ],
       },
@@ -251,6 +252,75 @@ export function buildPrivacyDocument({ ownerName, contactEmail }: LegalContext):
           p(
             "Esta política pode ser atualizada; a versão vigente fica sempre nesta página, com a data da última atualização.",
           ),
+        ],
+      },
+    ],
+  };
+}
+
+
+/**
+ * Página pública `/excluir-conta`: o caminho de exclusão fora do app, exigido pela Google Play
+ * (link da política de exclusão de conta no Play Console). Cita o nome do app e do desenvolvedor.
+ */
+export function buildAccountDeletionDocument({ ownerName, contactEmail }: LegalContext): LegalDocument {
+  return {
+    title: "Excluir conta e dados — Eneven Agenda",
+    intro: [
+      p(
+        `Esta página explica como excluir a sua conta no Eneven Agenda (Eneven Agendamentos Inteligentes), da Eneven Tech, sob responsabilidade de ${ownerName}, e o que acontece com os seus dados.`,
+      ),
+    ],
+    sections: [
+      {
+        heading: "1. Como excluir pelo aplicativo ou pelo site",
+        blocks: [
+          ul(
+            "Entre na sua conta.",
+            "Proprietário: abra **Configurações** e toque em **Excluir conta**. Recepção e profissionais: abra **Mais** e toque em **Excluir conta**.",
+            "Digite EXCLUIR e, se a sua conta tem senha, a senha atual. Confirme.",
+          ),
+          p("A exclusão é imediata e não pode ser desfeita."),
+        ],
+      },
+      {
+        heading: "2. Se você não consegue entrar",
+        blocks: [
+          p(
+            `Escreva para ${contactEmail}, do e-mail cadastrado, com o assunto "Excluir conta" e o nome do estabelecimento. Confirmamos que o pedido veio de você e excluímos em até 15 dias.`,
+          ),
+        ],
+      },
+      {
+        heading: "3. O que é apagado",
+        blocks: [
+          p("**Proprietário:** o estabelecimento inteiro e todos os dados ligados a ele."),
+          ul(
+            "Seu cadastro (nome, e-mail, senha e login com o Google).",
+            "Clientes, agendamentos, serviços, profissionais, fotos, logo, página de agendamento e configurações.",
+            "As contas de acesso da equipe que só existiam nesse estabelecimento.",
+            "Notificações do aparelho e registros de envio de avisos.",
+            "A assinatura de cartão é cancelada para não haver novas cobranças.",
+          ),
+          p(
+            "**Recepção e profissionais:** apenas a sua conta de acesso. O estabelecimento e os dados dele continuam existindo; o seu nome na equipe e os agendamentos já feitos ficam com o estabelecimento, sem ligação com uma conta.",
+          ),
+        ],
+      },
+      {
+        heading: "4. O que pode ser mantido",
+        blocks: [
+          ul(
+            "Registros de acesso, por 6 meses, conforme o Marco Civil da Internet.",
+            "Dados de pagamento que Mercado Pago e Stripe guardam por obrigação legal; eles seguem as políticas desses provedores.",
+            "Cópias de segurança, que são substituídas pelo ciclo normal de backups.",
+          ),
+        ],
+      },
+      {
+        heading: "5. Antes de excluir",
+        blocks: [
+          p("Baixe uma cópia dos dados em **Configurações > Seus dados**. Depois da exclusão não conseguimos recuperar nada."),
         ],
       },
     ],

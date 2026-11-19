@@ -10,7 +10,7 @@ import { getInvitation } from "@/server/team/accept";
 export const metadata: Metadata = { title: "Entrar" };
 
 export default async function EntrarPage({ searchParams }: PageProps<"/entrar">) {
-  const { senha, erro, convite } = await searchParams;
+  const { senha, erro, convite, conta } = await searchParams;
 
   // Vindo da página de um convite válido: entra com a conta do e-mail convidado
   // (mesmo com outra conta já aberta neste navegador) e o convite é aceito em seguida.
@@ -25,7 +25,9 @@ export default async function EntrarPage({ searchParams }: PageProps<"/entrar">)
     ? `Entre com ${invite.email} para aceitar o convite de ${invite.tenantName}.`
     : senha === "redefinida"
       ? "Senha redefinida. Entre com a nova senha."
-      : undefined;
+      : conta === "excluida"
+        ? "Sua conta foi excluída."
+        : undefined;
 
   return (
     <AuthShell tagline="Sua agenda do dia, onde você estiver.">

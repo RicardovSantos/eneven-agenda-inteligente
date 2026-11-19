@@ -1,6 +1,7 @@
 import { Figtree, Outfit } from "next/font/google";
 import "./globals.css";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { TWA_INIT_SCRIPT } from "@/lib/twa";
 
 // Metadados e viewport vivem em site-metadata.ts (testáveis fora do next/font).
 export { metadata, viewport } from "./site-metadata";
@@ -29,6 +30,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {/* Marca o <html> com data-app="twa" quando a página abre dentro do app Android. */}
+        <script dangerouslySetInnerHTML={{ __html: TWA_INIT_SCRIPT }} />
       </head>
       <body className="flex min-h-full flex-col">
         {children}

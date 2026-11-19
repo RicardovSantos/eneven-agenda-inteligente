@@ -1,4 +1,4 @@
-import { ChevronRight, LogOut, ShieldCheck, type LucideIcon } from "lucide-react";
+import { ChevronRight, LogOut, ShieldCheck, Trash2, type LucideIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CopyLinkButton } from "@/components/panel/copy-link-button";
@@ -39,15 +39,16 @@ export default async function MaisPage() {
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
       <h1 className="text-[1.75rem] font-semibold">Mais</h1>
 
-      {items.length > 0 ? (
-        <ul className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-surface">
-          {items.map((item) => (
-            <li key={item.href}>
-              <NavRow href={item.href} icon={item.icon} label={item.label} />
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <ul className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-surface">
+        {items.map((item) => (
+          <li key={item.href}>
+            <NavRow href={item.href} icon={item.icon} label={item.label} />
+          </li>
+        ))}
+        <li>
+          <NavRow href="/painel/conta/excluir" icon={Trash2} label="Excluir conta" />
+        </li>
+      </ul>
 
       {adminItem ? (
         <section aria-label="Administração" className="flex flex-col gap-2">

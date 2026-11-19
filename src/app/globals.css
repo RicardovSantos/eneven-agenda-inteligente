@@ -334,3 +334,18 @@ body:has([data-support-banner]) [class~="min-h-dvh"] {
     min-height: calc(100dvh - var(--banner-h));
   }
 }
+
+/*
+ * App Android (TWA): o script de src/lib/twa.ts marca o <html> com data-app="twa".
+ * Cobrança e assinatura somem ali (política de pagamentos da Google Play); o aviso
+ * que ocupa o lugar só aparece ali.
+ */
+[data-somente-no-app] {
+  display: none !important;
+}
+html[data-app="twa"] [data-somente-no-app] {
+  display: block !important;
+}
+html[data-app="twa"] [data-ocultar-no-app] {
+  display: none !important;
+}
